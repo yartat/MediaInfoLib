@@ -426,7 +426,14 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
     Curl_Data->Ssl_CertificateAuthorityPath=MediaInfoLib::Config.Ssl_CertificateAuthorityPath_Get().To_Local();
     Curl_Data->Ssl_CertificateRevocationListFileName=MediaInfoLib::Config.Ssl_CertificateRevocationListFileName_Get().To_Local();
     Curl_Data->Ssl_IgnoreSecurity=MediaInfoLib::Config.Ssl_IgnoreSecurity_Get();
-    Curl_Data->Ssh_PublicKeyFileName=Reader_libcurl_ExpandFileName(MediaInfoLib::Config.Ssh_PublicKeyFileName_Get()).To_Local();
+    if (Curl_Data->Ssl_CertificateFileName.empty() && Curl_Data->Ssl_CertificateFormat.empty() &&
+        Curl_Data->Ssl_PrivateKeyFileName.empty() && Curl_Data->Ssl_PrivateKeyFormat.empty() &&
+        Curl_Data->Ssl_CertificateAuthorityFileName.empty() && Curl_Data->Ssl_CertificateAuthorityPath.empty() && Curl_Data->Ssl_CertificateRevocationListFileName.empty())
+     {
+       Curl_Data->Ssl_IgnoreSecurity = true;
+     }
+
+	Curl_Data->Ssh_PublicKeyFileName = Reader_libcurl_ExpandFileName(MediaInfoLib::Config.Ssh_PublicKeyFileName_Get()).To_Local();
     if (Curl_Data->Ssh_PublicKeyFileName.empty())
     {
         if (Reader_libcurl_HomeIsSet())
@@ -465,6 +472,10 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
             Curl_Data->Ssh_KnownHostsFileName="known_hosts";
     }
     Curl_Data->Ssh_IgnoreSecurity=MediaInfoLib::Config.Ssh_IgnoreSecurity_Get();
+    if (Curl_Data->Ssh_PrivateKeyFileName.empty() && Curl_Data->Ssh_PublicKeyFileName.empty())
+    {
+      Curl_Data->Ssh_IgnoreSecurity = true;
+    }
     Curl_Data->Curl=curl_easy_init();
     if (Curl_Data->Curl==NULL)
         return 0;
