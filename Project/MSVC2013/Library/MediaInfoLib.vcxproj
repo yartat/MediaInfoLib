@@ -244,7 +244,9 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Text\File_TimedText.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Text\File_Ttml.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\TimeCode.cpp" />
-    <ClCompile Include="..\..\..\Source\MediaInfo\XmlUtils.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\XmlUtils.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Aic.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Avc.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Avc_Duplicate.cpp" />
