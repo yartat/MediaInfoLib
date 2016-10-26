@@ -53,7 +53,7 @@ File_DvbSubtitle::File_DvbSubtitle()
 :File__Analyze()
 {
     //Configuration
-    ParserName=__T("DVB Subtitle");
+    ParserName="DVB Subtitle";
     #if MEDIAINFO_EVENTS
         ParserIDs[0]=MediaInfo_Parser_DvbSubtitle;
     #endif //MEDIAINFO_EVENTS
@@ -388,8 +388,8 @@ void File_DvbSubtitle::region_composition_segment()
                         break;
             default   : ;
         }
+        Element_End0();
     }
-    Element_End0();
 
     FILLING_BEGIN();
         subtitle_streams[subtitle_stream_id].pages[page_id].regions[region_id].region_composition_segment=true;

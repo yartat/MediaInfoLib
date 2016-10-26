@@ -5,7 +5,7 @@ dnl #########################################################################
 dnl -------------------------------------------------------------------------
 dnl Name and version
 dnl
-AC_INIT([libmediainfo], [0.7.83])
+AC_INIT([libmediainfo], [0.7.89])
 
 dnl -------------------------------------------------------------------------
 dnl Test if we are at the good place
@@ -26,7 +26,7 @@ CXXFLAGS="$CXXFLAGS"
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_CXX
-AC_DISABLE_SHARED
+AC_DISABLE_STATIC
 AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
 AC_PROG_INSTALL
@@ -836,8 +836,16 @@ dnl #########################################################################
 dnl ### MediaInfoLib flags
 dnl #########################################################################
 
-MediaInfoLib_LIBS=" -L$(pwd) -l$with_libmediainfo_name $MediaInfoLib_LIBS"
-MediaInfoLib_LIBS_Static=" $(pwd)/.libs/lib$with_libmediainfo_name.a $MediaInfoLib_LIBS_Static"
+if test "$enable_shared" = yes ; then
+    MediaInfoLib_LIBS=" -L$(pwd) -l$with_libmediainfo_name $MediaInfoLib_LIBS"
+else
+    MediaInfoLib_LIBS=""
+fi
+if test "$enable_static" = yes ; then
+    MediaInfoLib_LIBS_Static=" $(pwd)/.libs/lib$with_libmediainfo_name.a $MediaInfoLib_LIBS_Static"
+else
+    MediaInfoLib_LIBS_Static=""
+fi
 
 dnl #########################################################################
 dnl ### Output
@@ -851,7 +859,7 @@ AC_SUBST(MediaInfoLib_LibName)
 AC_CONFIG_FILES(libmediainfo-config, [chmod u+x libmediainfo-config])
 AC_CONFIG_FILES(libmediainfo.pc)
 
-AC_OUTPUT(Makefile)
+AC_OUTPUT(Makefile test/Makefile)
 
 dnl #########################################################################
 dnl ### Report how we have been configured

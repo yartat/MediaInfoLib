@@ -40,10 +40,19 @@ namespace MediaInfoLib
 File_Aac::File_Aac()
 :File__Analyze(), File__Tags_Helper()
 {
+    //Config
+    #if MEDIAINFO_EVENTS
+        ParserIDs[0]=MediaInfo_Parser_Aac;
+        StreamIDs_Width[0]=0;
+    #endif //MEDIAINFO_EVENTS
+
     //File__Tags_Helper
     Base=this;
 
     //Configuration
+    #if MEDIAINFO_TRACE
+        Trace_Layers_Update(8); //Stream
+    #endif //MEDIAINFO_TRACE
     MustSynchronize=true;
     Buffer_TotalBytes_FirstSynched_Max=64*1024;
     PTS_DTS_Needed=true;

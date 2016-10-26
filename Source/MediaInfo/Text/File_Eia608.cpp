@@ -23,6 +23,10 @@
 //---------------------------------------------------------------------------
 #include "MediaInfo/Text/File_Eia608.h"
 #include "MediaInfo/MediaInfo_Config_MediaInfo.h"
+#if MEDIAINFO_EVENTS
+    #include "MediaInfo/MediaInfo_Config_MediaInfo.h"
+    #include "MediaInfo/MediaInfo_Events_Internal.h"
+#endif //MEDIAINFO_EVENTS
 using namespace std;
 //---------------------------------------------------------------------------
 
@@ -65,11 +69,14 @@ File_Eia608::File_Eia608()
         ParserIDs[0]=MediaInfo_Parser_Eia608;
         StreamIDs_Width[0]=1;
     #endif //MEDIAINFO_EVENTS
-    ParserName=__T("EIA-608");
+    ParserName="EIA-608";
     PTS_DTS_Needed=true;
 
     //In
     cc_type=(int8u)-1;
+    #if MEDIAINFO_EVENTS
+        MuxingMode=(int8u)-1;
+    #endif MEDIAINFO_EVENTS
 
     //Temp
     XDS_Level=(size_t)-1;
@@ -213,6 +220,29 @@ void File_Eia608::Read_Buffer_Init()
             FrameInfo.PTS=0;
     }
 
+    #if MEDIAINFO_EVENTS
+        if (MuxingMode==(int8u)-1)
+        {
+            if (StreamIDs_Size>=3 && ParserIDs[StreamIDs_Size-3]==MediaInfo_Parser_Mpegv && StreamIDs[StreamIDs_Size-3]==0x4741393400000003LL)
+                MuxingMode=0; //A/53 / DTVCC Transport
+            if (StreamIDs_Size>=3 && ParserIDs[StreamIDs_Size-3]==MediaInfo_Parser_Mpegv && StreamIDs[StreamIDs_Size-3]==0x0000000300000000LL)
+                MuxingMode=1; //SCTE 20
+            if (StreamIDs_Size>=3 && ParserIDs[StreamIDs_Size-3]==MediaInfo_Parser_Mpegv && StreamIDs[StreamIDs_Size-3]==0x434301F800000000LL)
+                MuxingMode=2; //DVD-Video
+            if (StreamIDs_Size>=4 && (ParserIDs[StreamIDs_Size-4]==MediaInfo_Parser_Gxf || ParserIDs[StreamIDs_Size-4]==MediaInfo_Parser_Lxf || ParserIDs[StreamIDs_Size-4]==MediaInfo_Parser_Mxf) && ParserIDs[StreamIDs_Size-2]==MediaInfo_Parser_Cdp)
+                MuxingMode=3; //Ancillary data / CDP
+            if (StreamIDs_Size>=3 && ParserIDs[StreamIDs_Size-3]==MediaInfo_Parser_Avc)
+                MuxingMode=4; //SCTE 128 / DTVCC Transport
+            if (StreamIDs_Size>=2 && ParserIDs[StreamIDs_Size-2]==MediaInfo_Parser_DvDif)
+                MuxingMode=5; //DV
+            if (StreamIDs_Size>=3 && ParserIDs[StreamIDs_Size-3]==MediaInfo_Parser_Mpeg4 && ParserIDs[StreamIDs_Size-2]==MediaInfo_Parser_Cdp)
+                MuxingMode=6; //Final Cut / CDP
+            if (StreamIDs_Size>=2 && ParserIDs[StreamIDs_Size-2]==MediaInfo_Parser_Scc)
+                MuxingMode=10; //SCC
+            if (StreamIDs_Size>=3 && ParserIDs[StreamIDs_Size-3]==MediaInfo_Parser_Mpeg4 && ParserIDs[StreamIDs_Size-2]==MediaInfo_Parser_Mpeg4)
+                MuxingMode=14; //Final Cut / cdat
+        }
+    #endif MEDIAINFO_EVENTS
 }
 
 //---------------------------------------------------------------------------
@@ -237,6 +267,8 @@ void File_Eia608::Read_Buffer_Continue()
     if (!Status[IsAccepted])
         Accept("EIA-608");
 
+    while (Element_Offset+1<Element_Size)
+    {
     int8u cc_data_1, cc_data_2;
     Get_B1 (cc_data_1,                                          "cc_data");
     Get_B1 (cc_data_2,                                          "cc_data");
@@ -279,6 +311,7 @@ void File_Eia608::Read_Buffer_Continue()
     }
     else if (cc_data_1) //Special
         Special(cc_data_1, cc_data_2);
+    }
 }
 
 //***************************************************************************
@@ -541,6 +574,7 @@ void File_Eia608::Special(int8u cc_data_1, int8u cc_data_2)
     }
 
     cc_data_1&=0xF7;
+
     if (cc_data_1==0x15 && (cc_data_2&0xF0)==0x20)
         cc_data_1=0x14;
 
@@ -669,22 +703,22 @@ void File_Eia608::Special_11(int8u cc_data_2)
 
                     break;
         //CEA-608-E, Section F.1.1.1
-        case 0x30 : Character_Fill(L'\x2122'); break;  //Registered mark symbol
-        case 0x31 : Character_Fill(L'\xB0'  ); break;  //Degree sign
-        case 0x32 : Character_Fill(L'\xBD'  ); break;  //1/2
-        case 0x33 : Character_Fill(L'\xBF'  ); break;  //interogation mark inverted
-        case 0x34 : Character_Fill(L'\xA9'  ); break;  //Trademark symbol
-        case 0x35 : Character_Fill(L'\xA2'  ); break;  //Cents sign
-        case 0x36 : Character_Fill(L'\xA3'  ); break;  //Pounds Sterling sign
-        case 0x37 : Character_Fill(L'\x266A'); break;  //Music note
-        case 0x38 : Character_Fill(L'\xE0'  ); break;  //a grave
+        case 0x30 : Character_Fill(L'\u2122'); break;  //Registered mark symbol
+        case 0x31 : Character_Fill(L'\u00B0'); break;  //Degree sign
+        case 0x32 : Character_Fill(L'\u00BD'); break;  //1/2
+        case 0x33 : Character_Fill(L'\u00BF'); break;  //interogation mark inverted
+        case 0x34 : Character_Fill(L'\u00A9'); break;  //Trademark symbol
+        case 0x35 : Character_Fill(L'\u00A2'); break;  //Cents sign
+        case 0x36 : Character_Fill(L'\u00A3'); break;  //Pounds Sterling sign
+        case 0x37 : Character_Fill(L'\u266A'); break;  //Music note
+        case 0x38 : Character_Fill(L'\u00E0'); break;  //a grave
         case 0x39 : Character_Fill(L' '     ); break;  //Transparent space
-        case 0x3A : Character_Fill(L'\xE8'  ); break;  //e grave
-        case 0x3B : Character_Fill(L'\xE2'  ); break;  //a circumflex
-        case 0x3C : Character_Fill(L'\xEA'  ); break;  //e circumflex
-        case 0x3D : Character_Fill(L'\xEE'  ); break;  //i circumflex
-        case 0x3E : Character_Fill(L'\xF4'  ); break;  //o circumflex
-        case 0x3F : Character_Fill(L'\xFB'  ); break;  //u circumflex
+        case 0x3A : Character_Fill(L'\u00E8'); break;  //e grave
+        case 0x3B : Character_Fill(L'\u00E2'); break;  //a circumflex
+        case 0x3C : Character_Fill(L'\u00EA'); break;  //e circumflex
+        case 0x3D : Character_Fill(L'\u00EE'); break;  //i circumflex
+        case 0x3E : Character_Fill(L'\u00F4'); break;  //o circumflex
+        case 0x3F : Character_Fill(L'\u00FB'); break;  //u circumflex
         default   : Illegal(0x11, cc_data_2);
     }
 }
@@ -702,38 +736,38 @@ void File_Eia608::Special_12(int8u cc_data_2)
     switch (cc_data_2)
     {
         //CEA-608-E, Section 6.4.2
-        case 0x20 : Character_Fill(L'A'     ); break;  //A with acute
-        case 0x21 : Character_Fill(L'E'     ); break;  //E with acute
-        case 0x22 : Character_Fill(L'O'     ); break;  //O with acute
-        case 0x23 : Character_Fill(L'U'     ); break;  //U with acute
-        case 0x24 : Character_Fill(L'U'     ); break;  //U withdiaeresis or umlaut
-        case 0x25 : Character_Fill(L'u'     ); break;  //u with diaeresis or umlaut
+        case 0x20 : Character_Fill(L'\u00C1'); break;  //A with acute
+        case 0x21 : Character_Fill(L'\u00C9'); break;  //E with acute
+        case 0x22 : Character_Fill(L'\u00D3'); break;  //O with acute
+        case 0x23 : Character_Fill(L'\u00DA'); break;  //U with acute
+        case 0x24 : Character_Fill(L'\u00DC'); break;  //U withdiaeresis or umlaut
+        case 0x25 : Character_Fill(L'\u00FC'); break;  //u with diaeresis or umlaut
         case 0x26 : Character_Fill(L'\''    ); break;  //opening single quote
-        case 0x27 : Character_Fill(L'!'     ); break;  //inverted exclamation mark
+        case 0x27 : Character_Fill(L'\u00A1'); break;  //inverted exclamation mark
         case 0x28 : Character_Fill(L'*'     ); break;  //Asterisk
         case 0x29 : Character_Fill(L'\''    ); break;  //plain single quote
-        case 0x2A : Character_Fill(L'_'     ); break;  //em dash
-        case 0x2B : Character_Fill(L'C'     ); break;  //Copyright
-        case 0x2C : Character_Fill(L'S'     ); break;  //Servicemark
-        case 0x2D : Character_Fill(L'x'     ); break;  //round bullet
-        case 0x2E : Character_Fill(L'\"'    ); break;  //opening double quotes
-        case 0x2F : Character_Fill(L'\"'    ); break;  //closing double quotes
-        case 0x30 : Character_Fill(L'A'     ); break;  //A with grave accent
-        case 0x31 : Character_Fill(L'A'     ); break;  //A with circumflex accent
-        case 0x32 : Character_Fill(L'C'     ); break;  //C with cedilla
-        case 0x33 : Character_Fill(L'E'     ); break;  //E with grave accent
-        case 0x34 : Character_Fill(L'E'     ); break;  //E with circumflex accent
-        case 0x35 : Character_Fill(L'E'     ); break;  //E with diaeresis or umlaut mark
-        case 0x36 : Character_Fill(L'e'     ); break;  //e with diaeresis or umlaut mark
-        case 0x37 : Character_Fill(L'I'     ); break;  //I with circumflex accent
-        case 0x38 : Character_Fill(L'I'     ); break;  //I with diaeresis or umlaut mark
-        case 0x39 : Character_Fill(L'i'     ); break;  //i with diaeresis or umlaut mark
-        case 0x3A : Character_Fill(L'O'     ); break;  //O with circumflex
-        case 0x3B : Character_Fill(L'U'     ); break;  //U with grave accent
-        case 0x3C : Character_Fill(L'u'     ); break;  //u with grave accent
-        case 0x3D : Character_Fill(L'U'     ); break;  //U with circumflex accent
-        case 0x3E : Character_Fill(L'\"'    ); break;  //opening guillemets
-        case 0x3F : Character_Fill(L'\"'    ); break;  //closing guillemets
+        case 0x2A : Character_Fill(L'\u2014'); break;  //em dash
+        case 0x2B : Character_Fill(L'\u00A9'); break;  //Copyright
+        case 0x2C : Character_Fill(L'\u2120'); break;  //Servicemark
+        case 0x2D : Character_Fill(L'\u2022'); break;  //round bullet
+        case 0x2E : Character_Fill(L'\u2120'); break;  //opening double quotes
+        case 0x2F : Character_Fill(L'\u2121'); break;  //closing double quotes
+        case 0x30 : Character_Fill(L'\u00C0'); break;  //A with grave accent
+        case 0x31 : Character_Fill(L'\u00C2'); break;  //A with circumflex accent
+        case 0x32 : Character_Fill(L'\u00C7'); break;  //C with cedilla
+        case 0x33 : Character_Fill(L'\u00C8'); break;  //E with grave accent
+        case 0x34 : Character_Fill(L'\u00CA'); break;  //E with circumflex accent
+        case 0x35 : Character_Fill(L'\u00CB'); break;  //E with diaeresis or umlaut mark
+        case 0x36 : Character_Fill(L'\u00EB'); break;  //e with diaeresis or umlaut mark
+        case 0x37 : Character_Fill(L'\u00CE'); break;  //I with circumflex accent
+        case 0x38 : Character_Fill(L'\u00CF'); break;  //I with diaeresis or umlaut mark
+        case 0x39 : Character_Fill(L'\u00EF'); break;  //i with diaeresis or umlaut mark
+        case 0x3A : Character_Fill(L'\u00D4'); break;  //O with circumflex
+        case 0x3B : Character_Fill(L'\u00D9'); break;  //U with grave accent
+        case 0x3C : Character_Fill(L'\u00F9'); break;  //u with grave accent
+        case 0x3D : Character_Fill(L'\u00D9'); break;  //U with circumflex accent
+        case 0x3E : Character_Fill(L'\u00AB'); break;  //opening guillemets
+        case 0x3F : Character_Fill(L'\u00BB'); break;  //closing guillemets
         default   : Illegal(0x12, cc_data_2);
     }
 }
@@ -751,15 +785,15 @@ void File_Eia608::Special_13(int8u cc_data_2)
     switch (cc_data_2)
     {
         //CEA-608-E, Section 6.4.2
-        case 0x20 : Character_Fill(L'A'     ); break;  //A with tilde
-        case 0x21 : Character_Fill(L'a'     ); break;  //a with tilde
-        case 0x22 : Character_Fill(L'I'     ); break;  //I with acute accent
-        case 0x23 : Character_Fill(L'I'     ); break;  //I with grave accent
-        case 0x24 : Character_Fill(L'i'     ); break;  //i with grave accent
-        case 0x25 : Character_Fill(L'O'     ); break;  //O with grave accent
-        case 0x26 : Character_Fill(L'o'     ); break;  //o with grave accent
-        case 0x27 : Character_Fill(L'O'     ); break;  //O with tilde
-        case 0x28 : Character_Fill(L'o'     ); break;  //o with tilde
+        case 0x20 : Character_Fill(L'\u00C3'); break;  //A with tilde
+        case 0x21 : Character_Fill(L'\u00E3'); break;  //a with tilde
+        case 0x22 : Character_Fill(L'\u00CD'); break;  //I with acute accent
+        case 0x23 : Character_Fill(L'\u00CC'); break;  //I with grave accent
+        case 0x24 : Character_Fill(L'\u00EC'); break;  //i with grave accent
+        case 0x25 : Character_Fill(L'\u00D2'); break;  //O with grave accent
+        case 0x26 : Character_Fill(L'\u00E2'); break;  //o with grave accent
+        case 0x27 : Character_Fill(L'\u00D5'); break;  //O with tilde
+        case 0x28 : Character_Fill(L'\u00F5'); break;  //o with tilde
         case 0x29 : Character_Fill(L'{'     ); break;  //opening brace
         case 0x2A : Character_Fill(L'}'     ); break;  //closing brace
         case 0x2B : Character_Fill(L'\\'    ); break;  //backslash
@@ -767,22 +801,22 @@ void File_Eia608::Special_13(int8u cc_data_2)
         case 0x2D : Character_Fill(L'_'     ); break;  //Underbar
         case 0x2E : Character_Fill(L'|'     ); break;  //pipe
         case 0x2F : Character_Fill(L'~'     ); break;  //tilde
-        case 0x30 : Character_Fill(L'A'     ); break;  //A with diaeresis or umlaut mark
-        case 0x31 : Character_Fill(L'a'     ); break;  //a with diaeresis or umlaut mark
-        case 0x32 : Character_Fill(L'O'     ); break;  //o with diaeresis or umlaut mark
-        case 0x33 : Character_Fill(L'o'     ); break;  //o with diaeresis or umlaut mark
-        case 0x34 : Character_Fill(L's'     ); break;  //eszett (mall sharp s)
-        case 0x35 : Character_Fill(L'Y'     ); break;  //yen
-        case 0x36 : Character_Fill(L' '     ); break;  //non-specific currency sign
-        case 0x37 : Character_Fill(L'|'     ); break;  //Vertical bar
-        case 0x38 : Character_Fill(L'A'     ); break;  //I with diaeresis or umlaut mark
-        case 0x39 : Character_Fill(L'a'     ); break;  //i with diaeresis or umlaut mark
-        case 0x3A : Character_Fill(L'O'     ); break;  //O with ring
-        case 0x3B : Character_Fill(L'o'     ); break;  //a with ring
-        case 0x3C : Character_Fill(L' '     ); break;  //upper left corner
-        case 0x3D : Character_Fill(L' '     ); break;  //upper right corner
-        case 0x3E : Character_Fill(L' '     ); break;  //lower left corner
-        case 0x3F : Character_Fill(L' '     ); break;  //lower right corner
+        case 0x30 : Character_Fill(L'\u00C4'); break;  //A with diaeresis or umlaut mark
+        case 0x31 : Character_Fill(L'\u00E4'); break;  //a with diaeresis or umlaut mark
+        case 0x32 : Character_Fill(L'\u00D6'); break;  //o with diaeresis or umlaut mark
+        case 0x33 : Character_Fill(L'\u00F6'); break;  //o with diaeresis or umlaut mark
+        case 0x34 : Character_Fill(L'\u00DF'); break;  //eszett (mall sharp s)
+        case 0x35 : Character_Fill(L'\u00A5'); break;  //yen
+        case 0x36 : Character_Fill(L'\u00A4'); break;  //non-specific currency sign
+        case 0x37 : Character_Fill(L'\u23D0'); break;  //Vertical bar
+        case 0x38 : Character_Fill(L'\u00C5'); break;  //I with diaeresis or umlaut mark
+        case 0x39 : Character_Fill(L'\u00E5'); break;  //i with diaeresis or umlaut mark
+        case 0x3A : Character_Fill(L'\u00D8'); break;  //O with ring
+        case 0x3B : Character_Fill(L'\u00F8'); break;  //a with ring
+        case 0x3C : Character_Fill(L'\u23A1'); break;  //upper left corner
+        case 0x3D : Character_Fill(L'\u23A4'); break;  //upper right corner
+        case 0x3E : Character_Fill(L'\u23A3'); break;  //lower left corner
+        case 0x3F : Character_Fill(L'\u23A6'); break;  //lower right corner
         default   : Illegal(0x13, cc_data_2);
     }
 }
@@ -1086,6 +1120,24 @@ void File_Eia608::Character_Fill(wchar_t Character)
 //---------------------------------------------------------------------------
 void File_Eia608::HasChanged()
 {
+    #if MEDIAINFO_EVENTS
+            size_t StreamPos=TextMode*2+DataChannelMode;
+            if (StreamPos<Streams.size() && Streams[StreamPos])
+            EVENT_BEGIN (Eia608, CC_Content, 0)
+                Event.Field=1+cc_type;
+                Event.MuxingMode=MuxingMode;
+                Event.Service=1+(TextMode?1:0)*2+(DataChannelMode?1:0);
+                for (size_t Pos_Y=0; Pos_Y<Streams[StreamPos]->CC_Displayed.size(); Pos_Y++)
+                {
+                    for (size_t Pos_X=0; Pos_X<Streams[StreamPos]->CC_Displayed[Pos_Y].size(); Pos_X++)
+                    {
+                        Event.Row_Values[Pos_Y][Pos_X]=Streams[StreamPos]->CC_Displayed[Pos_Y][Pos_X].Value;
+                        Event.Row_Attributes[Pos_Y][Pos_X]=Streams[StreamPos]->CC_Displayed[Pos_Y][Pos_X].Attribute;
+                    }
+                    Event.Row_Values[Pos_Y][32]=L'\0';
+                }
+            EVENT_END   ()
+    #endif MEDIAINFO_EVENTS
 }
 
 //---------------------------------------------------------------------------

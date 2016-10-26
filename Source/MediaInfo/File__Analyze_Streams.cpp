@@ -44,7 +44,7 @@ extern MediaInfo_Config Config;
 size_t File__Analyze::Stream_Prepare (stream_t KindOfStream, size_t StreamPos)
 {
     //Integrity
-    if (!Status[IsAccepted] || KindOfStream>Stream_Max)
+    if (KindOfStream>Stream_Max)
         return Error;
 
     //Clear
@@ -169,18 +169,19 @@ size_t File__Analyze::Stream_Prepare (stream_t KindOfStream, size_t StreamPos)
         Fill (Stream_General, 0, General_FileSize, File_Size);
 
     //Fill with already ready data
-    for (size_t Pos=0; Pos<Fill_Temp.size(); Pos++)
-        if (Fill_Temp(Pos, 0).IsNumber())
-            Fill(StreamKind_Last, StreamPos_Last, Fill_Temp(Pos, 0).To_int32u(), Fill_Temp(Pos, 1));
+    stream_t Fill_Temp_StreamKind=(Fill_Temp[StreamKind_Last].empty()?Stream_Max:StreamKind_Last);
+    for (size_t Pos=0; Pos<Fill_Temp[Fill_Temp_StreamKind].size(); Pos++)
+        if (Fill_Temp[Fill_Temp_StreamKind][Pos].Parameter.IsNumber())
+            Fill(StreamKind_Last, StreamPos_Last, Fill_Temp[Fill_Temp_StreamKind][Pos].Parameter.To_int32u(), Fill_Temp[Fill_Temp_StreamKind][Pos].Value);
         else
         {
-            Fill(StreamKind_Last, StreamPos_Last, Fill_Temp(Pos, 0).To_UTF8().c_str(), Fill_Temp(Pos, 1));
+            Fill(StreamKind_Last, StreamPos_Last, Fill_Temp[Fill_Temp_StreamKind][Pos].Parameter.To_UTF8().c_str(), Fill_Temp[Fill_Temp_StreamKind][Pos].Value);
             #if MEDIAINFO_DEMUX
                 if (!Retrieve(KindOfStream, StreamPos_Last, "Demux_InitBytes").empty())
                     (*Stream_More)[KindOfStream][StreamPos_Last](Ztring().From_Local("Demux_InitBytes"), Info_Options)=__T("N NT"); //TODO: find a better way to hide additional fields by default
             #endif //MEDIAINFO_DEMUX
         }
-    Fill_Temp.clear();
+    Fill_Temp[Fill_Temp_StreamKind].clear();
 
     return StreamPos_Last; //The position in the stream count
 }
@@ -188,7 +189,7 @@ size_t File__Analyze::Stream_Prepare (stream_t KindOfStream, size_t StreamPos)
 size_t File__Analyze::Stream_Erase (stream_t KindOfStream, size_t StreamPos)
 {
     //Integrity
-    if (!Status[IsAccepted] || KindOfStream>Stream_Max || StreamPos>=Count_Get(KindOfStream))
+    if (KindOfStream>Stream_Max || StreamPos>=Count_Get(KindOfStream))
         return Error;
 
     //Filling Lists & Counts
@@ -257,7 +258,7 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
     }
 
     //Integrity
-    if (!Status[IsAccepted] || StreamKind>Stream_Max || Parameter==(size_t)-1)
+    if (StreamKind>Stream_Max || Parameter==(size_t)-1)
         return;
 
     //Handling values with \r\n inside
@@ -276,10 +277,36 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
     //Handle Value before StreamKind
     if (StreamKind==Stream_Max || StreamPos>=(*Stream)[StreamKind].size())
     {
-        ZtringList NewList;
-        NewList.push_back(Ztring().From_Number(Parameter));
-        NewList.push_back(Value);
-        Fill_Temp.push_back(NewList);
+        size_t StreamKindS=(size_t)StreamKind;
+        if (StreamKind!=Stream_Max)
+        {
+            //Stream kind is found, moving content
+            for (size_t Pos=0; Pos<Fill_Temp[Stream_Max].size(); Pos++)
+                Fill_Temp[StreamKind].push_back(Fill_Temp[Stream_Max][Pos]);
+            Fill_Temp[Stream_Max].clear();
+        }
+        else
+        {
+            //Stream kind is not found, checking if it was found previously
+            for (StreamKindS=(size_t)Stream_General+1; StreamKindS<(size_t)Stream_Max; StreamKindS++)
+                if (!Fill_Temp[StreamKindS].empty())
+                    break;
+        }
+
+        if (Replace)
+        {
+            Ztring Parameter_String=Ztring::ToZtring(Parameter);
+            for (size_t Pos=0; Pos<Fill_Temp[StreamKindS].size(); Pos++)
+                if (Fill_Temp[StreamKindS][Pos].Parameter==Parameter_String)
+                {
+                    Fill_Temp[StreamKindS][Pos].Value=Value;
+                    return;
+                }
+        }
+        fill_temp_item NewList;
+        NewList.Parameter=Ztring::ToZtring(Parameter);
+        NewList.Value=Value;
+        Fill_Temp[StreamKindS].push_back(NewList);
         return; //No streams
     }
 
@@ -584,6 +611,21 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
                     if (Pos<(*Stream)[Stream_Text][StreamPos].size())
                         (*Stream)[Stream_Text][StreamPos][Pos].clear();
         }
+        if (StreamKind==Stream_Other && Parameter==Other_Delay && Count_Get(Stream_Video) && !Retrieve(Stream_Other, StreamPos, Other_Delay).empty() && !Retrieve(Stream_Video, 0, Video_Delay).empty())
+        {
+            if (Replace)
+                Clear(Stream_Other, StreamPos, Other_Video_Delay);
+            ZtringList OtherDelay; OtherDelay.Separator_Set(0, __T(" / ")); OtherDelay.Write(Retrieve(Stream_Other, StreamPos, Other_Delay));
+            ZtringList VideoDelay; VideoDelay.Separator_Set(0, __T(" / ")); VideoDelay.Write(Retrieve(Stream_Video, 0, Video_Delay));
+            if (!OtherDelay.empty() && !VideoDelay.empty() && OtherDelay.size() <= VideoDelay.size())
+            {
+                Fill(Stream_Other, StreamPos, Other_Video_Delay, OtherDelay(OtherDelay.size()-1).To_int64s()-VideoDelay(VideoDelay.size()-1).To_int64s(), 10);
+                if (VideoDelay.size()==1 && Retrieve(Stream_Other, StreamPos, Other_Video_Delay).To_int64u()==0)
+                    for (size_t Pos=Other_Video_Delay+1; Pos<=Other_Video_Delay+4; Pos++)
+                        if (Pos<(*Stream)[Stream_Other][StreamPos].size())
+                            (*Stream)[Stream_Other][StreamPos][Pos].clear();
+            }
+        }
 
         //Delay/Video0
         if (StreamKind==Stream_Video && StreamPos==0 && Parameter==Video_Delay)
@@ -634,6 +676,19 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
                 for (size_t Pos=Text_Video0_Delay+1; Pos<=Text_Video0_Delay+4; Pos++)
                     if (Pos<(*Stream)[Stream_Text][StreamPos].size())
                         (*Stream)[Stream_Text][StreamPos][Pos].clear();
+        }
+        if (StreamKind==Stream_Other && Parameter==Text_Delay && Count_Get(Stream_Video) && !Retrieve(Stream_Other, StreamPos, Text_Delay).empty() && !Retrieve(Stream_Video, 0, Video_Delay).empty())
+        {
+            Ztring MuxingMode_MoreInfo=Get(Stream_Other, StreamPos, "MuxingMode_MoreInfo");
+            Ztring StreamID=MuxingMode_MoreInfo.SubString(__T("Muxed in Video #"), Ztring());
+            size_t StreamID_Int=(size_t)StreamID.To_int64u();
+            if (StreamID_Int)
+                StreamID_Int--;
+            Fill(Stream_Other, StreamPos, Text_Video0_Delay, Value.To_int64s()-Retrieve(Stream_Video, StreamID_Int, Video_Delay).To_int64s(), 10, true);
+            if (Retrieve(Stream_Other, StreamPos, Text_Video0_Delay).To_int64u()==0)
+                for (size_t Pos=Text_Video0_Delay+1; Pos<=Text_Video0_Delay+4; Pos++)
+                    if (Pos<(*Stream)[Stream_Other][StreamPos].size())
+                        (*Stream)[Stream_Other][StreamPos][Pos].clear();
         }
 
         //Language
@@ -846,7 +901,7 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
 void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, const char* Parameter, const Ztring &Value, bool Replace)
 {
     //Integrity
-    if (!Status[IsAccepted] || StreamKind>Stream_Max || Parameter==NULL || Parameter[0]=='\0')
+    if (StreamKind>Stream_Max || Parameter==NULL || Parameter[0]=='\0')
         return;
 
     //Handling values with \r\n inside
@@ -865,18 +920,36 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, const char* Par
     //Handle Value before StreamKind
     if (StreamKind==Stream_Max || StreamPos>=(*Stream)[StreamKind].size())
     {
-        Ztring ParameterZ=Ztring().From_UTF8(Parameter);
+        size_t StreamKindS=(size_t)StreamKind;
+        if (StreamKind!=Stream_Max)
+        {
+            //Stream kind is found, moving content
+            for (size_t Pos=0; Pos<Fill_Temp[Stream_Max].size(); Pos++)
+                Fill_Temp[StreamKind].push_back(Fill_Temp[Stream_Max][Pos]);
+            Fill_Temp[Stream_Max].clear();
+        }
+        else
+        {
+            //Stream kind is not found, checking if it was found previously
+            for (StreamKindS=(size_t)Stream_General+1; StreamKindS<(size_t)Stream_Max; StreamKindS++)
+                if (!Fill_Temp[StreamKindS].empty())
+                    break;
+        }
+
         if (Replace)
-            for (size_t Pos=0; Pos<Fill_Temp.size(); Pos++)
-                if (Fill_Temp[Pos](0)==ParameterZ)
+        {
+            Ztring Parameter_String=Ztring().From_UTF8(Parameter);
+            for (size_t Pos=0; Pos<Fill_Temp[StreamKindS].size(); Pos++)
+                if (Fill_Temp[StreamKindS][Pos].Parameter==Parameter_String)
                 {
-                    Fill_Temp.erase(Fill_Temp.begin()+Pos);
-                    Pos--;
+                    Fill_Temp[StreamKindS][Pos].Value=Value;
+                    return;
                 }
-        ZtringList NewList;
-        NewList.push_back(ParameterZ);
-        NewList.push_back(Value);
-        Fill_Temp.push_back(NewList);
+        }
+        fill_temp_item NewList;
+        NewList.Parameter=Ztring().From_UTF8(Parameter);
+        NewList.Value=Value;
+        Fill_Temp[StreamKindS].push_back(NewList);
         return; //No streams
     }
 
@@ -888,6 +961,9 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, const char* Par
         return;
     }
 
+    if (StreamKind==Stream_Other && !strcmp(Parameter, "Codec"))
+        return; // "Codec" does not exist in "Other"
+    
     //Handling of unknown parameters
     if (Value.empty())
     {
@@ -1001,9 +1077,13 @@ void File__Analyze::Clear (stream_t StreamKind, size_t StreamPos, const char* Pa
 
     if (StreamPos>=(*Stream)[StreamKind].size())
     {
-        size_t Pos=Fill_Temp.Find(Ztring().From_UTF8(Parameter));
-        if (Pos!=string::npos)
-            Fill_Temp.erase(Fill_Temp.begin()+Pos);
+        Ztring Parameter_String=Ztring().From_UTF8(Parameter);
+        for (size_t Pos=0; Pos<Fill_Temp[StreamKind].size(); Pos++)
+            if (Fill_Temp[StreamKind][Pos].Parameter==Parameter_String)
+            {
+                Fill_Temp[StreamKind].erase(Fill_Temp[StreamKind].begin() + Pos);
+                return;
+            }
         return;
     }
 
@@ -1115,7 +1195,8 @@ void File__Analyze::Clear (stream_t StreamKind)
 void File__Analyze::Fill_Flush()
 {
     Stream_Prepare(Stream_Max); //clear filling
-    Fill_Temp.clear();
+    for (size_t StreamKind=(size_t)Stream_General; StreamKind<(size_t)Stream_Max+1; StreamKind++) // +1 because Fill_Temp[Stream_Max] is used when StreamKind is unknown
+        Fill_Temp[StreamKind].clear();
 }
 
 //---------------------------------------------------------------------------
@@ -1203,7 +1284,7 @@ size_t File__Analyze::Merge(File__Analyze &ToAdd, bool Erase)
 size_t File__Analyze::Merge(File__Analyze &ToAdd, stream_t StreamKind, size_t StreamPos_From, size_t StreamPos_To, bool Erase)
 {
     //Integrity
-    if (!Status[IsAccepted] || &ToAdd==NULL || StreamKind>=Stream_Max || !ToAdd.Stream || StreamPos_From>=(*ToAdd.Stream)[StreamKind].size())
+    if (&ToAdd==NULL || StreamKind>=Stream_Max || !ToAdd.Stream || StreamPos_From>=(*ToAdd.Stream)[StreamKind].size())
         return 0;
 
     //Destination
@@ -1768,14 +1849,12 @@ void File__Analyze::Duration_Duration123(stream_t StreamKind, size_t StreamPos, 
             if (DurationString1.size()>0)
                 DurationString1+=__T(" ");
             DurationString1+=Ztring::ToZtring(Sec)+MediaInfoLib::Config.Language_Get(__T("s"));
-            if (DurationString2.size()<5)
+            if (HH==0)
             {
                 if (DurationString2.size()>0)
                     DurationString2+=__T(" ");
                 DurationString2+=Ztring::ToZtring(Sec)+MediaInfoLib::Config.Language_Get(__T("s"));
             }
-            else if (DurationString2.size()==0)
-                DurationString2+=Ztring::ToZtring(Sec)+MediaInfoLib::Config.Language_Get(__T("s"));
             if (Sec<10)
                 DurationString3+=Ztring(__T("0"))+Ztring::ToZtring(Sec)+__T(".");
             else
@@ -1793,7 +1872,7 @@ void File__Analyze::Duration_Duration123(stream_t StreamKind, size_t StreamPos, 
             if (DurationString1.size()>0)
                 DurationString1+=__T(" ");
             DurationString1+=Ztring::ToZtring(MS)+MediaInfoLib::Config.Language_Get(__T("ms"));
-            if (DurationString2.size()<5)
+            if (HH==0 && MM==0)
             {
                 if (DurationString2.size()>0)
                     DurationString2+=__T(" ");
@@ -2723,6 +2802,32 @@ size_t File__Analyze::Fill_Parameter(stream_t StreamKind, generic StreamPos)
                                     case Generic_Duration_String5 : return Other_Duration_String5;
                                     case Generic_FrameRate : return Other_FrameRate;
                                     case Generic_FrameCount : return Other_FrameCount;
+                                    case Generic_Delay : return Other_Delay;
+                                    case Generic_Delay_String : return Other_Delay_String;
+                                    case Generic_Delay_String1 : return Other_Delay_String1;
+                                    case Generic_Delay_String2 : return Other_Delay_String2;
+                                    case Generic_Delay_String3 : return Other_Delay_String3;
+                                    case Generic_Delay_String4 : return Other_Delay_String4;
+                                    case Generic_Delay_String5 : return Other_Delay_String5;
+                                    case Generic_Delay_Settings : return Other_Delay_Settings;
+                                    case Generic_Delay_DropFrame : return Other_Delay_DropFrame;
+                                    case Generic_Delay_Source : return Other_Delay_Source;
+                                    case Generic_Delay_Source_String : return Other_Delay_Source_String;
+                                    case Generic_Delay_Original : return Other_Delay_Original;
+                                    case Generic_Delay_Original_String : return Other_Delay_Original_String;
+                                    case Generic_Delay_Original_String1 : return Other_Delay_Original_String1;
+                                    case Generic_Delay_Original_String2 : return Other_Delay_Original_String2;
+                                    case Generic_Delay_Original_String3 : return Other_Delay_Original_String3;
+                                    case Generic_Delay_Original_String4 : return Other_Delay_Original_String4;
+                                    case Generic_Delay_Original_Settings : return Other_Delay_Original_Settings;
+                                    case Generic_Delay_Original_DropFrame : return Other_Delay_Original_DropFrame;
+                                    case Generic_Delay_Original_Source : return Other_Delay_Original_Source;
+                                    case Generic_Video_Delay : return Other_Video_Delay;
+                                    case Generic_Video_Delay_String : return Other_Video_Delay_String;
+                                    case Generic_Video_Delay_String1 : return Other_Video_Delay_String1;
+                                    case Generic_Video_Delay_String2 : return Other_Video_Delay_String2;
+                                    case Generic_Video_Delay_String3 : return Other_Video_Delay_String3;
+                                    case Generic_Video_Delay_String4 : return Other_Video_Delay_String4;
                                     case Generic_Language : return Other_Language;
                                     default: return (size_t)-1;
                                 }

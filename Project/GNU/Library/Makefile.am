@@ -7,6 +7,7 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/File__Analyze_Buffer_MinimizeSize.cpp \
                        ../../../Source/MediaInfo/File__Analyze_Streams.cpp \
                        ../../../Source/MediaInfo/File__Analyze_Streams_Finish.cpp \
+                       ../../../Source/MediaInfo/File__Analyze_Element.cpp \
                        ../../../Source/MediaInfo/File__Base.cpp \
                        ../../../Source/MediaInfo/File__MultipleParsing.cpp \
                        ../../../Source/MediaInfo/File__Duplicate.cpp \
@@ -225,7 +226,6 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
  ../../../Source/MediaInfoDLL/MediaInfoDLL.h \
  ../../../Source/MediaInfoDLL/MediaInfoDLL_Static.h
 
-
 if COMPILE_AES
 lib@MediaInfoLib_LibName@_la_SOURCES += \
                        ../../../Source/ThirdParty/aes-gladman/aes_modes.c \
@@ -262,4 +262,20 @@ endif
 
 lib@MediaInfoLib_LibName@_la_LDFLAGS     = -no-undefined -version-info 0:0:0
 
+bin_SCRIPTS = libmediainfo-config
+
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libmediainfo.pc
+
 AM_CPPFLAGS = -I../../../Source -I../../../../ZenLib/Source
+
+TESTS_DIR = test
+
+SUBDIRS = . $(TESTS_DIR)
+
+REGRESSION_FILES = $(TESTS_DIR)/Files
+clone_regression_files: $(REGRESSION_FILES)
+
+$(REGRESSION_FILES):
+	git clone https://github.com/MediaArea/MediaArea-RegressionTestingFiles $(TESTS_DIR)/Files
+

@@ -155,9 +155,11 @@ private :
     void moov_trak_mdia_minf_stbl_stsd_xxxxText();
     void moov_trak_mdia_minf_stbl_stsd_xxxxVideo();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_alac();
+    void moov_trak_mdia_minf_stbl_stsd_xxxx_AALP();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_ACLR();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_APRG();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_ARES();
+    void moov_trak_mdia_minf_stbl_stsd_xxxx_AORD();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_avcC();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_bitr();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_btrt();
@@ -352,6 +354,7 @@ private :
         {
             int32u TimeScale;
             int32u FrameDuration;
+            int8u  NumberOfFrames;
             bool   DropFrame;
             bool   H24;
             bool   NegativeTimes;
@@ -445,6 +448,7 @@ private :
         #if MEDIAINFO_DEMUX
             bool            PtsDtsAreSame;
             bool            Demux_EventWasSent;
+            int32u          CodecID;
         #endif //MEDIAINFO_DEMUX
 
         stream()
@@ -479,6 +483,7 @@ private :
             IsPriorityStream=false;
             IsFilled=false;
             IsChapter=false;
+            IsEnabled=false;
             IsExcluded=false;
             HasForcedSamples=false;
             AllForcedSamples=false;
@@ -494,6 +499,7 @@ private :
             #if MEDIAINFO_DEMUX
                 PtsDtsAreSame=false;
                 Demux_EventWasSent=false;
+                CodecID=0x00000000;
             #endif //MEDIAINFO_DEMUX
         }
 
@@ -529,6 +535,10 @@ private :
     };
     typedef std::vector<mdat_Pos_Type> mdat_pos;
     static bool mdat_pos_sort (const File_Mpeg4::mdat_Pos_Type &i,const File_Mpeg4::mdat_Pos_Type &j) { return (i.Offset<j.Offset); }
+    void IsParsing_mdat_Set();
+    #if MEDIAINFO_DEMUX
+    void TimeCodeTrack_Check(stream &Stream_Temp, size_t Pos, int32u StreamID);
+    #endif //MEDIAINFO_DEMUX
     mdat_pos mdat_Pos;
     mdat_Pos_Type* mdat_Pos_Temp;
     mdat_Pos_Type* mdat_Pos_Max;

@@ -40,8 +40,14 @@ File_Vp8::File_Vp8()
 :File__Analyze()
 {
     //Configuration
-    ParserName=__T("VP8");
+    ParserName="VP8";
+    #if MEDIAINFO_TRACE
+        Trace_Layers_Update(8); //Stream
+    #endif //MEDIAINFO_TRACE
     IsRawStream=true;
+    #if MEDIAINFO_TRACE
+        Trace_Layers_Update(8); //Stream
+    #endif //MEDIAINFO_TRACE
 
     //In
     Frame_Count_Valid=MediaInfoLib::Config.ParseSpeed_Get()>=0.3?32:4;

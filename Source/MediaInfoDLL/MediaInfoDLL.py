@@ -26,6 +26,7 @@
 
 import os
 import sys
+import locale
 from ctypes import *
 if os.name == "nt" or os.name == "dos" or os.name == "os2" or os.name == "ce":
     MediaInfoDLL_Handler = windll.MediaInfo
@@ -136,7 +137,7 @@ class MediaInfo:
     MediaInfo_Get.argtypes = [c_void_p, c_size_t, c_size_t, c_wchar_p, c_size_t, c_size_t]
     MediaInfo_Get.restype = c_wchar_p
     MediaInfoA_Get = MediaInfoDLL_Handler.MediaInfoA_Get
-    MediaInfoA_Get.argtypes = [c_void_p, c_size_t, c_size_t, c_wchar_p, c_size_t, c_size_t]
+    MediaInfoA_Get.argtypes = [c_void_p, c_size_t, c_size_t, c_char_p, c_size_t, c_size_t]
     MediaInfoA_Get.restype = c_char_p
 
     #/** @brief Wrapper for MediaInfoLib::MediaInfo::Set */
@@ -145,7 +146,7 @@ class MediaInfo:
     MediaInfo_SetI.argtypes = [c_void_p, c_wchar_p, c_size_t, c_size_t, c_size_t, c_wchar_p]
     MediaInfo_SetI.restype = c_void_p
     MediaInfoA_SetI = MediaInfoDLL_Handler.MediaInfoA_SetI
-    MediaInfoA_SetI.argtypes = [c_void_p, c_char_p, c_size_t, c_size_t, c_size_t, c_wchar_p]
+    MediaInfoA_SetI.argtypes = [c_void_p, c_char_p, c_size_t, c_size_t, c_size_t, c_char_p]
     MediaInfoA_SetI.restype = c_void_p
 
     #/** @brief Wrapper for MediaInfoLib::MediaInfo::Set */
@@ -154,7 +155,7 @@ class MediaInfo:
     MediaInfo_Set.argtypes = [c_void_p, c_wchar_p, c_size_t, c_size_t, c_wchar_p, c_wchar_p]
     MediaInfo_Set.restype = c_size_t
     MediaInfoA_Set = MediaInfoDLL_Handler.MediaInfoA_Set
-    MediaInfoA_Set.argtypes = [c_void_p, c_char_p, c_size_t, c_size_t, c_wchar_p, c_wchar_p]
+    MediaInfoA_Set.argtypes = [c_void_p, c_char_p, c_size_t, c_size_t, c_char_p, c_char_p]
     MediaInfoA_Set.restype = c_size_t
 
     #/** @brief Wrapper for MediaInfoLib::MediaInfo::Option */
@@ -179,12 +180,13 @@ class MediaInfo:
     MediaInfo_Count_Get.restype = c_size_t
 
     Handle = c_void_p(0)
-    MustUseAnsi = 0
 
     #Handling
     def __init__(self):
         self.Handle=self.MediaInfo_New()
         self.MediaInfo_Option(self.Handle, "CharSet", "UTF-8")
+        if sys.version_info.major < 3 and os.name != "nt" and os.name != "dos" and os.name != "os2" and os.name != "ce" and locale.getlocale() == (None, None):
+            locale.setlocale(locale.LC_CTYPE, locale.getdefaultlocale())
     def __del__(self):
         self.MediaInfo_Delete(self.Handle)
     def Open(self, File):
@@ -343,6 +345,9 @@ class MediaInfoList:
     #Handling
     def __init__(self):
         self.Handle=MediaInfoList_New()
+        self.MediaInfo_Option(self.Handle, "CharSet", "UTF-8")
+        if sys.version_info.major < 3 and os.name != "nt" and os.name != "dos" and os.name != "os2" and os.name != "ce" and sys.platform != "darwin" and locale.getlocale() == (None, None):
+            locale.setlocale(locale.LC_CTYPE, locale.getdefaultlocale())
     def __del__(self):
         MediaInfoList_Delete(self.Handle)
     def Open(self, Files, Options=FileOptions.Nothing):

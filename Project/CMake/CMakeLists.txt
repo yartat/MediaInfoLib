@@ -6,7 +6,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 set(MediaInfoLib_MAJOR_VERSION 0)
 set(MediaInfoLib_MINOR_VERSION 7)
-set(MediaInfoLib_PATCH_VERSION 83)
+set(MediaInfoLib_PATCH_VERSION 89)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION}.${MediaInfoLib_PATCH_VERSION})
 
 if (NOT WIN32)
@@ -116,6 +116,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze_Buffer.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze_Buffer_MinimizeSize.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze_Element.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze_Streams.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze_Streams_Finish.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Base.cpp

@@ -40,6 +40,8 @@ using namespace std;
 namespace MediaInfoLib
 {
 
+using namespace FFV1;
+
 //***************************************************************************
 // Const
 //***************************************************************************
@@ -53,25 +55,45 @@ const int32s Slice::Context::Cmin = -128;
 // RangeCoder
 //***************************************************************************
 
+class RangeCoder
+{
+public:
+    RangeCoder(const int8u* Buffer, size_t Buffer_Size, const state_transitions default_state_transition);
+
+    void AssignStateTransitions(const state_transitions new_state_transition);
+    void   ResizeBuffer(size_t Buffer_Size); //Adapt the buffer limit
+    size_t BytesUsed();
+    bool   Underrun();
+    void   ForceUnderrun();
+
+    bool    get_rac(int8u* States);
+    int32u  get_symbol_u(int8u* States);
+    int32s  get_symbol_s(int8u* States);
+
+    int32u Current;
+    int32u Mask;
+    state_transitions zero_state;
+    state_transitions one_state;
+
+private:
+    const int8u* Buffer_Beg;
+    const int8u* Buffer_Cur;
+    const int8u* Buffer_End;
+};
+
 //---------------------------------------------------------------------------
 RangeCoder::RangeCoder (const int8u* Buffer, size_t Buffer_Size, const state_transitions default_state_transition)
 {
     //Assign buffer
+    Buffer_Beg=Buffer;
     Buffer_Cur=Buffer;
     Buffer_End=Buffer+Buffer_Size;
 
     //Init
-    if (Buffer_Size>=2)
-    {
-        Current=BigEndian2int16u(Buffer_Cur);
-        Buffer_Cur+=2;
-        Mask=0xFF00;
-    }
-    else
-    {
-        Current=0;
-        Mask=0;
-    }
+    if (Buffer_Size)
+        Current=*Buffer_Cur;
+    Mask=0xFF;
+    Buffer_Cur++;
 
     AssignStateTransitions(default_state_transition);
 }
@@ -86,38 +108,66 @@ void RangeCoder::AssignStateTransitions (const state_transitions new_state_trans
 }
 
 //---------------------------------------------------------------------------
+void RangeCoder::ResizeBuffer(size_t Buffer_Size)
+{
+    Buffer_End=Buffer_Beg+Buffer_Size;
+}
+
+//---------------------------------------------------------------------------
+size_t RangeCoder::BytesUsed()
+{
+    return Buffer_Cur-Buffer_Beg-(Mask<0x100?0:1);
+}
+
+//---------------------------------------------------------------------------
+bool RangeCoder::Underrun()
+{
+    return (Buffer_Cur-(Mask<0x100?0:1)>Buffer_End)?true:false;
+}
+
+//---------------------------------------------------------------------------
+void RangeCoder::ForceUnderrun()
+{
+    Mask=0;
+    Buffer_Cur=Buffer_End+1;
+}
+
+//---------------------------------------------------------------------------
 bool RangeCoder::get_rac(int8u* States)
 {
-    //Here is some black magic... But it works. TODO: better understanding of the algorithm and maybe optimization
-    int16u Mask2=(int16u)((((int32u)Mask) * (*States)) >> 8);
-    Mask-=Mask2;
-    bool Value;
-    if (Current<Mask)
-    {
-        *States=zero_state[*States];
-        Value=false;
-    }
-    else
-    {
-        Current-=Mask;
-        Mask=Mask2;
-        *States=one_state[*States];
-        Value=true;
-    }
-
     // Next byte
     if (Mask<0x100)
     {
-        Mask<<=8;
         Current<<=8;
-        if (Buffer_Cur < Buffer_End) // Set to 0 if end of stream. TODO: Find a way to detect buffer underrun
+
+        // If less, consume the next byte
+        // If equal, last byte assumed to be 0x00
+        // If more, underrun, we return 0
+        if (Buffer_Cur<Buffer_End)
         {
             Current|=*Buffer_Cur;
-            Buffer_Cur++;
         }
+        else if (Buffer_Cur>Buffer_End)
+        {
+            return false;
+        }
+
+        Buffer_Cur++;
+        Mask<<=8;
     }
 
-    return Value;
+    //Range Coder boolean value computing
+    int32u Mask2=(Mask*(*States))>>8;
+    Mask-=Mask2;
+    if (Current<Mask)
+    {
+        *States=zero_state[*States];
+        return false;
+    }
+    Current-=Mask;
+    Mask=Mask2;
+    *States=one_state[*States];
+    return true;
 }
 
 //---------------------------------------------------------------------------
@@ -126,22 +176,27 @@ int32u RangeCoder::get_symbol_u(int8u* States)
     if (get_rac(States))
         return 0;
 
-    int8u e=0;
-    while (get_rac((States+1+min(e, (int8u)9)))) // 1..10
-        e++;
-
-    int8u a=1;
-    if (e)
+    int e = 0;
+    while (get_rac(States + 1 + min(e, 9))) // 1..10
     {
-        do
+        e++;
+        if (e > 31)
         {
-            --e;
-            a<<=1;
-            if (get_rac((States+22+min(e, (int8u)9))))  // 22..31
-                ++a;
+            ForceUnderrun(); // stream is buggy or unsupported, we disable it completely and we indicate that it is NOK
+            return 0;
         }
-        while (e);
     }
+
+    int32u a = 1;
+    int i = e - 1;
+    while (i >= 0)
+    {
+        a <<= 1;
+        if (get_rac(States + 22 + min(i, 9)))  // 22..31
+            ++a;
+        i--;
+    }
+
     return a;
 }
 
@@ -151,26 +206,29 @@ int32s RangeCoder::get_symbol_s(int8u* States)
     if (get_rac(States))
         return 0;
 
-    int8u e=0;
-    while (get_rac(States+1+min(e, (int8u)9))) // 1..10
-        e++;
-
-    int32u a=1;
-    if (e)
+    int e = 0;
+    while (get_rac(States + 1 + min(e, 9))) // 1..10
     {
-        int8u i = e;
-        do
+        e++;
+        if (e > 31)
         {
-            --i;
-            a<<=1;
-            if (get_rac((States+22+min(i, (int8u)9))))  // 22..31
-                ++a;
+            ForceUnderrun(); // stream is buggy or unsupported, we disable it completely and we indicate that it is NOK
+            return 0;
         }
-        while (i);
     }
 
-    if (get_rac((States+11+min(e, (int8u)10)))) // 11..21
-        return -((int32s)a);
+    int32s a = 1;
+    int i = e - 1;
+    while (i >= 0)
+    {
+        a <<= 1;
+        if (get_rac(States + 22 + min(i, 9)))  // 22..31
+            ++a;
+        i--;
+    }
+
+    if (get_rac(States + 11 + min(e, 10))) // 11..21
+        return -a;
     else
         return a;
 }
@@ -211,6 +269,27 @@ const string Ffv1_colorspace_type(int8u colorspace_type, bool chroma_planes, boo
     return ToReturn;
 }
 
+const char* Ffv1_picture_structure_ScanType (int8u picture_structure)
+{
+    switch (picture_structure)
+    {
+        case 1 :
+        case 2 : return "Interlaced";
+        case 3 : return "Progressive";
+        default: return "";
+    }
+}
+
+const char* Ffv1_picture_structure_ScanOrder (int8u picture_structure)
+{
+    switch (picture_structure)
+    {
+        case 1 : return "TFF";
+        case 2 : return "BFF";
+        default: return "";
+    }
+}
+
 const state_transitions Ffv1_default_state_transition =
 {
       0,  0,  0,  0,  0,  0,  0,  0, 20, 21, 22, 23, 24, 25, 26, 27,
@@ -241,6 +320,51 @@ const int8u log2_run[41]={
     24,
 };
 
+const int32u run[41] =
+{
+    1 << 0,
+    1 << 0,
+    1 << 0,
+    1 << 0,
+    1 << 1,
+    1 << 1,
+    1 << 1,
+    1 << 1,
+    1 << 2,
+    1 << 2,
+    1 << 2,
+    1 << 2,
+    1 << 3,
+    1 << 3,
+    1 << 3,
+    1 << 3,
+    1 << 4,
+    1 << 4,
+    1 << 5,
+    1 << 5,
+    1 << 6,
+    1 << 6,
+    1 << 7,
+    1 << 7,
+    1 << 8,
+    1 << 9,
+    1 << 10,
+    1 << 11,
+    1 << 12,
+    1 << 13,
+    1 << 14,
+    1 << 15,
+    1 << 16,
+    1 << 17,
+    1 << 18,
+    1 << 19,
+    1 << 20,
+    1 << 21,
+    1 << 22,
+    1 << 23,
+    1 << 24,
+};
+
 //***************************************************************************
 // Slice
 //***************************************************************************
@@ -269,18 +393,6 @@ void Slice::contexts_init(int32u plane_count, int32u quant_table_index[MAX_PLANE
         }
         int32u idx = quant_table_index[i];
         contexts[i] = new Context [context_count[idx]];
-        for (size_t j = 0; j < context_count[idx]; j++)
-        {
-            Context *c = &contexts[i][j];
-
-            c->N = 1;
-            //c->A = (alpha + 32) / 64; // alpha == alphabet size (256)
-            //if (c->A < 2)
-            //    c->A = 2;
-            c->A = 4;
-            c->C = 0;
-            c->B = c->C;
-        }
     }
 }
 
@@ -293,7 +405,10 @@ File_Ffv1::File_Ffv1()
 :File__Analyze()
 {
     //Configuration
-    ParserName=__T("FFV1");
+    ParserName="FFV1";
+    #if MEDIAINFO_TRACE
+        Trace_Layers_Update(8); //Stream
+    #endif //MEDIAINFO_TRACE
     IsRawStream=true;
 
     //use Ffv1_default_state_transition by default
@@ -306,13 +421,20 @@ File_Ffv1::File_Ffv1()
 
     //Temp
     for (size_t i=0; i < MAX_QUANT_TABLES; ++i)
+    {
         plane_states[i] = NULL;
+        plane_states_maxsizes[i] = 0;
+    }
     ConfigurationRecordIsPresent=false;
     RC=NULL;
     version=0;
     num_h_slices = 1;
     num_v_slices = 1;
     slices = NULL;
+    picture_structure = (int32u)-1;
+    sample_aspect_ratio_num = 0;
+    sample_aspect_ratio_den = 0;
+    KeyFramePassed = false;
 }
 
 //---------------------------------------------------------------------------
@@ -359,7 +481,6 @@ void File_Ffv1::Get_RB (states &States, bool &Info, const char* Name)
 {
     Info=RC->get_rac(States);
 
-    Element_Offset=RC->Buffer_Cur-Buffer;
     if (Trace_Activated)
         Param(Name, Info);
 }
@@ -387,7 +508,6 @@ void File_Ffv1::Get_RS (int8u* &States, int32s &Info, const char* Name)
 {
     Info=RC->get_symbol_s(States);
 
-    Element_Offset=RC->Buffer_Cur-Buffer;
     if (Trace_Activated)
         Param(Name, Info);
 }
@@ -397,7 +517,6 @@ void File_Ffv1::Skip_RC (states &States, const char* Name)
 {
     int8u Info=RC->get_rac(States);
 
-    Element_Offset=RC->Buffer_Cur-Buffer;
     if (Trace_Activated)
         Param(Name, Info);
 }
@@ -486,11 +605,27 @@ void File_Ffv1::Read_Buffer_OutOfBand()
         RC = new RangeCoder(Buffer, Buffer_Size-4, Ffv1_default_state_transition);
 
     FrameHeader();
-    if (RC->Buffer_End!=RC->Buffer_Cur)
-        Skip_XX(RC->Buffer_Cur - RC->Buffer_End,                "Reserved");
+    Element_Offset+=RC->BytesUsed();
+    if (Element_Offset<Element_Size)
+        Skip_XX(Element_Size-Element_Offset,                    "Reserved");
     Skip_B4(                                                    "CRC-32");
 
     delete RC; RC=NULL;
+}
+
+//---------------------------------------------------------------------------
+void File_Ffv1::Skip_Frame()
+{
+    Skip_XX(Element_Size-Element_Offset, "Other data");
+
+    Frame_Count++;
+
+    delete RC;
+    RC = NULL;
+
+    Fill();
+    if (Config->ParseSpeed<1.0)
+        Finish();
 }
 
 //---------------------------------------------------------------------------
@@ -507,16 +642,41 @@ void File_Ffv1::Read_Buffer_Continue()
 
     Get_RB (States, keyframe,                                   "keyframe");
 
-    if (!ConfigurationRecordIsPresent)
+    if (keyframe && !ConfigurationRecordIsPresent)
+    {
+        #if MEDIAINFO_TRACE
+            bool Trace_Activated_Save=Trace_Activated;
+            if (Trace_Activated && Frame_Count)
+                Trace_Activated=false; // Trace is relatively huge, temporarary deactivating it. TODO: an option for it
+        #endif //MEDIAINFO_TRACE
+
         FrameHeader();
 
-    if (version>2)
+        #if MEDIAINFO_TRACE
+            Trace_Activated=Trace_Activated_Save; // Trace is too huge, reactivating it.
+        #endif //MEDIAINFO_TRACE
+    }
+    else if (!KeyFramePassed)
     {
-        int32u tail = 3;
-        tail += error_correction == 1 ? 5 : 0;
+        // If stream does not start with a key frame
+        Skip_Frame();
+        return;
+    }
 
-        int64u Slices_BufferPos=Element_Size;
-        vector<int32u> Slices_BufferSizes;
+    int32u tail = (version >= 3) ? 3 : 0;
+    tail += error_correction == 1 ? 5 : 0;
+
+    int64u Slices_BufferPos=Element_Size;
+    vector<int32u> Slices_BufferSizes;
+    if (version < 2)
+        Slices_BufferSizes.push_back(Element_Size);
+    else if (version == 2)
+    {
+        Skip_Frame();
+        return;
+    }
+    else
+    {
         while (Slices_BufferPos)
         {
             int32u Size = BigEndian2int24u(Buffer + Buffer_Offset + (size_t)Slices_BufferPos - tail);
@@ -528,60 +688,73 @@ void File_Ffv1::Read_Buffer_Continue()
 
             Slices_BufferSizes.insert(Slices_BufferSizes.begin(), Size);
         }
+    }
 
-        Element_Offset=0;
-        for (size_t Pos = 0; Pos < Slices_BufferSizes.size(); Pos++)
+    Element_Offset=0;
+    for (size_t Pos = 0; Pos < Slices_BufferSizes.size(); Pos++)
+    {
+        Element_Begin1("Slice");
+        int64u Element_Size_Save=Element_Size;
+        Element_Size=Element_Offset+Slices_BufferSizes[Pos]-tail;
+        int32u crc_left=0;
+
+        if (error_correction == 1)
+            crc_left=CRC_Compute(Slices_BufferSizes[Pos]);
+
+        if (Pos)
         {
-            Element_Begin1("Slice");
-            int64u End=Element_Offset+Slices_BufferSizes[Pos]-tail;
-            int32u crc_left=0;
+            delete RC; RC = new RangeCoder(Buffer+Buffer_Offset+(size_t)Element_Offset, Slices_BufferSizes[Pos]-tail, state_transitions_table);
+        }
+        else
+        {
+            RC->ResizeBuffer(Slices_BufferSizes[0]-tail);
+            RC->AssignStateTransitions(state_transitions_table);
+        }
 
-            if (error_correction == 1)
-                crc_left=CRC_Compute(Slices_BufferSizes[Pos]);
+#if MEDIAINFO_TRACE
+        if (!Frame_Count || Trace_Activated) // Parse slice only if trace feature is activated
+        {
+            int64u Start=Element_Offset;
 
-            if (Pos)
+            if (!slice(States))
             {
-                delete RC; RC = new RangeCoder(Buffer+Buffer_Offset+(size_t)Element_Offset, Slices_BufferSizes[Pos], state_transitions_table);
-            }
-            else // ac=2
-                RC->AssignStateTransitions(state_transitions_table);
-
-            #if MEDIAINFO_TRACE
-                if (Trace_Activated) // Parse slice only if trace feature is activated
-                {
-                    int64u Start=Element_Offset;
-                    Trace_Activated=false;
-
-                    slice(States);
-
-                    Trace_Activated=true;
-                    int64u SliceRealSize=Element_Offset-Start;
-                    Element_Offset=Start;
-                    Skip_XX(SliceRealSize,                          "slice_data");
-                    if (Trusted_Get())
-                        Param_Info1("OK");
-                    else
-                        Param_Info1("NOK");
-                }
-            #endif //MEDIAINFO_TRACE
-
-            if (Element_Offset!=End)
-                Skip_XX(End-Element_Offset,                         "Other data");
-            Skip_B3(                                                "slice_size");
-            if (error_correction == 1)
-            {
-                Skip_B1(                                                "error_status");
-                Skip_B4(                                                "crc_parity");
-                if (!crc_left)
+                int64u SliceRealSize=Element_Offset-Start;
+                Element_Offset=Start;
+                Skip_XX(SliceRealSize,                          "slice_data");
+                if (Trusted_Get() && !RC->Underrun() && Element_Offset==Element_Size)
                     Param_Info1("OK");
                 else
                     Param_Info1("NOK");
             }
-            Element_End0();
         }
+#endif //MEDIAINFO_TRACE
+
+        if (Element_Offset<Element_Size)
+            Skip_XX(Element_Size-Element_Offset,                    "Other data");
+        Element_Size=Element_Size_Save;
+        if (version > 2)
+            Skip_B3(                                                    "slice_size");
+        if (error_correction == 1)
+        {
+            Skip_B1(                                                "error_status");
+            Skip_B4(                                                "crc_parity");
+            if (!crc_left)
+                Param_Info1("OK");
+            else
+                Param_Info1("NOK");
+        }
+        Element_End0();
     }
 
     FILLING_BEGIN();
+        if (Frame_Count==0)
+        {
+            Fill(Stream_Video, 0, Video_ScanType, Ffv1_picture_structure_ScanType(picture_structure));
+            Fill(Stream_Video, 0, Video_ScanOrder, Ffv1_picture_structure_ScanOrder(picture_structure));
+            if (sample_aspect_ratio_num && sample_aspect_ratio_den)
+                Fill(Stream_Video, 0, Video_PixelAspectRatio, sample_aspect_ratio_num/sample_aspect_ratio_den);
+        }
+
         Frame_Count++;
     FILLING_END();
 
@@ -605,6 +778,7 @@ void File_Ffv1::FrameHeader()
     memset(States, 128, states_size);
     int32u coder_type, colorspace_type, bits_per_raw_sample=8, num_h_slices_minus1=0, num_v_slices_minus1=0, intra;
 
+    KeyFramePassed = true;
     micro_version = 0;
     Get_RU (States, version,                                    "version");
     if (( ConfigurationRecordIsPresent && version<=1)
@@ -613,6 +787,20 @@ void File_Ffv1::FrameHeader()
         Trusted_IsNot("Invalid version in global header");
         return;
     }
+    else if (version == 2)
+    {
+        FILLING_BEGIN();
+            if (Frame_Count==0)
+            {
+                Accept();
+
+                Ztring Version=__T("Version ")+Ztring::ToZtring(version);
+                Fill(Stream_Video, 0, Video_Format_Version, Version);
+            }
+        FILLING_END();
+        return;
+    }
+
     if (version>2)
         Get_RU (States, micro_version,                          "micro_version");
     Get_RU (States, coder_type,                                 "coder_type");
@@ -620,7 +808,7 @@ void File_Ffv1::FrameHeader()
     if (coder_type == 2) //Range coder with custom state transition table
     {
         Element_Begin1("state_transition_deltas");
-        for (int16u i = 1; i < state_transitions_size; i++)
+        for (size_t i = 1; i < state_transitions_size; i++)
         {
             int32s state_transition_delta;
             Get_RS (States, state_transition_delta,             "state_transition_delta");
@@ -636,8 +824,8 @@ void File_Ffv1::FrameHeader()
         Get_RU (States, bits_per_raw_sample,                    "bits_per_raw_sample");
         if (bits_per_raw_sample==0)
             bits_per_raw_sample=8; //I don't know the reason, 8-bit is coded 0 and 10-bit coded 10 (not 2?).
-        this->bits_per_sample = bits_per_raw_sample;
     }
+    this->bits_per_sample = bits_per_raw_sample;
     Get_RB (States, chroma_planes,                              "chroma_planes");
     Get_RU (States, chroma_h_shift,                             "log2(h_chroma_subsample)");
     Get_RU (States, chroma_v_shift,                             "log2(v_chroma_subsample)");
@@ -651,7 +839,7 @@ void File_Ffv1::FrameHeader()
         Get_RU (States, quant_table_count,                      "quant_table_count");
     }
     else
-        quant_table_count=1;
+        quant_table_count = 2 + alpha_plane;
 
     if (!slices)
     {
@@ -660,23 +848,48 @@ void File_Ffv1::FrameHeader()
         current_slice = &slices[0];
     }
 
-    for (size_t i = 0; i < quant_table_count; i++)
-        read_quant_tables(i);
-    memset(quant_tables+quant_table_count, 0x00, (MAX_QUANT_TABLES-quant_table_count)*MAX_CONTEXT_INPUTS*256*sizeof(int16s));
+    if (version > 1)
+        for (size_t i = 0; i < quant_table_count; i++)
+            read_quant_tables(i);
+    else
+    {
+        current_slice->x = 0;
+        current_slice->y = 0;
+        current_slice->w = Width;
+        current_slice->h = Height;
+        read_quant_tables(0);
+        quant_table_index[0] = 0;
+        for (size_t i = 1; i < quant_table_count; i++)
+        {
+            quant_table_index[i] = 0;
+            context_count[i] = context_count[0];
+        }
+    }
+    memset(quant_tables+quant_table_count, 0x00, (MAX_QUANT_TABLES-quant_table_count)*MAX_CONTEXT_INPUTS*256*sizeof(pixel_t));
 
     for (size_t i = 0; i < quant_table_count; i++)
     {
         Element_Begin1("initial_state");
-        bool present;
-        Get_RB (States, present,                                "present");
+        bool present = false;
+        if (version > 1)
+            Get_RB (States, present,                                "present");
 
-        if (coder_type)
-            plane_states[i] = new int8u* [context_count[i]];
+        if (coder_type && context_count[i]>plane_states_maxsizes[i])
+        {
+            states_context_plane plane_state_old = plane_states[i];
+            plane_states[i] = new int8u*[context_count[i]];
+            if (plane_state_old)
+            {
+                memcpy(plane_states[i], plane_state_old, plane_states_maxsizes[i] * sizeof(int8u*));
+                delete[] plane_state_old;
+            }
+            for (size_t j = plane_states_maxsizes[i]; j < context_count[i]; j++)
+                plane_states[i][j] = new int8u[states_size];
+            plane_states_maxsizes[i] = context_count[i];
+        }
 
         for (size_t j = 0; j < context_count[i]; j++)
         {
-            if (coder_type)
-                plane_states[i][j] = new int8u [states_size];
             if (present)
             {
                 Element_Begin1("initial_state");
@@ -704,6 +917,9 @@ void File_Ffv1::FrameHeader()
         if (micro_version)
             Get_RU (States, intra,                              "intra");
     }
+
+    //Marking handling of 16-bit overflow computing
+    is_overflow_16bit=(colorspace_type==0 && bits_per_raw_sample==16 && (coder_type==1 || coder_type==2))?true:false; //TODO: check in FFmpeg the version when the stream is fixed. Note: only with YUV colorspace
 
     FILLING_BEGIN();
         if (Frame_Count==0)
@@ -771,13 +987,17 @@ void File_Ffv1::FrameHeader()
 }
 
 //---------------------------------------------------------------------------
-void File_Ffv1::slice(states &States)
+int File_Ffv1::slice(states &States)
 {
     if (version>2)
-    {
-        slice_header(States);
+        if (slice_header(States) < 0)
+            return -1;
 
-    }
+    #if MEDIAINFO_TRACE
+        bool Trace_Activated_Save=Trace_Activated;
+        if (Trace_Activated)
+            Trace_Activated=false; // Trace is too huge, deactivating it during pixel decoding
+    #endif //MEDIAINFO_TRACE
 
     if (!coder_type)
     {
@@ -786,13 +1006,12 @@ void File_Ffv1::slice(states &States)
             states States;
             memset(States, 129, states_size);
             Skip_RC(States,                                     "?");
-
-            if ((version > 2 || (!current_slice->x && !current_slice->y)))
-                Element_Offset--;
-            else
-                Element_Offset=0;
-            BS_Begin();
         }
+        if ((version > 2 || (!current_slice->x && !current_slice->y)))
+            Element_Offset+=RC->BytesUsed(); // Computing how many bytes where consumed by the range coder
+        else
+            Element_Offset=0;
+        BS_Begin();
     }
 
     if (keyframe)
@@ -816,8 +1035,12 @@ void File_Ffv1::slice(states &States)
             int32u w = current_slice->w;
             int32u h = current_slice->h;
 
-            current_slice->w = current_slice->w >> chroma_h_shift;
-            current_slice->h = current_slice->h >> chroma_v_shift;
+            current_slice->w = w >> chroma_h_shift;
+            if (w & ((1 << chroma_h_shift) - 1))
+                current_slice->w++; //Is ceil
+            current_slice->h = h >> chroma_v_shift;
+            if (h & ((1 << chroma_v_shift) - 1))
+                current_slice->h++; //Is ceil
             plane(1); // Cb
             plane(1); // Cr
             current_slice->w = w;
@@ -836,28 +1059,65 @@ void File_Ffv1::slice(states &States)
     {
         int8u s = 129;
         RC->get_rac(&s);
-        Element_Offset=RC->Buffer_Cur-Buffer;
-        Element_Offset--;
+        Element_Offset+=RC->BytesUsed();
     }
+
+    #if MEDIAINFO_TRACE
+        Trace_Activated=Trace_Activated_Save; // Trace is too huge, reactivating after during pixel decoding
+    #endif //MEDIAINFO_TRACE
+
+    return 0;
 }
 
 //---------------------------------------------------------------------------
-void File_Ffv1::slice_header(states &States)
+int File_Ffv1::slice_header(states &States)
 {
+    Element_Begin1("SliceHeader");
+
     memset(States, 128, states_size);
 
-    int32u slice_x, slice_y, slice_width, slice_height;
+    int32u slice_x, slice_y, slice_width_minus1, slice_height_minus1;
     Get_RU (States, slice_x,                                "slice_x");
+    if (slice_x >= num_v_slices)
+    {
+        Param_Info1("NOK");
+        Element_End0();
+        return -1;
+    }
+
     Get_RU (States, slice_y,                                "slice_y");
-    Get_RU (States, slice_width,                            "slice_width_minus1");
-    Get_RU (States, slice_height,                           "slice_height_minus1");
+    if (slice_y >= num_h_slices)
+    {
+        Param_Info1("NOK");
+        Element_End0();
+        return -1;
+    }
+
+    Get_RU (States, slice_width_minus1,                     "slice_width_minus1");
+    int32u slice_x2 = slice_x + slice_width_minus1 + 1; //right boundary
+    if (slice_x2 > num_h_slices)
+    {
+        Param_Info1("NOK");
+        Element_End0();
+        return -1;
+    }
+
+    Get_RU (States, slice_height_minus1,                    "slice_height_minus1");
+    int32u slice_y2 = slice_y + slice_height_minus1 + 1; //bottom boundary
+    if (slice_y2 > num_v_slices)
+    {
+        Param_Info1("NOK");
+        Element_End0();
+        return -1;
+    }
 
     current_slice = &slices[slice_x + slice_y * num_h_slices];
 
-    current_slice->w = (slice_width + 1) * (Width / num_h_slices);
-    current_slice->h = (slice_height + 1) * (Height / num_v_slices);
-    current_slice->x = slice_x * current_slice->w;
-    current_slice->y = slice_y * current_slice->h;
+    //Computing boundaries, being careful about how are computed boundaries when there is not an integral number for Width  / num_h_slices or Height / num_v_slices (the last slice has more pixels)
+    current_slice->x = slice_x  * Width  / num_h_slices;
+    current_slice->y = slice_y  * Height / num_v_slices;
+    current_slice->w = slice_x2 * Width  / num_h_slices - current_slice->x;
+    current_slice->h = slice_y2 * Height / num_v_slices - current_slice->y;
 
 
     int8u plane_count=1+(alpha_plane?1:0);
@@ -865,25 +1125,38 @@ void File_Ffv1::slice_header(states &States)
         plane_count += 1;
     for (int8u i = 0; i < plane_count; i++)
         Get_RU (States, quant_table_index[i],               "quant_table_index");
-    Skip_RU(States,                                         "picture_structure");
-    Skip_RU(States,                                         "sample_aspect_ratio num");
-    Skip_RU(States,                                         "sample_aspect_ratio den");
+    Get_RU (States, picture_structure,                      "picture_structure");
+    Get_RU (States, sample_aspect_ratio_num,                "sample_aspect_ratio num");
+    Get_RU (States, sample_aspect_ratio_den,                "sample_aspect_ratio den");
     if (version > 3)
     {
         //TODO
     }
 
     RC->AssignStateTransitions(state_transitions_table);
+
+    Element_End0();
+    return 0;
 }
 
 //---------------------------------------------------------------------------
 void File_Ffv1::plane(int32u pos)
 {
-    Element_Begin1("Plane");
+    #if MEDIAINFO_TRACE_FFV1CONTENT
+        Element_Begin1("Plane");
+    #endif //MEDIAINFO_TRACE_FFV1CONTENT
 
-    int16s *sample[2];
+    if (bits_per_sample <= 8)
+        bits_max = 8;
+    else
+        bits_max = bits_per_sample;
+    bits_mask1 = ((1 << bits_max) - 1);
+    bits_mask2 = 1 << (bits_max - 1);
+    bits_mask3 = bits_mask2 - 1;
+
+    pixel_t *sample[2];
     sample[0] = current_slice->sample_buffer + 3;
-    sample[1] = current_slice->sample_buffer + current_slice->w + 6 + 3;
+    sample[1] = sample[0] + current_slice->w + 6;
 
     memset(current_slice->sample_buffer, 0, 2 * (current_slice->w + 6) * sizeof(*current_slice->sample_buffer));
 
@@ -891,105 +1164,169 @@ void File_Ffv1::plane(int32u pos)
 
     for (size_t y = 0; y < current_slice->h; y++)
     {
-        Element_Begin1("Line");
-        Element_Info1(y);
+        #if MEDIAINFO_TRACE_FFV1CONTENT
+            Element_Begin1("Line");
+            Element_Info1(y);
+        #endif //MEDIAINFO_TRACE_FFV1CONTENT
 
-        int16s *temp = sample[0];
-
-        sample[0] = sample[1];
-        sample[1] = temp;
+        swap(sample[0], sample[1]);
 
         sample[1][-1] = sample[0][0];
         sample[0][current_slice->w]  = sample[0][current_slice->w - 1];
 
-        if (bits_per_sample <= 8)
-            bits_max = 8;
-        else
-            bits_max = bits_per_sample;
-
         line(pos, sample);
-        Element_End0();
+
+        #if MEDIAINFO_TRACE_FFV1CONTENT
+            Element_End0();
+        #endif //MEDIAINFO_TRACE_FFV1CONTENT
     }
 
-    Element_End0();
+    #if MEDIAINFO_TRACE_FFV1CONTENT
+        Element_End0();
+    #endif //MEDIAINFO_TRACE_FFV1CONTENT
 }
 
 //---------------------------------------------------------------------------
 void File_Ffv1::rgb()
 {
-    Element_Begin1("rgb");
+    #if MEDIAINFO_TRACE_FFV1CONTENT
+        Element_Begin1("rgb");
+    #endif //MEDIAINFO_TRACE_FFV1CONTENT
 
-    int16s *sample[4][2];
+    bits_max = bits_per_sample + 1;
+    bits_mask1 = (1 << bits_max) - 1;
+    bits_mask2 = 1 << (bits_max - 1);
+    bits_mask3 = bits_mask2-1;
+
+    size_t c_max = alpha_plane ? 4 : 3;
+
+    pixel_t *sample[4][2];
 
     current_slice->run_index = 0;
 
-    for (int x = 0; x < 4; x++) {
+    for (int x = 0; x < c_max; x++) {
         sample[x][0] = current_slice->sample_buffer +  x * 2      * (current_slice->w + 6) + 3;
-        sample[x][1] = current_slice->sample_buffer + (x * 2 + 1) * (current_slice->w + 6) + 3;
+        sample[x][1] = sample[x][0] + current_slice->w + 6;
     }
     memset(current_slice->sample_buffer, 0, 8 * (current_slice->w + 6) * sizeof(*current_slice->sample_buffer));
 
     for (size_t y = 0; y < current_slice->h; y++)
     {
-        Element_Begin1("Line");
-        Element_Info1(y);
+        #if MEDIAINFO_TRACE_FFV1CONTENT
+            Element_Begin1("Line");
+            Element_Info1(y);
+        #endif //MEDIAINFO_TRACE_FFV1CONTENT
 
-        for (size_t c = 0; c < (unsigned)(3 + alpha_plane); c++)
+        for (size_t c = 0; c < c_max; c++)
         {
             // Copy for next lines: 4.3 context
-            int16s *temp = sample[c][0];
-
-            sample[c][0] = sample[c][1];
-            sample[c][1] = temp;
+            swap(sample[c][0], sample[c][1]);
 
             sample[c][1][-1]= sample[c][0][0  ];
             sample[c][0][current_slice->w]= sample[c][0][current_slice->w - 1];
-            bits_max = bits_per_sample + 1;
+
             line((c + 1) / 2, sample[c]);
         }
 
-        Element_End0();
+        #if MEDIAINFO_TRACE_FFV1CONTENT
+            Element_End0();
+        #endif //MEDIAINFO_TRACE_FFV1CONTENT
     }
 
-    Element_End0();
+    #if MEDIAINFO_TRACE_FFV1CONTENT
+        Element_End0();
+    #endif //MEDIAINFO_TRACE_FFV1CONTENT
 }
 
-static inline int get_context(int16s quant_table[MAX_CONTEXT_INPUTS][256], int16s *src, int16s *last, int16s *last2)
+//---------------------------------------------------------------------------
+static inline int32s get_median_number(int32s one, int32s two, int32s three)
+{
+    if (one > two)
+    {
+        // one > two > three
+        if (two > three)
+            return two;
+
+        // three > one > two
+        if (three > one)
+            return one;
+        // one > three > two
+        return three;
+    }
+
+    // three > two > one
+    if (three > two)
+        return two;
+
+    // two > one && two > three
+
+    // two > three > one
+    if (three > one)
+        return three;
+    return one;
+}
+
+//---------------------------------------------------------------------------
+static inline int32s predict(pixel_t *current, pixel_t *current_top, bool is_overflow_16bit)
+{
+    int32s LeftTop, Top, Left;
+    if (is_overflow_16bit)
+    {
+        LeftTop = (int16s)current_top[-1];
+        Top = (int16s)current_top[0];
+        Left = (int16s)current[-1];
+    }
+    else
+    {
+        LeftTop = current_top[-1];
+        Top = current_top[0];
+        Left = current[-1];
+    }
+
+    return get_median_number(Left, Left + Top - LeftTop, Top);
+}
+
+//---------------------------------------------------------------------------
+static inline int get_context_3(pixel_t quant_table[MAX_CONTEXT_INPUTS][256], pixel_t *src, pixel_t *last)
 {
     const int LT = last[-1];
     const int T  = last[0];
     const int RT = last[1];
     const int L  = src[-1];
 
-    if (quant_table[3][127])
-    {
-        const int TT = last2[0];
-        const int LL = src[-2];
-        return quant_table[0][(L - LT) & 0xFF]
-             + quant_table[1][(LT - T) & 0xFF]
-             + quant_table[2][(T - RT) & 0xFF]
-             + quant_table[3][(LL - L) & 0xFF]
-             + quant_table[4][(TT - T) & 0xFF];
-    }
-    else
-        return quant_table[0][(L - LT) & 0xFF]
-             + quant_table[1][(LT - T) & 0xFF]
-             + quant_table[2][(T - RT) & 0xFF];
+    return quant_table[0][(L - LT) & 0xFF]
+        + quant_table[1][(LT - T) & 0xFF]
+        + quant_table[2][(T - RT) & 0xFF];
+}
+static inline int get_context_5(pixel_t quant_table[MAX_CONTEXT_INPUTS][256], pixel_t *src, pixel_t *last)
+{
+    const int LT = last[-1];
+    const int T  = last[0];
+    const int RT = last[1];
+    const int L  = src[-1];
+    const int TT = src[0];
+    const int LL = src[-2];
+    return quant_table[0][(L - LT) & 0xFF]
+        + quant_table[1][(LT - T) & 0xFF]
+        + quant_table[2][(T - RT) & 0xFF]
+        + quant_table[3][(LL - L) & 0xFF]
+        + quant_table[4][(TT - T) & 0xFF];
 }
 
 //---------------------------------------------------------------------------
-int32s File_Ffv1::line_range_coder(int32s pos, int32s context)
+int32s File_Ffv1::pixel_RC(int32s context)
 {
     int32s u;
 
-    Get_RS(current_slice->plane_states[pos][context], u, "symbol");
+    Get_RS(Context_RC[context], u, "symbol");
     return u;
 }
 
 
 //---------------------------------------------------------------------------
-int32s File_Ffv1::line_adaptive_symbol_by_symbol(size_t x, int32s pos, int32s context)
+int32s File_Ffv1::pixel_GR(int32s context)
 {
+#if MEDIAINFO_TRACE_FFV1CONTENT
     int32s u;
 
     // New symbol, go to "run mode"
@@ -999,7 +1336,7 @@ int32s File_Ffv1::line_adaptive_symbol_by_symbol(size_t x, int32s pos, int32s co
     // If not running, get the symbol
     if (current_slice->run_mode == RUN_MODE_STOP)
     {
-        u = get_symbol_with_bias_correlation(&current_slice->contexts[pos][context]);
+        u = get_symbol_with_bias_correlation(&Context_GR[context]);
         #if MEDIAINFO_TRACE
         Param("symbol", u);
         #endif //MEDIAINFO_TRACE
@@ -1013,7 +1350,7 @@ int32s File_Ffv1::line_adaptive_symbol_by_symbol(size_t x, int32s pos, int32s co
         //if (bsf.GetB()) // "hits"
         if (hits) // "hits"
         {
-            current_slice->run_segment_length = 1 << log2_run[current_slice->run_index];
+            current_slice->run_segment_length = run[current_slice->run_index];
             if (x + current_slice->run_segment_length <= current_slice->w) //Do not go further as the end of line
                 ++current_slice->run_index;
         }
@@ -1032,7 +1369,7 @@ int32s File_Ffv1::line_adaptive_symbol_by_symbol(size_t x, int32s pos, int32s co
     current_slice->run_segment_length--;
     if (current_slice->run_segment_length < 0) // we passed the length of same symbol, time to get the new symbol
     {
-        u = get_symbol_with_bias_correlation(&current_slice->contexts[pos][context]);
+        u = get_symbol_with_bias_correlation(&Context_GR[context]);
         #if MEDIAINFO_TRACE
         Param("symbol", u);
         #endif //MEDIAINFO_TRACE
@@ -1045,44 +1382,112 @@ int32s File_Ffv1::line_adaptive_symbol_by_symbol(size_t x, int32s pos, int32s co
     } else // same symbol as previous pixel, no difference, waiting
         u = 0;
     return u;
+#else //MEDIAINFO_TRACE_FFV1CONTENT
+    if (current_slice->run_mode == RUN_MODE_STOP)
+    {
+        if (context)
+            return get_symbol_with_bias_correlation(&Context_GR[context]); // If not running, get the symbol
+
+        current_slice->run_mode = RUN_MODE_PROCESSING; // New symbol, go to "run mode"
+    }
+
+    if (current_slice->run_segment_length == 0 && current_slice->run_mode == RUN_MODE_PROCESSING) // Same symbol length
+    {
+        if (BS->GetB()) // "hits"
+        {
+            current_slice->run_segment_length = run[current_slice->run_index];
+            if (x + current_slice->run_segment_length <= current_slice->w) //Do not go further as the end of line
+                ++current_slice->run_index;
+            if (--current_slice->run_segment_length >= 0)
+                return 0;
+        }
+        else // "miss"
+        {
+            current_slice->run_mode = RUN_MODE_INTERRUPTED;
+
+            if (current_slice->run_index)
+            {
+                int8u count = log2_run[current_slice->run_index--];
+                if (count)
+                {
+                    current_slice->run_segment_length = ((int32s)BS->Get4(count)) - 1;
+                    if (current_slice->run_segment_length >= 0)
+                        return 0;
+                }
+                else
+                    current_slice->run_segment_length = -1;
+            }
+            else
+                current_slice->run_segment_length = -1;
+        }
+    }
+    else if (--current_slice->run_segment_length >= 0)
+        return 0;
+
+    // Time for the new symbol length run
+    current_slice->run_mode_init();
+
+    int32s u = get_symbol_with_bias_correlation(&Context_GR[context]);
+    if (u >= 0) // GR(u - 1, ...)
+        u++;
+    return u;
+#endif //MEDIAINFO_TRACE_FFV1CONTENT
 }
 
 //---------------------------------------------------------------------------
-void File_Ffv1::line(int pos, int16s *sample[2])
+void File_Ffv1::line(int pos, pixel_t *sample[2])
 {
     // TODO: slice_coding_mode (version 4)
 
-    if (!coder_type)
+    quant_table_struct& quant_table = quant_tables[quant_table_index[pos]];
+    bool Is5 = quant_table[3][127] ? true : false;
+    pixel_t* s0c = sample[0];
+    pixel_t* s0e = s0c + current_slice->w;
+    pixel_t* s1c = sample[1];
+
+    if (coder_type)
     {
-        current_slice->run_segment_length = 0;
-        current_slice->run_mode_init();
-    }
+        Context_RC = current_slice->plane_states[pos];
 
-    for (size_t x = 0; x < current_slice->w; x++)
-    {
-        int32s context;
-
-        context = get_context(quant_tables[quant_table_index[pos]], sample[1] + x, sample[0] + x, sample[1] + x);
-
-        bool negative = false;
-        // Step 7
-        if (context < 0)
+        while (s0c<s0e)
         {
-            context = -context;
-            negative = true;
+            int32s context = Is5 ? get_context_5(quant_table, s1c, s0c) : get_context_3(quant_table, s1c, s0c);
+
+            int32s Value = predict(s1c, s0c, is_overflow_16bit);
+            #if MEDIAINFO_TRACE_FFV1CONTENT
+                if (context >= 0)
+                    Value += pixel_RC(context);
+                else
+                    Value -= pixel_RC(-context);
+            #else //MEDIAINFO_TRACE_FFV1CONTENT
+                if (context >= 0)
+                    Value += RC->get_symbol_s(Context_RC[context]);
+                else
+                    Value -= RC->get_symbol_s(Context_RC[-context]);
+            #endif //MEDIAINFO_TRACE_FFV1CONTENT;
+            *s1c = Value & bits_mask1;
+
+            s0c++;
+            s1c++;
         }
+    }
+    else
+    {
+        current_slice->run_mode_init();
 
-        int32s u;
-        if (coder_type)
-            u = line_range_coder(pos, context);
-        else
-            u = line_adaptive_symbol_by_symbol(x, pos, context);
+        Context_GR = current_slice->contexts[pos];
+        x = 0;
 
-        // Step 7
-        if (negative)
-            u = -u;
+        while (s0c < s0e)
+        {
+            int32s context = Is5 ? get_context_5(quant_table, s1c, s0c) : get_context_3(quant_table, s1c, s0c);
 
-        sample[1][x] = (predict(sample[1] + x, sample[0] + x) + u) & ((1 << bits_max) -1);
+            *s1c = (predict(s1c, s0c, is_overflow_16bit) + (context >= 0 ? pixel_GR(context) : -pixel_GR(-context))) & bits_mask1;
+
+            s0c++;
+            s1c++;
+            x++;
+        }
     }
 }
 
@@ -1099,12 +1504,13 @@ void File_Ffv1::read_quant_tables(int i)
         scale *= 2 * len_count[i][j] - 1;
         if (scale > 32768U)
         {
+            //TODO Error
+            context_count[i] = (scale + 1) / 2;
             Element_End0();
             return;
         }
-
-        context_count[i] = (scale + 1) / 2;
     }
+    context_count[i] = (scale + 1) / 2;
 
     Element_End0();
 }
@@ -1113,8 +1519,6 @@ void File_Ffv1::read_quant_tables(int i)
 void File_Ffv1::read_quant_table(int i, int j, size_t scale)
 {
     Element_Begin1("per context");
-
-    ;
 
     int8u States[states_size];
     memset(States, 128, sizeof(States));
@@ -1169,46 +1573,9 @@ int32u File_Ffv1::CRC_Compute(size_t Size)
 }
 
 //---------------------------------------------------------------------------
-int32s File_Ffv1::get_median_number(int32s one, int32s two, int32s three)
-{
-    if (one > two)
-    {
-        // one > two > three
-        if (two > three)
-            return two;
-
-        // three > one > two
-        if (three > one)
-            return one;
-        // one > three > two
-        return three;
-    }
-
-    // three > two > one
-    if (three > two)
-        return two;
-
-    // two > one && two > three
-
-    // two > three > one
-    if (three > one)
-        return three;
-    return one;
-}
-
-//---------------------------------------------------------------------------
-int32s File_Ffv1::predict(int16s *current, int16s *current_top)
-{
-    int32s LeftTop = current_top[-1];
-    int32s Top = current_top[0];
-    int32s Left = current[-1];
-
-    return get_median_number(Left, Left + Top - LeftTop, Top);
-}
-
-//---------------------------------------------------------------------------
 int32s File_Ffv1::golomb_rice_decode(int k)
 {
+#if MEDIAINFO_TRACE_FFV1CONTENT
     int32u q = 0;
     int32u v;
 
@@ -1242,10 +1609,26 @@ int32s File_Ffv1::golomb_rice_decode(int k)
     // unsigned to signed
     int32s code = (v >> 1) ^ -(v & 1);
     return code;
+#else //MEDIAINFO_TRACE_FFV1CONTENT
+    int8u q = 0;
+    while (BS->Remain() && !BS->GetB())
+        if (++q >= PREFIX_MAX)
+        {
+            int32s v = 11 + BS->Get4(bits_max);
+
+            // unsigned to signed
+            return (v >> 1) ^ -(v & 1);
+        }
+
+    int32s v = (q << k) | BS->Get4(k);
+
+    // unsigned to signed
+    return (v >> 1) ^ -(v & 1);
+#endif //MEDIAINFO_TRACE_FFV1CONTENT
 }
 
 //---------------------------------------------------------------------------
-int32s File_Ffv1::get_symbol_with_bias_correlation(Slice::Context *context)
+int32s File_Ffv1::get_symbol_with_bias_correlation(Slice::ContextPtr context)
 {
     int k = 0;
     // Step 8: compute the Golomb parameter k
@@ -1264,50 +1647,15 @@ int32s File_Ffv1::get_symbol_with_bias_correlation(Slice::Context *context)
 
     code += context->C;
 
-    update_correlation_value_and_shift(context);
+    context->update_correlation_value_and_shift();
 
     // Step 7 (TODO better way)
-    bool neg = code & (1 << (bits_max - 1)); // check if the number is negative
-    code = code & ((1 << (bits_max - 1)) - 1); // Keep only the n bits
+    bool neg = code & bits_mask2; // check if the number is negative
+    code = code & bits_mask3; // Keep only the n bits
     if (neg)
-        code = - 1 - (~code & ((1 << (bits_max - 1)) - 1)); // 0xFFFFFFFF - positive value on n bits
+        code = - 1 - (~code & bits_mask3); // 0xFFFFFFFF - positive value on n bits
 
     return code;
-}
-
-//---------------------------------------------------------------------------
-void File_Ffv1::update_correlation_value_and_shift(Slice::Context *c)
-{
-    if (!c)
-        return;
-
-    // Step 11: Resets
-    if (c->N == c->N0)
-    {
-         // divide by 2, if >= 0 : ROUND, otherwise, CEIL
-        c->N >>= 1;
-        c->A >>= 1;
-        c->B >>= 1;
-    }
-    ++c->N; // context meets
-
-    // Step 12: Bias computation procedure
-    // Keep B in (-N;0]
-    if (c->B <= -c->N) {
-        if (c->C > c->Cmin)
-            --c->C;
-
-        c->B = c->B + c->N;
-        if (c->B <= -c->N)
-            c->B = -c->N + 1;
-    } else if (c->B > 0) {
-        if (c->C < c->Cmax)
-            ++c->C;
-
-        c->B = c->B - c->N;
-        if (c->B > 0)
-            c->B = 0;
-    }
 }
 
 //---------------------------------------------------------------------------
@@ -1321,9 +1669,11 @@ void File_Ffv1::copy_plane_states_to_slice(int8u plane_count)
         int32u idx = quant_table_index[i];
         if (!current_slice->plane_states[i])
         {
-            current_slice->plane_states[i] = new int8u* [context_count[idx] + 1];
+            current_slice->plane_states[i] = new int8u*[context_count[idx] + 1];
+            current_slice->plane_states_maxsizes[i] = context_count[idx] + 1;
             memset(current_slice->plane_states[i], 0, (context_count[idx] + 1) * sizeof(int8u*));
         }
+
         for (size_t j = 0; j < context_count[idx]; j++)
         {
             if (!current_slice->plane_states[i][j])

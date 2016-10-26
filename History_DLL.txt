@@ -3,10 +3,89 @@
 + Added
 - Deleted
 x Correction
-#number is the identifier of bug report (B), requested feature (F) or patch (P)
+#number is the identifier of SourceForge bug report (B), requested feature (F) or patch (P), MediaInfoLib GitHub issue (I), or MediaInfo GitHub issue (M)
 bug reports and feature request are here:
 https://sourceforge.net/p/mediainfo/_list/tickets
 
+
+Version 0.7.90
+--------------
++ #M94, WAV: support of file with a buggy RIFF header
++ MXF: detection of some incoherences between header and footer
++ MXF: display of Locked information
++ N19/STL: support of 48/50/60 fps content
++ N19/STL: display of time code of first frame
++ AC-3: bit depth
++ MPEG Video: CBR bitrate mode information based on vbv_delay
++ DXW: support of fake time code attribute
+x Teletext in MPEG-TS: CodecID, format (classic teletext or subtitle), video delay were sometimes not displayed
+x PDF: fixed crash with some files with full analysis set
+
+Version 0.7.89, 2016-09-30
+--------------
++ QuickTime: support of Panasonic AVC-Intra 50/100/200 without SPS/PPS ("aixx" and "AVin" CodecID)
++ More QuickTime/MP4/AVC/HEVC color descriptions based on future ISO 23001-8:201x/PDAM1
++ FFV1: handling 16+ bitdepth (YUV and RGB) while handling buggy version <= 3 YUV 16-bit streams
++ Improved growing file detection, option for forcing the growing file test
++ Matroska: support of video FieldOrder, MatrixCoefficients, BitsPerChannel, Range, TransferCharacteristics, Primaries
++ Acquisition Metadata: support of more elements (IrisTNumber, IrisRingPosition, FocusRingPosition, ZoomRingPosition, ColorMatrix)
++ Add stream counts to MIXML output
++ I242, AVI/Matroska: mapping of mjp2 to JPEG 2000 format name
++ MPEG-4 Visual: parsing of Studio profiles, providing width/height/frame rate...
++ MXF: reading MPEG-4 Visual profile from MXF sub-descriptor and/or EssenceCompression
++ MXF: reading Intra GOP info from descriptors
++ Sequence of images: detection of sequence even if the provided path separator is the Unix one (Windows only)
+x Acquisition Metadata: IrisFNumber, FocusPosition, LensZoom were not correctly reported
+x LXF: fixed crash in case of some malformed files
+x LXF: reject bad frames instead of displaying wrong duration and bit rate
+
+Version 0.7.88, 2016-08-31
+--------------
++ MediaInfo distributed with HTTP/HTTPS support: support of Amazon S3 with Signature Version 4
++ FFV1: parsing speed slight improvement
+x Duration: fixed regression in last release, sometimes duration was displayed with only count of minutes
+
+Version 0.7.87, 2016-06-30
+--------------
++ Refactoring of the trace feature, for better performance and some bug fixes
+- Visual C++ 2012 project files removed
+x Review of symbols display, now using standard display (e.g. "k" instead of "K", " min" instead of "mn"...)
+x XML output: revert to old versioning method (version is MediaInfo software version)
+x I63, EBUCore/FIMS outputs: typo correction about WritingLibrary and WritingApplication
+x Matroska: files with CodecPrivate element before CodecID element where not always correctly parsed
+x OGG: crash/incoherent behavior with some buggy OGG streams having invalid chunk sizes
+
+Version 0.7.86, 2016-05-31
+--------------
++ FFV1 parsing optimization, avoiding by default a too verbose trace
++ Matroska: more elements support and typo fixes in the trace
++ #I172, Trace feature: provide the name of the main parser in the media element
++ Matroska: consider all values below 0x10 EBML names as 1-byte junk
++ --HTTPS=0 option for using HTTP in XML outputs
+x Matroska: better support (including speed improvement) of huge lossless frames (e.g. 20 MB FFV1 4K)
+x #I144, Python binding: Python 2 on Linux does not automatically provide the locale to the shared object
+x HTML output: don't escape carriage returns from the input file
+x FFV1: some streams were rejected despite the fact they are valid
+x Python binding: some errors during call of Get() API with Python3 on Linux/Mac
+
+Version 0.7.85, 2016-04-29
+--------------
++ FFV1: ScanType and ScanOrder
++ Detection of Omneon VBI and move of the VBI track from Video part to Others part
++ N19/STL: Support of etection of less standard frame rates (23.976 and 29.970)
++ Teletext in MPEG-TS: Teletext not subtitle moved to "Other" part
++ Teletext in MPEG-TS: display of CodecID and timestamp of first frame
+x Teletext in MXF: some IDs were wrong (when there are more than one Teletext service)
+x MPEG-4/MOV: default of raw audio to Signed in case of stsd atom version <2
+x MPEG Video: some CEA-608/708 captions were not correctly detected due to some packets discarded by the parser with interlaced content
+x MPEG-4/MOV: Dolby E with 2 or more audio services were not correctly reported
+
+Version 0.7.84, 2016-03-31
+--------------
+x #I122, MPEG-4/MOV: Crash if mdhd timescale is 0
+x MPEG-4/MOV: Infinite loop if malformed stsc / stsz (detected by fuzzing)
+x MPEG-TS: some DVB Subtitles were not detected
+x HLS: better handling of media playlists having EXT-X-BYTERANGE
 
 Version 0.7.83, 2016-02-29
 --------------

@@ -41,7 +41,7 @@ File_Teletext::File_Teletext()
 :File__Analyze()
 {
     //Configuration
-    ParserName=__T("Teletext");
+    ParserName="Teletext";
     #if MEDIAINFO_EVENTS
         ParserIDs[0]=MediaInfo_Parser_Teletext;
         StreamIDs_Width[0]=2;
@@ -59,6 +59,13 @@ File_Teletext::File_Teletext()
         Parser=NULL;
     #endif
     IsSubtitle=false;
+
+    //Stream
+    Stream_HasChanged=0;
+
+    //Temp
+    PageNumber=0xFF;
+    SubCode=0x3F7F;
 }
 
 //---------------------------------------------------------------------------
@@ -78,12 +85,42 @@ void File_Teletext::Streams_Fill()
 //---------------------------------------------------------------------------
 void File_Teletext::Streams_Finish()
 {
-    for (streams::iterator Stream=Streams.begin(); Stream!=Streams.end(); ++Stream)
+    //Filling when it is from MpegPs
+    //TODO: filter subtitles and non subtitles, some files have normal teletext in subtitles block.
+    if (Parser)
     {
-        Stream_Prepare(Stream_Text);
-        Fill(Stream_Text, StreamPos_Last, Text_Format, IsSubtitle?"Teletext Subtitle":"Teletext");
-        Fill(Stream_Text, StreamPos_Last, Text_ID, Ztring::ToZtring(Stream->first, 16));
+        Parser->Finish();
+        for (size_t StreamKind=Stream_General+1; StreamKind<Stream_Max; StreamKind++)
+            for (size_t StreamPos=0; StreamPos<Parser->Count_Get((stream_t)StreamKind); StreamPos++)
+            {
+                Stream_Prepare((stream_t)StreamKind);
+                Merge(*Parser, (stream_t)StreamKind, StreamPos_Last, StreamPos);
+            }
+
+        return;
     }
+
+    if (Teletexts && !Teletexts->empty())
+        for (std::map<int16u, teletext>::iterator Teletext=Teletexts->begin(); Teletext!=Teletexts->end(); ++Teletext)
+        {
+            std::map<std::string, Ztring>::iterator Info_Format=Teletext->second.Infos.find("Format");
+            Stream_Prepare((Info_Format!=Teletext->second.Infos.end() && Info_Format->second==__T("Teletext"))?Stream_Other:Stream_Text);
+            Fill(StreamKind_Last, StreamPos_Last, General_ID, Ztring::ToZtring(Teletext->first), true);
+            Fill(StreamKind_Last, StreamPos_Last, General_ID_String, Ztring::ToZtring(Teletext->first), true);
+
+            for (std::map<std::string, ZenLib::Ztring>::iterator Info=Teletext->second.Infos.begin(); Info!=Teletext->second.Infos.end(); ++Info)
+            {
+                if (Retrieve(StreamKind_Last, StreamPos_Last, Info->first.c_str()).empty())
+                    Fill(StreamKind_Last, StreamPos_Last, Info->first.c_str(), Info->second);
+            }
+        }
+    else
+        for (streams::iterator Stream = Streams.begin(); Stream != Streams.end(); ++Stream)
+        {
+            Stream_Prepare(IsSubtitle?Stream_Text:Stream_Other);
+            Fill(StreamKind_Last, StreamPos_Last, General_ID, Ztring::ToZtring(Stream->first, 16));
+            Fill(StreamKind_Last, StreamPos_Last, "Format", IsSubtitle?"Teletext Subtitle":"Teletext");
+        }
 }
 
 //***************************************************************************
@@ -165,12 +202,6 @@ bool File_Teletext::Synched_Test()
 //---------------------------------------------------------------------------
 void File_Teletext::Synched_Init()
 {
-    //Stream
-    Stream_HasChanged=0;
-
-    //Temp
-    PageNumber=0xFF;
-    SubCode=0x3F7F;
 }
 
 //***************************************************************************
@@ -197,6 +228,10 @@ void File_Teletext::Read_Buffer_Unsynched()
                 Stream_HasChanged=0;
             }
         }
+
+    //Unsynching when it is from MpegPs
+    if (Parser)
+        Parser->Open_Buffer_Unsynch();
 }
 
 static inline int8u ReverseBits(int8u c)
@@ -216,7 +251,10 @@ void File_Teletext::Read_Buffer_Continue()
         if (FromMpegPs)
         {
             if (!Status[IsAccepted])
+            {
                 Accept();
+                MustSynchronize=false;
+            }
 
             Skip_B1(                                            "data_identifier");
             while (Element_Offset<Element_Size)
@@ -237,7 +275,10 @@ void File_Teletext::Read_Buffer_Continue()
                     {
                         Parser=new File_Teletext();
                         Parser->MustSynchronize=false;
+                        Parser->IsSubtitle=data_unit_id==0x03;
+                        Parser->Teletexts=Teletexts;
                         Open_Buffer_Init(Parser);
+                        Parser->Accept(); //Force to be accepted because there is no other synchronization layer (MustSynchronize set to false)
                     }
                     Element_Code=data_unit_id;
                     int8u Temp[2];
@@ -245,6 +286,7 @@ void File_Teletext::Read_Buffer_Continue()
                     Temp[1]=0x55;
                     Demux(Temp, 2, ContentType_MainStream);
                     Demux(Data, 43, ContentType_MainStream);
+                    Parser->FrameInfo=FrameInfo;
                     Open_Buffer_Continue(Parser, Data, 43);
                     Element_Offset+=43;
                 }
@@ -522,7 +564,7 @@ void File_Teletext::Header_Parse()
         Element_Info1(Y);
     #endif // MEDIAINFO_TRACE
 
-    Header_Fill_Size(45);
+    Header_Fill_Size(45-(MustSynchronize?0:2));
 
     if (Y==0)
     {
@@ -532,7 +574,7 @@ void File_Teletext::Header_Parse()
             Stream_HasChanged=0;
         }
 
-        if (C[4])
+        if (C[4] && PageNumber!=0xFF)
         {
             stream &Stream=Streams[(X<<8)|PageNumber];
             for (size_t PosY=0; PosY<26; ++PosY)
@@ -681,6 +723,35 @@ void File_Teletext::Data_Parse()
 //---------------------------------------------------------------------------
 void File_Teletext::HasChanged()
 {
+    #if MEDIAINFO_EVENTS
+        EVENT_BEGIN (Global, SimpleText, 0)
+            wstring Content;
+            stream &Stream=Streams[Stream_HasChanged];
+            const wchar_t* Row_Values[26];
+            for (size_t PosY=0; PosY<26; ++PosY)
+            {
+                if (PosY)
+                    Content+=EOL;
+                Content+=Stream.CC_Displayed_Values[PosY];
+                Row_Values[PosY]=Stream.CC_Displayed_Values[PosY].c_str();
+            }
+            Event.StreamIDs[StreamIDs_Size-1]=Stream_HasChanged;
+            Event.DTS=FrameInfo.DTS;
+            Event.PTS=Event.DTS;
+            Event.DUR=(int64u)-1;
+            Event.Content=Content.c_str();
+            Event.Flags=0;
+            if (StreamIDs_Size>1 && Event.ParserIDs[StreamIDs_Size-2]==MediaInfo_Parser_Sdp)
+                Event.MuxingMode=12; //Ancillary data / OP-47 / SDP
+            else
+                Event.MuxingMode=14; //Usually Teletext in MPEG-TS
+            Event.Service=(int8u)-1;
+            Event.Row_Max=26;
+            Event.Column_Max=40;
+            Event.Row_Values=(wchar_t**)&Row_Values;
+            Event.Row_Attributes=NULL;
+        EVENT_END   ()
+    #endif //MEDIAINFO_EVENTS
 }
 
 //***************************************************************************

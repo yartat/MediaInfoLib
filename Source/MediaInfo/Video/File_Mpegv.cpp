@@ -42,6 +42,10 @@ extern const char* Mpegv_colour_primaries(int8u colour_primaries)
         case  7 : return "SMPTE 240M"; //Same as BT.601 NTSC
         case  8 : return "Generic film";
         case  9 : return "BT.2020";                                     //Added in HEVC
+        case 10 : return "XYZ";                                         //Added in HEVC 2014
+        case 11 : return "SMPTE RP 431-2";                              //Added in ISO 23001-8:201x/PDAM1
+        case 12 : return "SMPTE EG 432-1";                              //Added in ISO 23001-8:201x/PDAM1
+        case 22 : return "EBU Tech 3213";                               //Added in ISO 23001-8:201x/PDAM1
         default : return "";
     }
 }
@@ -66,6 +70,7 @@ extern const char* Mpegv_transfer_characteristics(int8u transfer_characteristics
         case 15 : return "BT.2020";                                     //Added in HEVC
         case 16 : return "SMPTE ST 2084";                               //Added in HEVC 2015
         case 17 : return "SMPTE ST 428-1";                              //Added in HEVC 2015
+        case 18 : return "HLG";                                         //Added in ISO 23001-8:201x/PDAM1
         default : return "";
     }
 }
@@ -84,15 +89,14 @@ extern const char* Mpegv_matrix_coefficients(int8u matrix_coefficients)
         case  8 : return "YCgCo";                                       //Added in AVC
         case  9 : return "BT.2020 non-constant";                        //Added in HEVC
         case 10 : return "BT.2020 constant";                            //Added in HEVC
+        case 11 : return "Chroma-derived non-constant";                 //Added in ISO 23001-8:201x/PDAM1
+        case 12 : return "Chroma-derived constant";                     //Added in ISO 23001-8:201x/PDAM1
         default : return "";
     }
 }
 
 } //NameSpace
 
-#if !MEDIAINFO_ADVANCED
-    const int64u Config_VariableGopDetection_Occurences=4;
-#endif // MEDIAINFO_ADVANCED
 //---------------------------------------------------------------------------
 #endif //...
 //---------------------------------------------------------------------------
@@ -1024,6 +1028,10 @@ const File__Analyze::vlc Mpegv_coded_block_pattern[]=
 
 #endif //MEDIAINFO_MACROBLOCKS
 
+#if !MEDIAINFO_ADVANCED
+    const int64u Config_VariableGopDetection_Occurences=4;
+#endif // MEDIAINFO_ADVANCED
+
 //***************************************************************************
 // Constructor/Destructor
 //***************************************************************************
@@ -1033,7 +1041,7 @@ File_Mpegv::File_Mpegv()
 :File__Analyze()
 {
     //Configuration
-    ParserName=__T("MPEG Video");
+    ParserName="MPEG Video";
     #if MEDIAINFO_EVENTS
         ParserIDs[0]=MediaInfo_Parser_Mpegv;
         StreamIDs_Width[0]=16;
@@ -1264,6 +1272,8 @@ void File_Mpegv::Streams_Fill()
     //BitRate
     if (vbv_delay==0xFFFF || (MPEG_Version==1 && bit_rate_value==0x3FFFF))
         Fill(Stream_Video, 0, Video_BitRate_Mode, "VBR");
+    else
+        Fill(Stream_Video, 0, Video_BitRate_Mode, "CBR");
     if (bit_rate_value_IsValid && (bit_rate_extension>0 || bit_rate_value!=0x3FFFF))
         Fill(Stream_Video, 0, Video_BitRate_Maximum, ((((int32u)bit_rate_extension<<12))+bit_rate_value)*400);
 
@@ -3458,14 +3468,22 @@ void File_Mpegv::user_data_start_GA94_03()
 
         if (TemporalReference_Offset+temporal_reference>=TemporalReference.size())
             TemporalReference.resize(TemporalReference_Offset+temporal_reference+1);
-        if (TemporalReference[TemporalReference_Offset+temporal_reference]==NULL)
-            TemporalReference[TemporalReference_Offset+temporal_reference]=new temporalreference;
-        if (TemporalReference[TemporalReference_Offset+temporal_reference]->GA94_03==NULL)
-            TemporalReference[TemporalReference_Offset+temporal_reference]->GA94_03=new temporalreference::buffer_data;
-        TemporalReference[TemporalReference_Offset+temporal_reference]->GA94_03->Size=(size_t)(Element_Size-Element_Offset);
-        delete[] TemporalReference[TemporalReference_Offset+temporal_reference]->GA94_03->Data;
-        TemporalReference[TemporalReference_Offset+temporal_reference]->GA94_03->Data=new int8u[(size_t)(Element_Size-Element_Offset)];
-        std::memcpy(TemporalReference[TemporalReference_Offset+temporal_reference]->GA94_03->Data, Buffer+Buffer_Offset+(size_t)Element_Offset, (size_t)(Element_Size-Element_Offset));
+        temporalreference* &Ref=TemporalReference[TemporalReference_Offset+temporal_reference];
+        if (Ref==NULL)
+            Ref=new temporalreference;
+        if (Ref->GA94_03==NULL)
+            Ref->GA94_03=new temporalreference::buffer_data;
+        temporalreference::buffer_data* NewBuffer=Ref->GA94_03;
+        int8u* NewData=new int8u[NewBuffer->Size+(size_t)(Element_Size-Element_Offset)];
+        if (NewBuffer->Size)
+        {
+            //Data already present, copying in the new buffer
+            std::memcpy(NewData, NewBuffer->Data, NewBuffer->Size);
+            delete[] NewBuffer->Data; //Reassignement done below
+        }
+        NewBuffer->Data=NewData;
+        std::memcpy(NewBuffer->Data+ NewBuffer->Size, Buffer+Buffer_Offset+(size_t)Element_Offset, (size_t)(Element_Size-Element_Offset));
+        NewBuffer->Size+=(size_t)(Element_Size-Element_Offset);
 
         //Parsing
         Skip_XX(Element_Size-Element_Offset,                    "CC data");
@@ -3657,6 +3675,7 @@ void File_Mpegv::sequence_header()
 
         //Setting as OK
         sequence_header_IsParsed=true;
+        FirstFieldFound=false;
         if (Frame_Count==0 && FrameInfo.DTS==(int64u)-1)
             FrameInfo.DTS=0; //No DTS in container
 

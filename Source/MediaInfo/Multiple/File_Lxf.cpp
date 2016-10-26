@@ -104,7 +104,7 @@ const char* Lxf_PictureType[4]=
 };
 
 //---------------------------------------------------------------------------
-extern const float64 Mpegv_frame_rate[]; //In Video/File_Mpegv.cpp
+extern const float64 Mpegv_frame_rate[16]; //In Video/File_Mpegv.cpp
 
 //***************************************************************************
 // Constructor/Destructor
@@ -115,7 +115,7 @@ File_Lxf::File_Lxf()
 :File__Analyze()
 {
     //Configuration
-    ParserName=__T("LXF");
+    ParserName="LXF";
     #if MEDIAINFO_EVENTS
         ParserIDs[0]=MediaInfo_Parser_Lxf;
         StreamIDs_Width[0]=4; //2 numbers for Code, 2 numbers for subcode
@@ -640,6 +640,9 @@ void File_Lxf::Header_Parse()
     //Parsing
     int64u BlockSize=0, TimeStamp=0, Duration=0;
     int32u HeaderSize, Type;
+    int32u Size; //Video and Audio
+    int8u VideoFormat, GOP_M, PictureType; //Video
+    int8u Channels_Count=0; //Audio
     Skip_C8(                                                    "Signature");
     Get_L4 (Version,                                            "Version"); //0=start and duration are in field, 1=in 27 MHz values
     Get_L4 (HeaderSize,                                         "Header size");
@@ -665,17 +668,17 @@ void File_Lxf::Header_Parse()
                     int32u TimeStamp4, Duration4;
                     Get_L4 (TimeStamp4,                         "TimeStamp");
                     TimeStamp=TimeStamp4;
-                    Param_Info3(((float64)TimeStamp4)/TimeStamp_Rate, 3, " s");
+                    Param_Info3(((float64)TimeStamp4)/TimeStamp_Rate, " s", 3);
                     FrameInfo.DTS=FrameInfo.PTS=float64_int64s(((float64)TimeStamp)*1000000000/TimeStamp_Rate);
                     Get_L4 (Duration4,                          "Duration");
                     Duration=Duration4;
-                    Param_Info3(((float64)Duration)/TimeStamp_Rate, 3, " s");
+                    Param_Info3(((float64)Duration)/TimeStamp_Rate, " s", 3);
                     FrameInfo.DUR=float64_int64s(((float64)Duration)*1000000000/TimeStamp_Rate);
                     }
                     break;
         case 1 :
-                    Get_L8 (TimeStamp,                          "TimeStamp"); Param_Info3(((float64)TimeStamp)/720000, 3, " s"); FrameInfo.DTS=FrameInfo.PTS=float64_int64s(((float64)TimeStamp)*1000000/720);
-                    Get_L8 (Duration,                           "Duration"); Param_Info3(((float64)Duration)/720000, 3, " s"); FrameInfo.DUR=float64_int64s(((float64)Duration)*1000000/720);
+                    Get_L8 (TimeStamp,                          "TimeStamp"); Param_Info3(((float64)TimeStamp)/720000, " s", 3); FrameInfo.DTS=FrameInfo.PTS=float64_int64s(((float64)TimeStamp)*1000000/720);
+                    Get_L8 (Duration,                           "Duration"); Param_Info3(((float64)Duration)/720000, " s", 3); FrameInfo.DUR=float64_int64s(((float64)Duration)*1000000/720);
                     break;
         default:    ;
     }
@@ -684,8 +687,6 @@ void File_Lxf::Header_Parse()
         case 0  :   //Video
                     {
                     Video_Sizes.resize(3);
-                    int32u Size;
-                    int8u VideoFormat, GOP_M, PictureType;
                     BS_Begin_LE();
                     Get_T1 (4, VideoFormat,                     "Format"); Param_Info1(Lxf_Format_Video[VideoFormat]);
                     Skip_T1(7,                                  "GOP (N)");
@@ -708,44 +709,10 @@ void File_Lxf::Header_Parse()
                     if (!Video_Sizes.empty())
                         Video_Sizes[0]=Size;
                     BlockSize+=Size;
-                    if (Videos_Header.TimeStamp_Begin==(int64u)-1)
-                        Videos_Header.TimeStamp_Begin=TimeStamp;
-                    Videos_Header.TimeStamp_End=TimeStamp+Duration;
-                    Videos_Header.Duration=Duration;
-                    if (TimeStamp==LastAudio_TimeOffset.TimeStamp_Begin)
-                        TimeOffsets[LastAudio_BufferOffset]=stream_header(TimeStamp, TimeStamp+Duration, Duration, PictureType);
-                    else
-                        TimeOffsets[File_Offset+Buffer_Offset]=stream_header(TimeStamp, TimeStamp+Duration, Duration, PictureType);
-                    int64u PTS_Computing=TimeStamp;
-                    #if MEDIAINFO_DEMUX
-                        switch (PictureType)
-                        {
-                            case 2 :
-                            case 3 : Demux_random_access=false; break; //P-Frame, B-Frame
-                            default: Demux_random_access=true ;        //I-Frame
-                        }
-                    #endif //MEDIAINFO_DEMUX
-                    if (2>Videos.size())
-                        Videos.resize(2+1);
-                    if (!Video_Sizes.empty())
-                        Videos[2].Format=VideoFormat;
-                    if (GOP_M>1) //With B-frames
-                    {
-                        switch (PictureType)
-                        {
-                            case 2 : PTS_Computing+=GOP_M*Duration; break; //P-Frame
-                            case 3 :                                break; //B-Frame
-                            default: PTS_Computing+=Duration;              //I-Frame
-                        }
-                    }
-                    FrameInfo.PTS=float64_int64s(((float64)PTS_Computing)*1000000000/TimeStamp_Rate);
                     }
                     break;
         case 1  :   //Audio
                     {
-                    int32u Size;
-                    int8u Channels_Count=0;
-
                     if (Version==0)
                     {
                         Skip_L4(                                "First Active Field");
@@ -778,17 +745,6 @@ void File_Lxf::Header_Parse()
                     for (size_t Pos=0; Pos<Audio_Sizes.size(); Pos++)
                         Audio_Sizes[Pos]=Size;
                     BlockSize=Size*Channels_Count;
-                    if (Audios_Header.TimeStamp_Begin==(int64u)-1)
-                        Audios_Header.TimeStamp_Begin=TimeStamp;
-                    Audios_Header.TimeStamp_End=TimeStamp+Duration;
-                    Audios_Header.Duration=Duration;
-                    if (Audios_Header.Duration_First==(int64u)-1 && Duration)
-                        Audios_Header.Duration_First=Duration;
-                    LastAudio_BufferOffset=File_Offset+Buffer_Offset;
-                    LastAudio_TimeOffset=stream_header(TimeStamp, TimeStamp+Duration, Duration, (int8u)-1);
-                    #if MEDIAINFO_DEMUX
-                        Demux_random_access=true;
-                    #endif //MEDIAINFO_DEMUX
                     }
                     break;
         case 2  :   //Header
@@ -820,20 +776,77 @@ void File_Lxf::Header_Parse()
     if (Element_Offset<HeaderSize)
         Skip_XX(Header_Size-Element_Offset,                     "Unknown");
 
-    if (Buffer_Offset+Element_Offset+BlockSize>Buffer_Size)
-    {
-        //Hints
-        if (File_Buffer_Size_Hint_Pointer)
-        {
-            size_t Buffer_Size_Target=(size_t)(Buffer_Offset+0x48+BlockSize+0x48); //+0x48 for next packet header
-            if ((*File_Buffer_Size_Hint_Pointer)<Buffer_Size_Target)
-                (*File_Buffer_Size_Hint_Pointer)=Buffer_Size_Target;
-        }
-    }
-
     //Filling
     Header_Fill_Code(Type, Ztring::ToZtring(Type));
     Header_Fill_Size(HeaderSize+BlockSize);
+
+    FILLING_BEGIN();
+        if (Buffer_Offset+Element_Offset+BlockSize>Buffer_Size)
+        {
+            //Hints
+            if (File_Buffer_Size_Hint_Pointer)
+            {
+                size_t Buffer_Size_Target=(size_t)(Buffer_Offset+0x48+BlockSize+0x48); //+0x48 for next packet header
+                if ((*File_Buffer_Size_Hint_Pointer)<Buffer_Size_Target)
+                    (*File_Buffer_Size_Hint_Pointer)=Buffer_Size_Target;
+            }
+        }
+
+        switch(Type)
+        {
+            case 0  :   //Video
+                        {
+                        if (Videos_Header.TimeStamp_Begin==(int64u)-1)
+                            Videos_Header.TimeStamp_Begin=TimeStamp;
+                        Videos_Header.TimeStamp_End=TimeStamp+Duration;
+                        Videos_Header.Duration=Duration;
+                        if (TimeStamp==LastAudio_TimeOffset.TimeStamp_Begin)
+                            TimeOffsets[LastAudio_BufferOffset]=stream_header(TimeStamp, TimeStamp+Duration, Duration, PictureType);
+                        else
+                            TimeOffsets[File_Offset+Buffer_Offset]=stream_header(TimeStamp, TimeStamp+Duration, Duration, PictureType);
+                        int64u PTS_Computing=TimeStamp;
+                        #if MEDIAINFO_DEMUX
+                            switch (PictureType)
+                            {
+                                case 2 :
+                                case 3 : Demux_random_access=false; break; //P-Frame, B-Frame
+                                default: Demux_random_access=true ;        //I-Frame
+                            }
+                        #endif //MEDIAINFO_DEMUX
+                        if (2>Videos.size())
+                            Videos.resize(2+1);
+                        if (!Video_Sizes.empty())
+                            Videos[2].Format=VideoFormat;
+                        if (GOP_M>1) //With B-frames
+                        {
+                            switch (PictureType)
+                            {
+                                case 2 : PTS_Computing+=GOP_M*Duration; break; //P-Frame
+                                case 3 :                                break; //B-Frame
+                                default: PTS_Computing+=Duration;              //I-Frame
+                            }
+                        }
+                        FrameInfo.PTS=float64_int64s(((float64)PTS_Computing)*1000000000/TimeStamp_Rate);
+                        }
+                        break;
+            case 1  :   //Audio
+                        {
+                        if (Audios_Header.TimeStamp_Begin==(int64u)-1)
+                            Audios_Header.TimeStamp_Begin=TimeStamp;
+                        Audios_Header.TimeStamp_End=TimeStamp+Duration;
+                        Audios_Header.Duration=Duration;
+                        if (Audios_Header.Duration_First==(int64u)-1 && Duration)
+                            Audios_Header.Duration_First=Duration;
+                        LastAudio_BufferOffset=File_Offset+Buffer_Offset;
+                        LastAudio_TimeOffset=stream_header(TimeStamp, TimeStamp+Duration, Duration, (int8u)-1);
+                        #if MEDIAINFO_DEMUX
+                            Demux_random_access=true;
+                        #endif //MEDIAINFO_DEMUX
+                        }
+                        break;
+            default :   BlockSize=0;
+        }
+    FILLING_END();
 }
 
 //---------------------------------------------------------------------------
@@ -1050,7 +1063,7 @@ void File_Lxf::Header_Meta()
                                             FrameRate=Mpegv_frame_rate[frameRateCode+1];
                                             if (Version==0)
                                                 TimeStamp_Rate=FrameRate*2; //Time stamp is in fields
-                                            Element_Info3(FrameRate, 3, " fps");
+                                            Element_Info3(FrameRate, " fps", 3);
                                         }
                                     }
                                     Element_End0();

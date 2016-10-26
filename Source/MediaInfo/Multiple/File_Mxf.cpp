@@ -337,7 +337,7 @@ namespace Elements
     UUID(060E2B34, 02050101, 0D010201, 01040400, 0000, "SMPTE ST 377-1", ClosedCompleteFooterPartition, "")
     UUID(060E2B34, 02050101, 0D010201, 01050100, 0000, "SMPTE ST 377-1", Primer, "")
     UUID(060E2B34, 02530101, 0D010201, 01100100, 0000, "SMPTE ST 377-1", IndexTableSegment, "")
-    UUID(060E2B34, 02050101, 0D010201, 01110100, 0000, "SMPTE ST 377-1", RandomIndexMetadata, "")
+    UUID(060E2B34, 02050101, 0D010201, 01110100, 0000, "SMPTE ST 377-1", RandomIndexPack, "")
 
     //                           03 - ?
     //                             01 - ?
@@ -435,6 +435,17 @@ namespace Elements
     UUID(060E2B34, 02530105, 0E0B0102, 01010100, 0000, "", Omneon_010201010100, "")
     UUID(060E2B34, 02530105, 0E0B0102, 01020100, 0000, "", Omneon_010201020100, "")
 }
+
+//---------------------------------------------------------------------------
+extern const char* Mpegv_profile_and_level_indication_profile[];
+extern const char* Mpegv_profile_and_level_indication_level[];
+extern const char* Mpeg4v_Profile_Level(int32u Profile_Level);
+extern string Jpeg2000_Rsiz(int16u Rsiz);
+
+//---------------------------------------------------------------------------
+extern const char* AfdBarData_active_format[];
+extern const char* AfdBarData_active_format_4_3[];
+extern const char* AfdBarData_active_format_16_9[];
 
 //---------------------------------------------------------------------------
 const char* Mxf_Category(int8u Category)
@@ -1023,6 +1034,60 @@ const char* Mxf_EssenceCompression(const int128u EssenceCompression)
     }
 }
 
+//---------------------------------------------------------------------------
+const char* Mxf_EssenceCompression_Profile(const int128u EssenceCompression)
+{
+    int8u Code2=(int8u)((EssenceCompression.lo&0x00FF000000000000LL)>>48);
+    int8u Code3=(int8u)((EssenceCompression.lo&0x0000FF0000000000LL)>>40);
+    int8u Code4=(int8u)((EssenceCompression.lo&0x000000FF00000000LL)>>32);
+    int8u Code5=(int8u)((EssenceCompression.lo&0x00000000FF000000LL)>>24);
+    int8u Code6=(int8u)((EssenceCompression.lo&0x0000000000FF0000LL)>>16);
+    int8u Code7=(int8u)((EssenceCompression.lo&0x000000000000FF00LL)>> 8);
+    int8u Code8=(int8u)((EssenceCompression.lo&0x00000000000000FFLL)    );
+
+    switch (Code2)
+    {
+        case 0x01 : //Picture
+                    switch (Code3)
+                    {
+                        case 0x02 : //Coding characteristics
+                                    switch (Code4)
+                                    {
+                                        case 0x02 : //Compressed coding
+                                                    switch (Code5)
+                                                    {
+                                                        case 0x01 : //MPEG Compression
+                                                                    switch (Code6)
+                                                                    {
+                                                                        case 0x20 : //MPEG-4 Visual
+                                                                                    switch (Code7)
+                                                                                    {
+                                                                                        case 0x10 : //
+                                                                                                    switch (Code8)
+                                                                                                    {
+                                                                                                        case 0x01 :
+                                                                                                        case 0x02 :
+                                                                                                        case 0x03 :
+                                                                                                        case 0x04 :
+                                                                                                                    return Mpeg4v_Profile_Level(B8(11100000)+Code8);
+                                                                                                        case 0x05 :
+                                                                                                        case 0x06 :
+                                                                                                                    return Mpeg4v_Profile_Level(B8(11101011)-5+Code8);
+                                                                                                        default   : return "";
+                                                                                                    }
+                                                                                        default   : return "";
+                                                                                    }
+                                                                        default   : return "";
+                                                                    }
+                                                        default   : return "";
+                                                    }
+                                         default   : return "";
+                                    }
+                         default   : return "";
+                    }
+        default   : return "";
+    }
+}
 //---------------------------------------------------------------------------
 const char* Mxf_EssenceCompression_Version(const int128u EssenceCompression)
 {
@@ -2019,6 +2084,10 @@ string Mxf_AcquisitionMetadata_ElementName(int16u Value, bool IsSony=false)
         case 0x8005: return "LensZoomActualFocalLength";
         case 0x8006: return "OpticalExtenderMagnification";
         case 0x8007: return "LensAttributes";
+        case 0x8008: return "IrisTNumber";
+        case 0x8009: return "IrisRingPosition";
+        case 0x800A: return "FocusRingPosition";
+        case 0x800B: return "ZoomRingPosition";
         case 0x8100: return "AutoExposureMode";
         case 0x8101: return "AutoFocusSensingAreaSetting";
         case 0x8102: return "ColorCorrectionFilterWheelSetting";
@@ -2043,6 +2112,7 @@ string Mxf_AcquisitionMetadata_ElementName(int16u Value, bool IsSony=false)
         case 0x8115: return "ExposureIndexofPhotoMeter";
         case 0x8116: return "GammaForCDL";
         case 0x8117: return "ASC_CDL_V12";
+        case 0x8118: return "ColorMatrix";
         default:     return Ztring(Ztring::ToZtring(Value, 16)).To_UTF8();
     }
 }
@@ -2096,16 +2166,6 @@ string Mxf_AcquisitionMetadata_Sony_MonitoringBaseCurve(int128u Value)
     }
 }
 
-//---------------------------------------------------------------------------
-extern const char* Mpegv_profile_and_level_indication_profile[];
-extern const char* Mpegv_profile_and_level_indication_level[];
-extern const char* Mpeg4v_Profile_Level(int32u Profile_Level);
-
-//---------------------------------------------------------------------------
-extern const char* AfdBarData_active_format[];
-extern const char* AfdBarData_active_format_4_3[];
-extern const char* AfdBarData_active_format_16_9[];
-
 //***************************************************************************
 // Constructor/Destructor
 //***************************************************************************
@@ -2115,7 +2175,7 @@ File_Mxf::File_Mxf()
 :File__Analyze()
 {
     //Configuration
-    ParserName=__T("MXF");
+    ParserName="MXF";
     #if MEDIAINFO_EVENTS
         ParserIDs[0]=MediaInfo_Parser_Mxf;
         StreamIDs_Width[0]=8;
@@ -2133,7 +2193,7 @@ File_Mxf::File_Mxf()
     #endif //MEDIAINFO_DEMUX
 
     //Temp
-    RandomIndexMetadatas_AlreadyParsed=false;
+    RandomIndexPacks_AlreadyParsed=false;
     Streams_Count=(size_t)-1;
     OperationalPattern=0;
     Buffer_Begin=(int64u)-1;
@@ -2153,7 +2213,7 @@ File_Mxf::File_Mxf()
     IdIsAlwaysSame_Offset=0;
     PartitionMetadata_PreviousPartition=(int64u)-1;
     PartitionMetadata_FooterPartition=(int64u)-1;
-    RandomIndexMetadatas_MaxOffset=(int64u)-1;
+    RandomIndexPacks_MaxOffset=(int64u)-1;
     DTS_Delay=0;
     SDTI_TimeCode_RepetitionCount=0;
     SDTI_SizePerFrame=0;
@@ -2287,6 +2347,12 @@ void File_Mxf::Streams_Finish()
     {
         if (Tracks.empty())
         {
+            //Clear
+            for (size_t StreamKind=Stream_General+1; StreamKind<Stream_Max; StreamKind++)
+            {
+                (*Stream)[StreamKind].clear();
+                (*Stream_More)[StreamKind].clear();
+            }
             for (essences::iterator Essence=Essences.begin(); Essence!=Essences.end(); ++Essence)
                 for (parsers::iterator Parser=Essence->second.Parsers.begin(); Parser!=Essence->second.Parsers.end(); ++Parser)
                 {
@@ -2473,6 +2539,9 @@ void File_Mxf::Streams_Finish()
 
     //CameraUnitMetadata
     if (!AcquisitionMetadataLists.empty())
+    {
+        Stream_Prepare(Stream_Other);
+
         for (size_t Pos = 0; Pos < AcquisitionMetadataLists.size(); Pos++)
         {
             if (UserDefinedAcquisitionMetadata_UdamSetIdentifier_IsSony && Pos==0xE201 && !AcquisitionMetadata_Sony_E201_Lists.empty())
@@ -2526,12 +2595,18 @@ void File_Mxf::Streams_Finish()
                 {
                     case 0x8001 : //FocusPosition_ImagePlane
                     case 0x8002 : //FocusPosition_FrontLensVertex
-                    case 0x8004 : //LensZoom_35mmStillCameraEquivalent
-                    case 0x8005 : //LensZoom_ActualFocalLength
                         (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" m");
                         break;
+                    case 0x8004 : //LensZoom35mmStillCameraEquivalent
+                    case 0x8005 : //LensZoomActualFocalLength
+                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" mm");
+                        break;
                     case 0x8006 : //OpticalExtenderMagnification
+                    case 0x8009 : //IrisRingPosition
+                    case 0x800A : //FocusRingPosition
+                    case 0x800B : //ZoomRingPosition
                     case 0x810C : //ElectricalExtenderMagnification
                     case 0x810F : //CameraMasterBlackLevel
                     case 0x8110 : //CameraKneePoint
@@ -2577,6 +2652,7 @@ void File_Mxf::Streams_Finish()
                 (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FrameCounts.c_str()), Info_Options)=__T("N NT");
             }
         }
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -2931,7 +3007,7 @@ void File_Mxf::Streams_Finish_Essence(int32u EssenceUID, int128u TrackUID)
 
         //Positioning other streams
         for (essences::iterator Essence_Temp=Essence; Essence_Temp!=Essences.end(); ++Essence_Temp)
-            if (*(Essence_Temp->second.Parsers.begin()) && (*(Essence_Temp->second.Parsers.begin()))->Count_Get(Stream_Audio))
+            if (!Essence_Temp->second.Parsers.empty() && Essence_Temp->second.Parsers[0]->Count_Get(Stream_Audio))
             {
                 Essence_Temp->second.StreamPos-=2; //ChannelGrouping
                 Essence_Temp->second.StreamPos+=(*(Essence_Temp->second.Parsers.begin()))->Count_Get(Stream_Audio);
@@ -3626,7 +3702,23 @@ void File_Mxf::Streams_Finish_Descriptor(const int128u DescriptorUID, const int1
                                                     Fill(Stream_Audio, StreamPos_Last, Info->first.c_str(), Info->second, true);
                                                 break;
                         default:                ;
+                                                #if MEDIAINFO_ADVANCED
+                                                    if (SubDescriptor->second.Jpeg2000_Rsiz!=(int16u)-1 && !Retrieve(StreamKind_Last, StreamPos_Last, "Format_Profile").empty() && Jpeg2000_Rsiz(SubDescriptor->second.Jpeg2000_Rsiz)!=Retrieve(StreamKind_Last, StreamPos_Last, "Format_Profile").To_UTF8())
+                                                    {
+                                                        Fill(StreamKind_Last, StreamPos_Last, "Format_Profile_FromStream", Retrieve(StreamKind_Last, StreamPos_Last, "Format_Profile"));
+                                                        Fill(StreamKind_Last, StreamPos_Last, "Format_Profile_FromContainer", Jpeg2000_Rsiz(SubDescriptor->second.Jpeg2000_Rsiz));
+                                                    }
+                                                #endif //MEDIAINFO_ADVANCED
                     }
+
+                    for (std::map<std::string, Ztring>::iterator Info=SubDescriptor->second.Infos.begin(); Info!=SubDescriptor->second.Infos.end(); ++Info)
+                        if (Retrieve(StreamKind_Last, StreamPos_Last, Info->first.c_str()).empty())
+                            Fill(StreamKind_Last, StreamPos_Last, Info->first.c_str(), Info->second);
+                        else if (Retrieve(StreamKind_Last, StreamPos_Last, Info->first.c_str()) != Info->second)
+                        {
+                            Fill(StreamKind_Last, StreamPos_Last, (Info->first+"_Original").c_str(), Retrieve(StreamKind_Last, StreamPos_Last, Info->first.c_str()));
+                            Fill(StreamKind_Last, StreamPos_Last, Info->first.c_str(), Info->second, true);
+                        }
                 }
             }
 
@@ -3734,7 +3826,7 @@ void File_Mxf::Streams_Finish_CommercialNames ()
 }
 
 //---------------------------------------------------------------------------
-void File_Mxf::Streams_Finish_Component(const int128u ComponentUID, float64 EditRate, int32u TrackID, int64u Origin)
+void File_Mxf::Streams_Finish_Component(const int128u ComponentUID, float64 EditRate, int32u TrackID, int64s Origin)
 {
     components::iterator Component=Components.find(ComponentUID);
     if (Component==Components.end())
@@ -3797,7 +3889,7 @@ void File_Mxf::Streams_Finish_Component(const int128u ComponentUID, float64 Edit
 }
 
 //---------------------------------------------------------------------------
-void File_Mxf::Streams_Finish_Component_ForTimeCode(const int128u ComponentUID, float64 EditRate, int32u TrackID, int64u Origin, bool IsSourcePackage)
+void File_Mxf::Streams_Finish_Component_ForTimeCode(const int128u ComponentUID, float64 EditRate, int32u TrackID, int64s Origin, bool IsSourcePackage)
 {
     components::iterator Component=Components.find(ComponentUID);
     if (Component==Components.end())
@@ -3861,7 +3953,7 @@ void File_Mxf::Streams_Finish_Component_ForTimeCode(const int128u ComponentUID, 
 }
 
 //---------------------------------------------------------------------------
-void File_Mxf::Streams_Finish_Component_ForAS11(const int128u ComponentUID, float64 EditRate, int32u TrackID, int64u Origin)
+void File_Mxf::Streams_Finish_Component_ForAS11(const int128u ComponentUID, float64 EditRate, int32u TrackID, int64s Origin)
 {
     components::iterator Component=Components.find(ComponentUID);
     if (Component==Components.end())
@@ -4389,7 +4481,7 @@ void File_Mxf::Read_Buffer_AfterParsing()
 
         if (IsParsingEnd)
         {
-            if (PartitionMetadata_PreviousPartition && RandomIndexMetadatas.empty() && !RandomIndexMetadatas_AlreadyParsed)
+            if (PartitionMetadata_PreviousPartition && RandomIndexPacks.empty() && !RandomIndexPacks_AlreadyParsed)
             {
                 Partitions_Pos=0;
                 while (Partitions_Pos<Partitions.size() && Partitions[Partitions_Pos].StreamOffset!=PartitionMetadata_PreviousPartition)
@@ -5197,6 +5289,8 @@ bool File_Mxf::Header_Begin()
                             DemuxedSampleCount_Current=Config->File_IgnoreEditsAfter-DemuxedSampleCount_Total;
                             Element_Size=DemuxedSampleCount_Current*SingleDescriptor->second.BlockAlign;
                         }
+                        if (DemuxedSampleCount_Total+DemuxedSampleCount_Current+1==IgnoreSamplesAfter)
+                            DemuxedSampleCount_Current++; //Avoid rounding issues (sometimes it remains only 1 sample)
                     }
                 #endif //MEDIAINFO_DEMUX
             }
@@ -5661,7 +5755,7 @@ void File_Mxf::Data_Parse()
     ELEMENT(ClosedCompleteFooterPartition,                      "Closed and Complete Footer Partition Pack")
     ELEMENT(Primer,                                             "Primer")
     ELEMENT(IndexTableSegment,                                  "Index Table (Segment)")
-    ELEMENT(RandomIndexMetadata,                                "Random Index Metadata")
+    ELEMENT(RandomIndexPack,                                    "Random Index Metadata")
     ELEMENT(SDTI_SystemMetadataPack,                            "SDTI System Metadata Pack")
     else if (Code_Compare1==Elements::SDTI_SystemMetadataPack1
           && ((Code_Compare2)&0xFF00FFFF)==(Elements::SDTI_SystemMetadataPack2&0xFF00FFFF)
@@ -5761,7 +5855,7 @@ void File_Mxf::Data_Parse()
 
         if (IsParsingEnd)
         {
-            NextRandomIndexMetadata();
+            NextRandomIndexPack();
             return;
         }
 
@@ -6033,9 +6127,9 @@ void File_Mxf::Data_Parse()
                         if (Essence->second.FrameInfo.DUR!=(int64u)-1)
                             (*Parser)->FrameInfo.DUR=Essence->second.FrameInfo.DUR;
                         #if defined(MEDIAINFO_ANCILLARY_YES)
-                            if ((*Parser)->ParserName==__T("Ancillary"))
+                            if ((*Parser)->ParserName=="Ancillary")
                                 ((File_Ancillary*)(*Parser))->LineNumber=LineNumber;
-                            if ((*Parser)->ParserName==__T("Ancillary") && (((File_Ancillary*)(*Parser))->FrameRate==0 || ((File_Ancillary*)(*Parser))->AspectRatio==0))
+                            if ((*Parser)->ParserName=="Ancillary" && (((File_Ancillary*)(*Parser))->FrameRate==0 || ((File_Ancillary*)(*Parser))->AspectRatio==0))
                             {
                                 //Configuring with video info
                                 for (descriptors::iterator Descriptor=Descriptors.begin(); Descriptor!=Descriptors.end(); ++Descriptor)
@@ -6274,8 +6368,8 @@ void File_Mxf::Data_Parse()
         Open_Buffer_Unsynch();
     }
 
-    if (File_Offset+Buffer_Offset+Element_Size>=RandomIndexMetadatas_MaxOffset)
-        NextRandomIndexMetadata();
+    if (File_Offset+Buffer_Offset+Element_Size>=RandomIndexPacks_MaxOffset)
+        NextRandomIndexPack();
 }
 
 //***************************************************************************
@@ -6354,8 +6448,8 @@ void File_Mxf::CDCIEssenceDescriptor()
         default: GenericPictureEssenceDescriptor();
     }
 
-    if (Descriptors[InstanceUID].Infos["ColorSpace"].empty())
-        Descriptors[InstanceUID].Infos["ColorSpace"]="YUV";
+    if (Descriptors[InstanceUID].Infos.find("ColorSpace")==Descriptors[InstanceUID].Infos.end())
+        Descriptor_Fill("ColorSpace", "YUV");
 }
 
 //---------------------------------------------------------------------------
@@ -7051,52 +7145,46 @@ void File_Mxf::RGBAEssenceDescriptor()
         default: GenericPictureEssenceDescriptor();
     }
 
-    if (Descriptors[InstanceUID].Infos["ColorSpace"].empty())
-        Descriptors[InstanceUID].Infos["ColorSpace"]="RGB";
+    if (Descriptors[InstanceUID].Infos.find("ColorSpace")==Descriptors[InstanceUID].Infos.end())
+        Descriptor_Fill("ColorSpace", "RGB");
 }
 
 //---------------------------------------------------------------------------
-void File_Mxf::RandomIndexMetadata()
+void File_Mxf::RandomIndexPack()
 {
-    if (RandomIndexMetadatas_AlreadyParsed)
-    {
-        Skip_XX(Element_Size,                                   "(Already parsed)");
-        return;
-    }
-
     //Parsing
     while (Element_Offset+4<Element_Size)
     {
         Element_Begin1("PartitionArray");
-        randomindexmetadata RandomIndexMetadata;
-        Get_B4 (RandomIndexMetadata.BodySID,                    "BodySID"); Element_Info1(RandomIndexMetadata.BodySID);
-        Get_B8 (RandomIndexMetadata.ByteOffset,                 "ByteOffset"); Element_Info1(Ztring::ToZtring(RandomIndexMetadata.ByteOffset, 16));
+        randomindexpack RandomIndexPack;
+        Get_B4 (RandomIndexPack.BodySID,                        "BodySID"); Element_Info1(RandomIndexPack.BodySID);
+        Get_B8 (RandomIndexPack.ByteOffset,                     "ByteOffset"); Element_Info1(Ztring::ToZtring(RandomIndexPack.ByteOffset, 16));
         Element_End0();
 
         FILLING_BEGIN();
-            if (!RandomIndexMetadatas_AlreadyParsed && PartitionPack_AlreadyParsed.find(RandomIndexMetadata.ByteOffset)==PartitionPack_AlreadyParsed.end())
-                RandomIndexMetadatas.push_back(RandomIndexMetadata);
+            if (!RandomIndexPacks_AlreadyParsed && PartitionPack_AlreadyParsed.find(RandomIndexPack.ByteOffset)==PartitionPack_AlreadyParsed.end())
+                RandomIndexPacks.push_back(RandomIndexPack);
         FILLING_END();
     }
     Skip_B4(                                                    "Length");
 
     FILLING_BEGIN();
-        if (MediaInfoLib::Config.ParseSpeed_Get()<1.0 && !RandomIndexMetadatas_AlreadyParsed && !RandomIndexMetadatas.empty() && Config->File_Mxf_ParseIndex_Get())
+        if (MediaInfoLib::Config.ParseSpeed_Get()<1.0 && !RandomIndexPacks_AlreadyParsed && !RandomIndexPacks.empty() && Config->File_Mxf_ParseIndex_Get())
         {
             IsParsingEnd=true;
-            GoTo(RandomIndexMetadatas[0].ByteOffset);
-            RandomIndexMetadatas.erase(RandomIndexMetadatas.begin());
+            GoTo(RandomIndexPacks[0].ByteOffset);
+            RandomIndexPacks.erase(RandomIndexPacks.begin());
             Open_Buffer_Unsynch();
 
             //Hints
             if (File_Buffer_Size_Hint_Pointer)
                 (*File_Buffer_Size_Hint_Pointer)=64*1024;
         }
-        else if (!RandomIndexMetadatas_AlreadyParsed && !Partitions_IsFooter && !RandomIndexMetadatas.empty() && (!RandomIndexMetadatas[RandomIndexMetadatas.size()-1].BodySID || File_Offset+Buffer_Offset-Header_Size-RandomIndexMetadatas[RandomIndexMetadatas.size()-1].ByteOffset<16*1024*1024)) // If footer was not parsed but is available
+        else if (!RandomIndexPacks_AlreadyParsed && !Partitions_IsFooter && !RandomIndexPacks.empty() && (!RandomIndexPacks[RandomIndexPacks.size()-1].BodySID || File_Offset+Buffer_Offset-Header_Size-RandomIndexPacks[RandomIndexPacks.size()-1].ByteOffset<16*1024*1024)) // If footer was not parsed but is available
         {
-            GoTo(RandomIndexMetadatas[RandomIndexMetadatas.size()-1].ByteOffset);
+            GoTo(RandomIndexPacks[RandomIndexPacks.size()-1].ByteOffset);
         }
-        RandomIndexMetadatas_AlreadyParsed=true;
+        RandomIndexPacks_AlreadyParsed=true;
     FILLING_END();
 }
 
@@ -8060,11 +8148,7 @@ void File_Mxf::SubDescriptors()
 void File_Mxf::LensUnitMetadata()
 {
     if (Count_Get(Stream_Other)==0)
-    {
-        Stream_Prepare(Stream_Other);
-
         AcquisitionMetadataLists.resize(0x10000);
-    }
 
     switch(Code2)
     {
@@ -8076,6 +8160,10 @@ void File_Mxf::LensUnitMetadata()
         ELEMENT(8005, LensUnitMetadata_LensZoomActualFocalLength,           "LensZoom (Actual Focal Length)")
         ELEMENT(8006, LensUnitMetadata_OpticalExtenderMagnification,        "Optical Extender Magnification")
         ELEMENT(8007, LensUnitMetadata_LensAttributes,                      "Lens Attributes")
+        ELEMENT(8008, LensUnitMetadata_IrisTNumber,                         "Iris (T)")
+        ELEMENT(8009, LensUnitMetadata_IrisRingPosition,                    "Iris Ring Position")
+        ELEMENT(800A, LensUnitMetadata_FocusRingPosition,                   "Focus Ring Position")
+        ELEMENT(800B, LensUnitMetadata_ZoomRingPosition,                    "Zoom Ring Position")
         default:
                     GenerationInterchangeObject();
     }
@@ -8085,11 +8173,7 @@ void File_Mxf::LensUnitMetadata()
 void File_Mxf::CameraUnitMetadata()
 {
     if (Count_Get(Stream_Other)==0)
-    {
-        Stream_Prepare(Stream_Other);
-
         AcquisitionMetadataLists.resize(0x10000);
-    }
 
     switch(Code2)
     {
@@ -8117,7 +8201,8 @@ void File_Mxf::CameraUnitMetadata()
         ELEMENT(8114, CameraUnitMetadata_CameraAttributes,                  "Camera Attributes")
         ELEMENT(8115, CameraUnitMetadata_ExposureIndexofPhotoMeter,         "Exposure Index of Photo Meter")
         ELEMENT(8116, CameraUnitMetadata_GammaForCDL,                       "Gamma for CDL")
-        ELEMENT(8117, CameraUnitMetadata_ASC_CDL_V12,                        "ASC CDL V1.2")
+        ELEMENT(8117, CameraUnitMetadata_ASC_CDL_V12,                       "ASC CDL V1.2")
+        ELEMENT(8118, CameraUnitMetadata_ColorMatrix,                       "ColorMatrix")
         default:
                     GenerationInterchangeObject();
     }
@@ -8128,8 +8213,6 @@ void File_Mxf::UserDefinedAcquisitionMetadata()
 {
     if (Count_Get(Stream_Other)==0)
     {
-        Stream_Prepare(Stream_Other);
-
         AcquisitionMetadataLists.resize(0x10000);
         AcquisitionMetadata_Sony_CalibrationType = (int8u)-1;
     }
@@ -8539,11 +8622,7 @@ void File_Mxf::CDCIEssenceDescriptor_ComponentDepth()
     Get_B4 (Data,                                                "Data"); Element_Info1(Data);
 
     FILLING_BEGIN();
-        if (!Partitions_IsFooter || Descriptors[InstanceUID].Infos["BitDepth"].empty())
-        {
-            if (Data)
-                Descriptors[InstanceUID].Infos["BitDepth"].From_Number(Data);
-        }
+        Descriptor_Fill("BitDepth", Ztring().From_Number(Data));
     FILLING_END();
 }
 
@@ -8764,7 +8843,7 @@ void File_Mxf::FileDescriptor_SampleRate()
 
     FILLING_BEGIN();
         if (Descriptors[InstanceUID].SampleRate && Descriptors[InstanceUID].Duration!=(int64u)-1)
-            Descriptors[InstanceUID].Infos["Duration"].From_Number(Descriptors[InstanceUID].Duration/Descriptors[InstanceUID].SampleRate*1000, 0);
+            Descriptor_Fill("Duration", Ztring().From_Number(Descriptors[InstanceUID].Duration/Descriptors[InstanceUID].SampleRate*1000, 0));
     FILLING_END();
 }
 
@@ -8800,7 +8879,7 @@ void File_Mxf::FileDescriptor_EssenceContainer()
         int8u Code8=(int8u)((EssenceContainer.lo&0x00000000000000FFLL)    );
 
         Descriptors[InstanceUID].EssenceContainer=EssenceContainer;
-        Descriptors[InstanceUID].Infos["Format_Settings_Wrapping"].From_UTF8(Mxf_EssenceContainer_Mapping(Code6, Code7, Code8));
+        Descriptor_Fill("Format_Settings_Wrapping", Mxf_EssenceContainer_Mapping(Code6, Code7, Code8));
 
         if (!DataMustAlwaysBeComplete && Descriptors[InstanceUID].Infos["Format_Settings_Wrapping"].find(__T("Frame"))!=string::npos)
             DataMustAlwaysBeComplete=true;
@@ -8877,7 +8956,11 @@ void File_Mxf::InterchangeObject_InstanceUID()
                 //Merging
                 Descriptor->second.Infos.insert(Descriptor_Previous->second.Infos.begin(), Descriptor_Previous->second.Infos.end()); //TODO: better implementation
             }
+            for (std::map<std::string, Ztring>::iterator Info = Descriptor->second.Infos.begin(); Info != Descriptor->second.Infos.end(); ++Info) //Note: can not be mapped directly because there are some tests done in Descriptor_Fill
+                Descriptor_Fill(Info->first.c_str(), Info->second);
+            std::map<std::string, Ztring> Infos_Temp=Descriptors[InstanceUID].Infos; //Quick method for copying the whole descriptor without erasing the modifications made by Descriptor_Fill(). TODO: a better method in order to be more generic
             Descriptors[InstanceUID]=Descriptor->second;
+            Descriptors[InstanceUID].Infos=Infos_Temp;
             Descriptors.erase(Descriptor);
         }
         locators::iterator Locator=Locators.find(0);
@@ -9002,8 +9085,9 @@ void File_Mxf::GenericPictureEssenceDescriptor_PictureEssenceCoding()
     FILLING_BEGIN();
         Descriptors[InstanceUID].EssenceCompression=Data;
         Descriptors[InstanceUID].StreamKind=Stream_Video;
-        Descriptors[InstanceUID].Infos["Format"]=Mxf_EssenceCompression(Data);
-        Descriptors[InstanceUID].Infos["Format_Version"]=Mxf_EssenceCompression_Version(Data);
+        Descriptor_Fill("Format", Mxf_EssenceCompression(Data));
+        Descriptor_Fill("Format_Version", Mxf_EssenceCompression_Version(Data));
+        Descriptor_Fill("Format_Profile", Mxf_EssenceCompression_Profile(Data));
     FILLING_END();
 }
 
@@ -9219,7 +9303,7 @@ void File_Mxf::GenericPictureEssenceDescriptor_AspectRatio()
         if (Data)
         {
             Descriptors[InstanceUID].DisplayAspectRatio=Data;
-            Descriptors[InstanceUID].Infos["DisplayAspectRatio"].From_Number(Data, 3);
+            Descriptor_Fill("DisplayAspectRatio", Ztring().From_Number(Data, 3));
         }
     FILLING_END();
 }
@@ -9241,7 +9325,7 @@ void File_Mxf::GenericPictureEssenceDescriptor_TransferCharacteristic()
     Get_UL(Data,                                                "Data", Mxf_TransferCharacteristic);  Element_Info1(Mxf_TransferCharacteristic(Data));
 
     FILLING_BEGIN();
-        Descriptors[InstanceUID].Infos["transfer_characteristics"]=Mxf_TransferCharacteristic(Data);
+        Descriptor_Fill("transfer_characteristics", Mxf_TransferCharacteristic(Data));
     FILLING_END();
 }
 
@@ -9347,7 +9431,7 @@ void File_Mxf::GenericPictureEssenceDescriptor_ColorPrimaries()
     Get_UL(Data,                                                "Data", Mxf_ColorPrimaries);  Element_Info1(Mxf_ColorPrimaries(Data));
 
     FILLING_BEGIN();
-        Descriptors[InstanceUID].Infos["colour_primaries"]=Mxf_ColorPrimaries(Data);
+        Descriptor_Fill("colour_primaries", Mxf_ColorPrimaries(Data));
     FILLING_END();
 }
 
@@ -9360,7 +9444,7 @@ void File_Mxf::GenericPictureEssenceDescriptor_CodingEquations()
     Get_UL(Data,                                                "Data", Mxf_CodingEquations);  Element_Info1(Mxf_CodingEquations(Data));
 
     FILLING_BEGIN();
-        Descriptors[InstanceUID].Infos["matrix_coefficients"]=Mxf_CodingEquations(Data);
+        Descriptor_Fill("matrix_coefficients", Mxf_CodingEquations(Data));
     FILLING_END();
 }
 
@@ -9375,7 +9459,7 @@ void File_Mxf::GenericSoundEssenceDescriptor_QuantizationBits()
     FILLING_BEGIN();
         if (Data)
         {
-            Descriptors[InstanceUID].Infos["BitDepth"].From_Number(Data);
+            Descriptor_Fill("BitDepth", Ztring().From_Number(Data));
             Descriptors[InstanceUID].QuantizationBits=Data;
         }
     FILLING_END();
@@ -9386,7 +9470,12 @@ void File_Mxf::GenericSoundEssenceDescriptor_QuantizationBits()
 void File_Mxf::GenericSoundEssenceDescriptor_Locked()
 {
     //Parsing
-    Info_B1(Data,                                               "Data"); Element_Info1(Data?"Yes":"No");
+    int8u Data;
+    Get_B1 (Data,                                               "Data"); Element_Info1(Data?"Yes":"No");
+
+    FILLING_BEGIN();
+        Descriptor_Fill("Locked", Data?"Yes":"No");
+    FILLING_END();
 }
 
 //---------------------------------------------------------------------------
@@ -9398,7 +9487,7 @@ void File_Mxf::GenericSoundEssenceDescriptor_AudioSamplingRate()
     Get_Rational(Data); Element_Info1(Data);
 
     FILLING_BEGIN();
-        Descriptors[InstanceUID].Infos["SamplingRate"].From_Number(Data, 0);
+        Descriptor_Fill("SamplingRate", Ztring().From_Number(Data, 0));
     FILLING_END();
 }
 
@@ -9429,10 +9518,10 @@ void File_Mxf::GenericSoundEssenceDescriptor_SoundEssenceCompression()
     FILLING_BEGIN();
         Descriptors[InstanceUID].EssenceCompression=Data;
         Descriptors[InstanceUID].StreamKind=Stream_Audio;
-        Descriptors[InstanceUID].Infos["Format"]=Mxf_EssenceCompression(Data);
-        Descriptors[InstanceUID].Infos["Format_Version"]=Mxf_EssenceCompression_Version(Data);
+        Descriptor_Fill("Format", Mxf_EssenceCompression(Data));
+        Descriptor_Fill("Format_Version", Mxf_EssenceCompression_Version(Data));
         if ((Data.lo&0xFFFFFFFFFF000000LL)==0x040202017e000000LL)
-            Descriptors[InstanceUID].Infos["Format_Settings_Endianness"]=__T("Big");
+            Descriptor_Fill("Format_Settings_Endianness", "Big");
     FILLING_END();
 }
 
@@ -9446,7 +9535,7 @@ void File_Mxf::GenericSoundEssenceDescriptor_ChannelCount()
 
     FILLING_BEGIN();
         Descriptors[InstanceUID].ChannelCount=Value;
-        Descriptors[InstanceUID].Infos["Channel(s)"].From_Number(Value);
+        Descriptor_Fill("Channel(s)", Ztring().From_Number(Value));
 
         //if (Descriptors[InstanceUID].ChannelAssignment.lo!=(int64u)-1)
         //{
@@ -9803,8 +9892,9 @@ void File_Mxf::IndexTableSegment_IndexStartPosition()
                         IndexTables.erase(IndexTables.begin()+Pos);
                     else
                     {
-                        IndexTables.erase(IndexTables.begin()+IndexTables.size()-1);
-                        Element_Offset=Element_Size;
+                        //Removed in order to get all indexes, even the duplicated ones (in order to check duplicated index in the footer)
+                        //IndexTables.erase(IndexTables.begin()+IndexTables.size()-1);
+                        //Element_Offset=Element_Size;
                     }
 
                     return;
@@ -9853,8 +9943,17 @@ void File_Mxf::IndexTableSegment_8002()
 // 0x8001
 void File_Mxf::JPEG2000PictureSubDescriptor_Rsiz()
 {
-    //Parsing
-    Info_B2(Data,                                                "Data"); Element_Info1(Data);
+    #if MEDIAINFO_ADVANCED
+        //Parsing
+        int16u Data;
+        Get_B2 (Data,                                            "Data"); Element_Info1(Data);
+
+        FILLING_BEGIN();
+            Descriptors[InstanceUID].Jpeg2000_Rsiz=Data;
+        FILLING_END();
+    #else //MEDIAINFO_ADVANCED
+        Info_B2(Data,                                            "Data"); Element_Info1(Data);
+    #endif //MEDIAINFO_ADVANCED
 }
 
 //---------------------------------------------------------------------------
@@ -10039,7 +10138,7 @@ void File_Mxf::RFC5646AudioLanguageCode()
     Get_Local (Length2-(SizeIsPresent?4:0), Value,              "Value"); Element_Info1(Value);
 
     FILLING_BEGIN();
-        Descriptors[InstanceUID].Infos["Language"]=Value;
+        Descriptor_Fill("Language", Value);
     FILLING_END();
 }
 
@@ -10110,7 +10209,13 @@ void File_Mxf::MPEG2VideoDescriptor_IdenticalGOP()
 void File_Mxf::MPEG2VideoDescriptor_MaxGOP()
 {
     //Parsing
-    Info_B2(Data,                                               "Data"); Element_Info1(Data);
+    int16u Data;
+    Get_B2 (Data,                                               "Data"); Element_Info1(Data);
+
+    FILLING_BEGIN();
+        if (Data==1)
+            Descriptors[InstanceUID].Infos["Format_Settings_GOP"]=__T("N=1");
+    FILLING_END();
 }
 
 //---------------------------------------------------------------------------
@@ -10140,7 +10245,7 @@ void File_Mxf::MPEG2VideoDescriptor_ProfileAndLevel()
 
     FILLING_BEGIN();
         if (profile_and_level_indication_profile && profile_and_level_indication_level)
-            Descriptors[InstanceUID].Infos["Format_Profile"]=Ztring().From_Local(Mpegv_profile_and_level_indication_profile[profile_and_level_indication_profile])+__T("@")+Ztring().From_Local(Mpegv_profile_and_level_indication_level[profile_and_level_indication_level]);
+            Descriptor_Fill("Format_Profile", Ztring().From_UTF8(Mpegv_profile_and_level_indication_profile[profile_and_level_indication_profile])+__T("@")+Ztring().From_UTF8(Mpegv_profile_and_level_indication_level[profile_and_level_indication_level]));
     FILLING_END();
 }
 
@@ -10150,11 +10255,11 @@ void File_Mxf::Mpeg4VisualDescriptor_ProfileAndLevel()
 {
     //Parsing
     int8u profile_and_level_indication;
-    Get_B1 (profile_and_level_indication,                       "profile_and_level_indication"); Param_Info1(Mpeg4v_Profile_Level(profile_and_level_indication));
+    Get_B1 (profile_and_level_indication,                       "profile_and_level_indication"); Param_Info1(Mpeg4v_Profile_Level(profile_and_level_indication)); Element_Info1(Mpeg4v_Profile_Level(profile_and_level_indication));
 
     FILLING_BEGIN();
         if (profile_and_level_indication)
-            Descriptors[InstanceUID].Infos["Format_Profile"]=Ztring().From_Local(Mpeg4v_Profile_Level(profile_and_level_indication));
+            Descriptor_Fill("Format_Profile", Mpeg4v_Profile_Level(profile_and_level_indication));
     FILLING_END();
 }
 
@@ -10167,7 +10272,7 @@ void File_Mxf::MPEG2VideoDescriptor_BitRate()
     Get_B4 (Data,                                               "Data"); Element_Info1(Data);
 
     FILLING_BEGIN();
-        Descriptors[InstanceUID].Infos["BitRate"].From_Number(Data);
+        Descriptor_Fill("BitRate", Ztring().From_Number(Data));
     FILLING_END();
 }
 
@@ -10302,7 +10407,7 @@ void File_Mxf::PartitionMetadata()
         if (IsParsingEnd)
         {
             //Parsing only index
-            RandomIndexMetadatas_MaxOffset=File_Offset+Buffer_Offset+Element_Size+HeaderByteCount+IndexByteCount;
+            RandomIndexPacks_MaxOffset=File_Offset+Buffer_Offset+Element_Size+HeaderByteCount+IndexByteCount;
 
             //Hints
             if (File_Buffer_Size_Hint_Pointer && Buffer_Offset+Element_Size+HeaderByteCount+IndexByteCount>=Buffer_Size)
@@ -10936,11 +11041,10 @@ void File_Mxf::Track_Origin()
 {
     //Parsing
     int64u Data;
-    Get_B8 (Data,                                                "Data"); Element_Info1(Data);
+    Get_B8 (Data,                                                "Data"); Element_Info1(Data); //Note: Origin is signed but there is no signed Get_* in MediaInfo
 
     FILLING_BEGIN();
-        if (Data!=(int64u)-1)
-            Tracks[InstanceUID].Origin=Data;
+        Tracks[InstanceUID].Origin=(int64s)Data; //Origin is signed
     FILLING_END();
 }
 
@@ -10953,7 +11057,7 @@ void File_Mxf::WaveAudioDescriptor_AvgBps()
     Get_B4 (Data,                                               "Data"); Element_Info1(Data);
 
     FILLING_BEGIN();
-        Descriptors[InstanceUID].Infos["BitRate"].From_Number(Data*8);
+        Descriptor_Fill("BitRate", Ztring().From_Number(Data*8));
         Descriptors[InstanceUID].ByteRate=Data;
     FILLING_END();
 }
@@ -11084,9 +11188,33 @@ void File_Mxf::LensUnitMetadata_IrisFNumber()
     Get_B2(Value,                                               "Value");
 
     FILLING_BEGIN();
-        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(0x100000*(1-(log(float(Value))-log(2.0))/8), 0).To_UTF8());
+        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(std::pow(2, 8*(1-(float(Value)/0x10000))), 6).To_UTF8());
     FILLING_END();
 }
+
+//---------------------------------------------------------------------------
+// Big Endian - float 16 bits
+// TODO: remove it when Linux version of ZenLib is updated
+float32 BigEndian2float16lens(const char* Liste)
+{
+    //exponent      4 bit
+    //significand  12 bit
+
+    //Retrieving data
+    int16u Integer=BigEndian2int16s(Liste);
+
+    //Retrieving elements
+    int Exponent=(Integer>>12)&0x0F;
+    if (Exponent>=8)
+        Exponent=-(((~Exponent)&0x7)+1);
+    int32u Mantissa= Integer&0x0FFF;
+
+    //Some computing
+    float64 Answer=((float64)Mantissa)*std::pow((float64)10, Exponent);
+
+    return (float32)Answer;
+}
+inline float32 BigEndian2float16lens(const int8u* List) {return BigEndian2float16lens((const char*)List);}
 
 //---------------------------------------------------------------------------
 //
@@ -11094,7 +11222,8 @@ void File_Mxf::LensUnitMetadata_FocusPositionFromImagePlane()
 {
     //Parsing
     float32 Value;
-    Get_BF2(Value,                                              "Value");
+    Value=BigEndian2float16lens(Buffer+Buffer_Offset+(size_t)Element_Offset);
+    Skip_B2(                                                    "Value");
 
     FILLING_BEGIN();
         AcquisitionMetadata_Add(Code2, Ztring::ToZtring(Value, 3).To_UTF8());
@@ -11107,7 +11236,8 @@ void File_Mxf::LensUnitMetadata_FocusPositionFromFrontLensVertex()
 {
     //Parsing
     float32 Value;
-    Get_BF2(Value,                                              "Value");
+    Value=BigEndian2float16lens(Buffer+Buffer_Offset+(size_t)Element_Offset);
+    Skip_B2(                                                    "Value");
 
     FILLING_BEGIN();
         AcquisitionMetadata_Add(Code2, Ztring::ToZtring(Value, 3).To_UTF8());
@@ -11133,10 +11263,11 @@ void File_Mxf::LensUnitMetadata_LensZoom35mmStillCameraEquivalent()
 {
     //Parsing
     float32 Value;
-    Get_BF2(Value,                                              "Value");
+    Value=BigEndian2float16lens(Buffer+Buffer_Offset+(size_t)Element_Offset);
+    Skip_B2(                                                    "Value");
 
     FILLING_BEGIN();
-        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(Value, 3).To_UTF8());
+        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(Value*1000, 3).To_UTF8());
     FILLING_END();
 }
 
@@ -11146,10 +11277,11 @@ void File_Mxf::LensUnitMetadata_LensZoomActualFocalLength()
 {
     //Parsing
     float32 Value;
-    Get_BF2(Value,                                              "Value");
+    Value=BigEndian2float16lens(Buffer+Buffer_Offset+(size_t)Element_Offset);
+    Skip_B2(                                                    "Value");
 
     FILLING_BEGIN();
-        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(Value, 3).To_UTF8());
+        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(Value * 1000, 3).To_UTF8());
     FILLING_END();
 }
 
@@ -11176,6 +11308,58 @@ void File_Mxf::LensUnitMetadata_LensAttributes()
 
     FILLING_BEGIN();
         AcquisitionMetadata_Add(Code2, Value.To_UTF8());
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+//
+void File_Mxf::LensUnitMetadata_IrisTNumber()
+{
+    //Parsing
+    int16u Value;
+    Get_B2(Value,                                               "Value");
+
+    FILLING_BEGIN();
+        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(std::pow(2, 8*(1-(float(Value)/0x10000))), 6).To_UTF8());
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+//
+void File_Mxf::LensUnitMetadata_IrisRingPosition()
+{
+    //Parsing
+    int16u Value;
+    Get_B2(Value,                                               "Value");
+
+    FILLING_BEGIN();
+        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(((float)Value)/65536*100, 4).To_UTF8());
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+//
+void File_Mxf::LensUnitMetadata_FocusRingPosition()
+{
+    //Parsing
+    int16u Value;
+    Get_B2(Value,                                               "Value");
+
+    FILLING_BEGIN();
+        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(((float)Value)/65536*100, 4).To_UTF8());
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+//
+void File_Mxf::LensUnitMetadata_ZoomRingPosition()
+{
+    //Parsing
+    int16u Value;
+    Get_B2(Value,                                               "Value");
+
+    FILLING_BEGIN();
+        AcquisitionMetadata_Add(Code2, Ztring::ToZtring(((float)Value)/65536*100, 4).To_UTF8());
     FILLING_END();
 }
 
@@ -11264,7 +11448,6 @@ void File_Mxf::CameraUnitMetadata_ImageSensorDimensionEffectiveWidth()
 //
 void File_Mxf::CameraUnitMetadata_ImageSensorDimensionEffectiveHeight()
 {
-    //Parsing
     //Parsing
     int16u Value;
     Get_B2(Value,                                               "Value");
@@ -11524,6 +11707,48 @@ void File_Mxf::CameraUnitMetadata_ASC_CDL_V12()
 
     FILLING_BEGIN();
         Ztring ValueS=__T("sR=")+Ztring::ToZtring(sR, 1)+__T(" sG=")+Ztring::ToZtring(sG, 1)+__T(" sB=")+Ztring::ToZtring(sB, 1)+__T(" oR=")+Ztring::ToZtring(oR, 1)+__T(" oG=")+Ztring::ToZtring(oG, 1)+__T(" oB=")+Ztring::ToZtring(oB, 1)+__T(" pR=")+Ztring::ToZtring(pR, 1)+__T(" pG=")+Ztring::ToZtring(pG, 1)+__T(" pB=")+Ztring::ToZtring(pB, 1)+__T(" sat=")+Ztring::ToZtring(sat, 1);
+        AcquisitionMetadata_Add(Code2, ValueS.To_UTF8());
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+//
+void File_Mxf::CameraUnitMetadata_ColorMatrix()
+{
+    //Parsing
+    //Vector
+    int32u Count, Length;
+    Get_B4 (Count,                                              "Count");
+    Get_B4 (Length,                                             "Length");
+    if (Count!=9 || Length!=8)
+    {
+        Skip_XX (Length2-8,                                     "Data");
+        return;
+    }
+    int32u RR_N, RR_D, GR_N, GR_D, BR_N, BR_D, RG_N, RG_D, GG_N, GG_D, BG_N, BG_D, RB_N, RB_D, GB_N, GB_D, BB_N, BB_D;
+    Get_B4 (RR_N,                                               "RR Num");
+    Get_B4 (RR_D,                                               "RR Den");
+    Get_B4 (GR_N,                                               "GR Num");
+    Get_B4 (GR_D,                                               "GR Den");
+    Get_B4 (BR_N,                                               "BR Num");
+    Get_B4 (BR_D,                                               "BR Den");
+    Get_B4 (RG_N,                                               "RG Num");
+    Get_B4 (RG_D,                                               "RG Den");
+    Get_B4 (GG_N,                                               "GG Num");
+    Get_B4 (GG_D,                                               "GG Den");
+    Get_B4 (BG_N,                                               "BG Num");
+    Get_B4 (BG_D,                                               "BG Den");
+    Get_B4 (RB_N,                                               "RB Num");
+    Get_B4 (RB_D,                                               "RB Den");
+    Get_B4 (GB_N,                                               "GB Num");
+    Get_B4 (GB_D,                                               "GB Den");
+    Get_B4 (BB_N,                                               "BB Num");
+    Get_B4 (BB_D,                                               "BB Den");
+
+    FILLING_BEGIN();
+        Ztring ValueS=__T("RR=")+Ztring::ToZtring(((float)RR_N)/RR_D, 3)+__T(" GR=")+Ztring::ToZtring(((float)GR_N)/GR_D, 3)+__T(" BR=")+Ztring::ToZtring(((float)BR_N)/BR_D, 3)
+                   + __T(" RG=")+Ztring::ToZtring(((float)RG_N)/RG_D, 3)+__T(" GG=")+Ztring::ToZtring(((float)GG_N)/GG_D, 3)+__T(" BG=")+Ztring::ToZtring(((float)BG_N)/BG_D, 3)
+                   + __T(" RB=")+Ztring::ToZtring(((float)RB_N)/RB_D, 3)+__T(" GB=")+Ztring::ToZtring(((float)GB_N)/GB_D, 3)+__T(" BB=")+Ztring::ToZtring(((float)BB_N)/BB_D, 3);
         AcquisitionMetadata_Add(Code2, ValueS.To_UTF8());
     FILLING_END();
 }
@@ -16664,13 +16889,13 @@ void File_Mxf::Locators_Test()
 #endif //defined(MEDIAINFO_REFERENCES_YES)
 
 //---------------------------------------------------------------------------
-void File_Mxf::NextRandomIndexMetadata()
+void File_Mxf::NextRandomIndexPack()
 {
     //We have the necessary for indexes, jumping to next index
     Skip_XX(Element_Size-Element_Offset,                        "Data");
-    if (RandomIndexMetadatas.empty())
+    if (RandomIndexPacks.empty())
     {
-        if (!RandomIndexMetadatas_AlreadyParsed)
+        if (!RandomIndexPacks_AlreadyParsed)
         {
             Partitions_Pos=0;
             while (Partitions_Pos<Partitions.size() && Partitions[Partitions_Pos].StreamOffset!=PartitionMetadata_PreviousPartition)
@@ -16688,12 +16913,12 @@ void File_Mxf::NextRandomIndexMetadata()
     }
     else
     {
-        GoTo(RandomIndexMetadatas[0].ByteOffset);
-        RandomIndexMetadatas.erase(RandomIndexMetadatas.begin());
+        GoTo(RandomIndexPacks[0].ByteOffset);
+        RandomIndexPacks.erase(RandomIndexPacks.begin());
         Open_Buffer_Unsynch();
     }
 
-    RandomIndexMetadatas_MaxOffset=(int64u)-1;
+    RandomIndexPacks_MaxOffset=(int64u)-1;
 }
 
 //---------------------------------------------------------------------------
@@ -16712,6 +16937,28 @@ void File_Mxf::TryToFinish()
     }
 
     Finish();
+}
+
+//---------------------------------------------------------------------------
+void File_Mxf::Descriptor_Fill(const char* Name, const Ztring& Value)
+{
+    descriptor& Descriptor = Descriptors[InstanceUID];
+    std::map<std::string, Ztring>::iterator Info = Descriptor.Infos.find(Name);
+
+    //Ignore value if header partition has aleady a value
+    if (Partitions_IsFooter && InstanceUID != int128u() && Info != Descriptor.Infos.end())
+    {
+        //Test
+        if (Value != Info->second)
+            Descriptor.Infos[string(Name)+"_Footer"] = Value;
+
+        return;
+    }
+
+    if (Info == Descriptor.Infos.end())
+        Descriptor.Infos[Name] = Value;
+    else
+        Info->second = Value;
 }
 
 } //NameSpace

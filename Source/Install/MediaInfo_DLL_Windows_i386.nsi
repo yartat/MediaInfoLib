@@ -4,7 +4,7 @@ RequestExecutionLevel admin
 ; Some defines
 !define PRODUCT_NAME "MediaInfo"
 !define PRODUCT_PUBLISHER "MediaArea.net"
-!define PRODUCT_VERSION "0.7.83"
+!define PRODUCT_VERSION "0.7.89"
 !define PRODUCT_VERSION4 "${PRODUCT_VERSION}.0"
 !define PRODUCT_WEB_SITE "http://MediaArea.net/MediaInfo"
 !define COMPANY_REGISTRY "Software\MediaArea.net"
@@ -26,7 +26,7 @@ SetCompressor /FINAL /SOLID lzma
 ; Modern UI
 !include "MUI2.nsh"
 !define MUI_ABORTWARNING
-!define MUI_ICON "..\..\..\MediaInfo\Source\Resource\Image\MediaInfo.ico"
+!define MUI_ICON "..\Resource\Image\MediaInfo.ico"
 
 ; Language Selection Dialog Settings
 !define MUI_LANGDLL_REGISTRY_ROOT "${PRODUCT_UNINST_ROOT_KEY}"

@@ -313,18 +313,9 @@ struct complete_stream
         table_ids                                   Table_IDs; //Key is table_id
         std::map<std::string, Ztring>               Infos;
         std::map<std::string, Ztring>               Infos_Option;
-        struct teletext
-        {
-            std::map<std::string, Ztring>           Infos;
-            stream_t                                StreamKind;
-            size_t                                  StreamPos;
-
-            teletext()
-                : StreamKind(Stream_Max)
-                , StreamPos((size_t)-1)
-            {}
-        };
-        std::map<int16u, teletext>                  Teletexts; //Key is teletext_magazine_number
+        #if defined(MEDIAINFO_TELETEXT_YES)
+            std::map<int16u, File__Analyze::teletext> Teletexts; //Key is teletext_magazine_number;
+        #endif
         #if MEDIAINFO_TRACE
             Ztring Element_Info1;
         #endif //MEDIAINFO_TRACE
@@ -382,7 +373,7 @@ struct complete_stream
         bool                                        IsUpdated_IsRegistered;
         bool                                        IsUpdated_Info;
         bool                                        CA_system_ID_MustSkipSlices;
-        bool                                        EBP_IsPresent;
+        bool                                        EBP_Marker_Detected;
         size_t                                      Scrambled_Count;
         int16u                                      CA_system_ID;
         int16u                                      SubStream_pid;
@@ -453,7 +444,7 @@ struct complete_stream
             Scrambled_Count=0;
             CA_system_ID_MustSkipSlices=false;
             CA_system_ID=0x0000;
-            EBP_IsPresent=false;
+            EBP_Marker_Detected=false;
             SubStream_pid=0x0000;
             #if MEDIAINFO_IBIUSAGE
                 Ibi_SynchronizationOffset_BeginOfFrame=(int64u)-1;

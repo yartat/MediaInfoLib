@@ -746,7 +746,11 @@ size_t MediaInfo_Internal::Open_Buffer_Init (int64u File_Size_, int64u File_Offs
     if (Config.File_Names.size()<=1) //If analyzing multiple files, theses members are adapted in File_Reader.cpp
     {
         if (File_Size_!=(int64u)-1)
+        {
             Config.File_Size=Config.File_Current_Size=File_Size_;
+            if (Info && !Info->Retrieve(Stream_General, 0, General_FileSize).empty())
+                Info->Fill(Stream_General, 0, General_FileSize, File_Size_, 10, true); //TODO: avoid multiple tests of file size field, refactor it in order to have a single place for file size info
+        }
     }
 
     if (Info==NULL || File_Size_!=(int64u)-1)
@@ -917,12 +921,21 @@ size_t MediaInfo_Internal::Open_Buffer_Finalize ()
     //Cleanup
     if (!Config.File_IsSub_Get() && !Config.File_KeepInfo_Get()) //We need info for the calling parser
     {
+        #if MEDIAINFO_TRACE
+        ParserName=Ztring().From_UTF8(Info->ParserName); //Keep it in memory in case we need it after delete of Info
+        #endif //MEDIAINFO_TRACE
         delete Info; Info=NULL;
     }
     if (Config.File_Names_Pos>=Config.File_Names.size())
     {
         delete[] Config.File_Buffer; Config.File_Buffer=NULL; Config.File_Buffer_Size=0; Config.File_Buffer_Size_Max=0;
     }
+    #if MEDIAINFO_EVENTS
+        if (!Config.File_IsReferenced_Get()) //TODO: get its own metadata in order to know if it was created by this instance
+        {
+            delete Config.Config_PerPackage; Config.Config_PerPackage=NULL;
+        }
+    #endif MEDIAINFO_EVENTS
 
     EXECUTE_SIZE_T(1, Debug+=__T("Open_Buffer_Finalize, will return 1"))
 }
@@ -1324,6 +1337,12 @@ String MediaInfo_Internal::Option (const String &Option, const String &Value)
             return __T("Seek manager is disabled due to compilation options");
         #endif //MEDIAINFO_SEEK
     }
+    #if MEDIAINFO_TRACE
+        if (OptionLower.find(__T("file_details_stringpointer")) == 0 && MediaInfoLib::Config.Inform_Get()!=__T("MAXML") && (MediaInfoLib::Config.Trace_Level_Get() || MediaInfoLib::Config.Inform_Get()==__T("Details")) && !Details.empty())
+        {
+            return Ztring::ToZtring((int64u)Details.data())+__T(':')+Ztring::ToZtring((int64u)Details.size());
+        }
+    #endif //MEDIAINFO_TRACE
     else if (OptionLower.find(__T("file_"))==0)
     {
         Ztring ToReturn2=Config.Option(Option, Value);

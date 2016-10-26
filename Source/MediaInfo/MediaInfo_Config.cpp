@@ -105,8 +105,8 @@
         _TOAPPEND; \
         Debug_Close();
 #else // MEDIAINFO_DEBUG
-    #define MEDIAINFO_DEBUG1(_NAME,__TOAPPEND)
-    #define MEDIAINFO_DEBUG2(_NAME,__TOAPPEND)
+    #define MEDIAINFO_DEBUG1(_NAME,_TOAPPEND)
+    #define MEDIAINFO_DEBUG2(_NAME,_TOAPPEND)
 #endif // MEDIAINFO_DEBUG
 
 //---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ namespace MediaInfoLib
 {
 
 //---------------------------------------------------------------------------
-const Char*  MediaInfo_Version=__T("MediaInfoLib - v0.7.83");
+const Char*  MediaInfo_Version=__T("MediaInfoLib - v0.7.89");
 const Char*  MediaInfo_Url=__T("http://MediaArea.net/MediaInfo");
       Ztring EmptyZtring;       //Use it when we can't return a reference to a true Ztring
 const Ztring EmptyZtring_Const; //Use it when we can't return a reference to a true Ztring, const version
@@ -217,6 +217,7 @@ void MediaInfo_Config::Init()
     Verbosity=(float32)0.5;
     Trace_Level=(float32)0.0;
     Compat=70778;
+    Https=true;
     Trace_TimeSection_OnlyFirstOccurrence=false;
     Trace_Format=Trace_Format_Tree;
     Language_Raw=false;
@@ -597,11 +598,30 @@ Ztring MediaInfo_Config::Option (const String &Option, const String &Value_Raw)
             Inform_Set(Ztring());
             Trace_Format_Set(Trace_Format_XML); // TODO: better coherency in options
         }
+        if (Inform_Get()==__T("MICRO_XML"))
+        {
+            Inform_Set(Ztring());
+            Trace_Format_Set(Trace_Format_MICRO_XML);
+        }
         return Ztring();
     }
     else if (Option_Lower==__T("trace_level_get"))
     {
         return Ztring::ToZtring(Trace_Level_Get());
+    }
+    else if (Option_Lower==__T("https"))
+    {
+        Https_Set(Value.To_int64u()?true:false);
+        return Ztring();
+    }
+    else if (Option_Lower==__T("no-https"))
+    {
+        Https_Set(false);
+        return Ztring();
+    }
+    else if (Option_Lower==__T("https_get"))
+    {
+        return Https_Get()?__T("1"):__T("0");
     }
     else if (Option_Lower==__T("trace_timesection_onlyfirstoccurrence"))
     {
@@ -630,6 +650,8 @@ Ztring MediaInfo_Config::Option (const String &Option, const String &Value_Raw)
             Trace_Format_Set(Trace_Format_CSV);
         else if (NewValue_Lower==__T("xml") || NewValue_Lower==__T("MAXML"))
             Trace_Format_Set(Trace_Format_XML);
+        else if (NewValue_Lower==__T("micro_xml"))
+            Trace_Format_Set(Trace_Format_MICRO_XML);
         else
             Trace_Format_Set(Trace_Format_Tree);
         return Ztring();
@@ -1228,6 +1250,20 @@ int64u MediaInfo_Config::Compat_Get ()
     return Compat;
 }
 
+//---------------------------------------------------------------------------
+void MediaInfo_Config::Https_Set(bool NewValue)
+{
+    CriticalSectionLocker CSL(CS);
+    Https=NewValue;
+}
+
+bool MediaInfo_Config::Https_Get()
+{
+    CriticalSectionLocker CSL(CS);
+    return Https;
+}
+
+//---------------------------------------------------------------------------
 std::bitset<32> MediaInfo_Config::Trace_Layers_Get ()
 {
     CriticalSectionLocker CSL(CS);
@@ -1619,6 +1655,11 @@ void MediaInfo_Config::Inform_Set (const ZtringListList &NewValue)
     else if (Trace_Level_Get() && NewValue.Read(0, 0)==__T("XML"))
     {
         Trace_Format_Set(Trace_Format_XML); // TODO: better coherency in options
+        return;
+    }
+    else if (Trace_Level_Get() && NewValue.Read(0, 0)==__T("MICRO_XML"))
+    {
+        Trace_Format_Set(Trace_Format_MICRO_XML);
         return;
     }
     else
@@ -2392,7 +2433,15 @@ void MediaInfo_Config::Event_Send (const int8u* Data_Content, size_t Data_Size)
     CriticalSectionLocker CSL(CS);
 
     if (Event_CallBackFunction)
+    {
+        MEDIAINFO_DEBUG1(   "Event",
+                            Debug+=", EventID=";Debug+=Ztring::ToZtring(LittleEndian2int32u(Data_Content), 16).To_UTF8();)
+
         Event_CallBackFunction ((unsigned char*)Data_Content, Data_Size, Event_UserHandler);
+ 
+        MEDIAINFO_DEBUG2(   "Event",
+                            )
+    }
 }
 #endif //MEDIAINFO_EVENTS
 

@@ -104,6 +104,7 @@
       <PrecompiledHeaderFile>MediaInfo/PreComp.h</PrecompiledHeaderFile>
       <OmitFramePointers>true</OmitFramePointers>
       <DebugInformationFormat>None</DebugInformationFormat>
+      <EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -143,6 +144,7 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\File__Analyze.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\File__Analyze_Buffer.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\File__Analyze_Buffer_MinimizeSize.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\File__Analyze_Element.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\File__Analyze_Streams.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\File__Analyze_Streams_Finish.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\File__Base.cpp" />
@@ -423,6 +425,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Export\Export_reVTMD.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\File__Analyse_Automatic.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\File__Analyze.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\File__Analyze_Element.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\File__Analyze_MinimizeSize.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\File__Base.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\File__Duplicate.h" />
@@ -623,7 +626,7 @@
     <ClInclude Include="..\..\..\Source\ThirdParty\tinyxml2\tinyxml2.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\ZenLib\Project\MSVC2013\Library\ZenLib.vcxproj">
+    <ProjectReference Include="..\..\..\..\ZenLib\Project\MSVC2015\Library\ZenLib.vcxproj">
       <Project>{0da1da7d-f393-4e7c-a7ce-cb5c6a67bc94}</Project>
     </ProjectReference>
     <ProjectReference Include="..\..\..\..\zlib\contrib\vstudio\vc14\zlibstat.vcxproj">

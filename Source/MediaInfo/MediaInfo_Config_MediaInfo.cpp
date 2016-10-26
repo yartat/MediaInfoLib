@@ -120,8 +120,8 @@ using namespace std;
         _TOAPPEND; \
         Debug_Close();
 #else // MEDIAINFO_DEBUG
-    #define MEDIAINFO_DEBUG1(_NAME,__TOAPPEND)
-    #define MEDIAINFO_DEBUG2(_NAME,__TOAPPEND)
+    #define MEDIAINFO_DEBUG1(_NAME,_TOAPPEND)
+    #define MEDIAINFO_DEBUG2(_NAME,_TOAPPEND)
 #endif // MEDIAINFO_DEBUG
 
 namespace MediaInfoLib
@@ -185,6 +185,8 @@ MediaInfo_Config_MediaInfo::MediaInfo_Config_MediaInfo()
         Event_UserHandler=NULL;
         SubFile_StreamID=(int64u)-1;
         ParseUndecodableFrames=false;
+        Events_TimestampShift_Reference_PTS=(int64u)-1;
+        Events_TimestampShift_Reference_ID=(int64u)-1;
     #endif //MEDIAINFO_EVENTS
     #if MEDIAINFO_DEMUX
         Demux_ForceIds=false;
@@ -252,6 +254,9 @@ MediaInfo_Config_MediaInfo::MediaInfo_Config_MediaInfo()
     File_DtvccTransport_Stream_IsPresent=false;
     File_DtvccTransport_Descriptor_IsPresent=false;
     #endif //defined(MEDIAINFO_EIA608_YES) || defined(MEDIAINFO_EIA708_YES)
+    #if defined(MEDIAINFO_MPEGPS_YES)
+    File_MpegPs_PTS_Begin_IsNearZero=false;
+    #endif //defined(MEDIAINFO_MPEGPS_YES)
     File_Current_Offset=0;
     File_Current_Size=(int64u)-1;
     File_IgnoreEditsBefore=0;
@@ -261,6 +266,7 @@ MediaInfo_Config_MediaInfo::MediaInfo_Config_MediaInfo()
     ParseSpeed=MediaInfoLib::Config.ParseSpeed_Get();
     #if MEDIAINFO_EVENTS
         Config_PerPackage=NULL;
+        Events_TimestampShift_Disabled=false;
     #endif //MEDIAINFO_EVENTS
     #if MEDIAINFO_DEMUX
         Demux_EventWasSent=false;
@@ -403,6 +409,15 @@ Ztring MediaInfo_Config_MediaInfo::Option (const String &Option, const String &V
     {
         return File_ID_OnlyRoot_Get()?"1":"0";
     }
+    else if (Option_Lower==__T("file_ignoresequencefilesize"))
+    {
+        #if MEDIAINFO_ADVANCED
+            File_IgnoreSequenceFileSize_Set(!(Value==__T("0") || Value.empty()));
+            return Ztring();
+        #else //MEDIAINFO_ADVANCED
+            return __T("Disabled due to compilation options");
+        #endif //MEDIAINFO_ADVANCED
+    }
     else if (Option_Lower==__T("file_ignoresequencefilescount"))
     {
         #if MEDIAINFO_ADVANCED
@@ -428,6 +443,15 @@ Ztring MediaInfo_Config_MediaInfo::Option (const String &Option, const String &V
             return Ztring();
         #else //MEDIAINFO_ADVANCED
             return __T("File_DefaultFrameRate is disabled due to compilation options");
+        #endif //MEDIAINFO_ADVANCED
+    }
+    else if (Option_Lower==__T("file_defaulttimecode"))
+    {
+        #if MEDIAINFO_ADVANCED
+            File_DefaultTimeCode_Set(Ztring(Value).To_UTF8());
+            return Ztring();
+        #else //MEDIAINFO_ADVANCED
+            return __T("File_DefaultTimeCode is disabled due to compilation options");
         #endif //MEDIAINFO_ADVANCED
     }
     else if (Option_Lower==__T("file_source_list"))
@@ -1054,6 +1078,11 @@ Ztring MediaInfo_Config_MediaInfo::Option (const String &Option, const String &V
     {
         return Ztring::ToZtring(File_GrowingFile_Delay_Get());
     }
+    else if (Option_Lower==__T("file_growingfile_force"))
+    {
+        File_GrowingFile_Force_Set(Ztring(Value).To_float64());
+        return Ztring();
+    }
     else if (Option_Lower==__T("file_curl"))
     {
         #if defined(MEDIAINFO_LIBCURL_YES)
@@ -1425,6 +1454,21 @@ float64 MediaInfo_Config_MediaInfo::File_DefaultFrameRate_Get ()
 {
     CriticalSectionLocker CSL(CS);
     return File_DefaultFrameRate;
+}
+#endif //MEDIAINFO_ADVANCED
+
+//---------------------------------------------------------------------------
+#if MEDIAINFO_ADVANCED
+void MediaInfo_Config_MediaInfo::File_DefaultTimeCode_Set(string NewValue)
+{
+    CriticalSectionLocker CSL(CS);
+    File_DefaultTimeCode = NewValue;
+}
+
+string MediaInfo_Config_MediaInfo::File_DefaultTimeCode_Get()
+{
+    CriticalSectionLocker CSL(CS);
+    return File_DefaultTimeCode;
 }
 #endif //MEDIAINFO_ADVANCED
 
@@ -2356,6 +2400,118 @@ void MediaInfo_Config_MediaInfo::Event_Send (File__Analyze* Source, const int8u*
         }
     }
 
+    //Adaptation of time stamps
+    if (!FileIsReferenced && !Events_TimestampShift_Disabled)
+    {
+        MediaInfo_Event_Generic* Event=(MediaInfo_Event_Generic*)Data_Content;
+
+        if (Event->StreamIDs_Size>=2 && Event->ParserIDs[0]==MediaInfo_Parser_MpegTs && Event->ParserIDs[1]==MediaInfo_Parser_MpegPs)
+        {
+            //Catching reference stream
+            if (Event->StreamIDs[1]==0xE0 && Events_TimestampShift_Reference_ID==(int64u)-1)
+                Events_TimestampShift_Reference_ID=Event->StreamIDs[0];
+
+            //Store the last PTS of the reference stream
+            if (Events_TimestampShift_Reference_ID==Event->StreamIDs[0] && Event->PTS!=(int64u)-1)
+                Events_TimestampShift_Reference_PTS=Event->PTS;
+
+            //Sending events whose were delayed
+            if (!Events_TimestampShift_Delayed.empty() && Events_TimestampShift_Reference_ID!=(int64u)-1 && Event->PTS!=(int64u)-1)
+            {
+                Events_TimestampShift_Disabled=true; //Disable the sending of events in the next call
+
+                for (size_t Pos=0; Pos<Events_TimestampShift_Delayed.size(); Pos++)
+                    if (Events_TimestampShift_Delayed[Pos])
+                    {
+                        Event_Send(NULL, Events_TimestampShift_Delayed[Pos]->Data_Content, Events_TimestampShift_Delayed[Pos]->Data_Size, Events_TimestampShift_Delayed[Pos]->File_Name);
+
+                        int32u EventCode=*((int32u*)Events_TimestampShift_Delayed[Pos]->Data_Content);
+                        bool IsSimpleText=(EventCode&0x00FFFF00)==(MediaInfo_Event_Global_SimpleText<<8);
+                        if (IsSimpleText)
+                        {
+                            MediaInfo_Event_Global_SimpleText_0* Old=(MediaInfo_Event_Global_SimpleText_0*)Events_TimestampShift_Delayed[Pos]->Data_Content;
+                            delete[] Old->Content; //Old->Content=NULL;
+                            if (Old->Row_Values)
+                            {
+                                for (size_t Row_Pos=0; Row_Pos<Old->Row_Max; Row_Pos++)
+                                    delete[] Old->Row_Values[Row_Pos]; // Row_Values[Row_Pos]=NULL;
+                                delete[] Old->Row_Values; //Old->Row_Values=NULL;
+                            }
+                            if (Old->Row_Attributes)
+                            {
+                                for (size_t Row_Pos=0; Row_Pos<Old->Row_Max; Row_Pos++)
+                                    delete[] Old->Row_Attributes[Row_Pos]; // Row_Attributes[Row_Pos]=NULL;
+                                delete[] Old->Row_Attributes; //Old->Row_Attributes=NULL;
+                            }
+                        }
+
+                        delete Events_TimestampShift_Delayed[Pos]; //Events_TimestampShift_Delayed[Pos]=NULL;
+                    }
+                Events_TimestampShift_Delayed.clear();
+                Events_TimestampShift_Disabled=false;
+            }
+
+            //MediaInfo_Event_Global_SimpleText
+            if ((Event->EventCode &0x00FFFF00)==(MediaInfo_Event_Global_SimpleText<<8)) //If it is MediaInfo_Event_Global_SimpleText
+            {
+                //Store the event if there is no reference stream
+                if (Events_TimestampShift_Reference_ID==(int64u)-1 || Events_TimestampShift_Reference_PTS==(int64u)-1)
+                {
+                    event_delayed* Event=new event_delayed(Data_Content, Data_Size, File_Name);
+                    Events_TimestampShift_Delayed.push_back(Event);
+
+                    // Copying buffers
+                    int32u* EventCode=(int32u*)Data_Content;
+                    if (((*EventCode)&0x00FFFFFF)==(MediaInfo_Event_Global_SimpleText<<8) && Data_Size==sizeof(MediaInfo_Event_Global_SimpleText_0))
+                    {
+                        MediaInfo_Event_Global_SimpleText_0* Old=(MediaInfo_Event_Global_SimpleText_0*)Data_Content;
+                        MediaInfo_Event_Global_SimpleText_0* New=(MediaInfo_Event_Global_SimpleText_0*)Event->Data_Content;
+                        if (New->Content)
+                        {
+                            size_t Content_Size=wcslen(New->Content);
+                            wchar_t* Content=new wchar_t[Content_Size+1];
+                            std::memcpy(Content, Old->Content, (Content_Size+1)*sizeof(wchar_t));
+                            New->Content=Content;
+                        }
+                        if (New->Row_Values)
+                        {
+                            wchar_t** Row_Values=new wchar_t*[New->Row_Max];
+                            for (size_t Row_Pos=0; Row_Pos<New->Row_Max; Row_Pos++)
+                            {
+                                Row_Values[Row_Pos]=new wchar_t[New->Column_Max];
+                                std::memcpy(Row_Values[Row_Pos], Old->Row_Values[Row_Pos], New->Column_Max*sizeof(wchar_t));
+                            }
+                            New->Row_Values=Row_Values;
+                        }
+                        if (New->Row_Attributes)
+                        {
+                            int8u** Row_Attributes=new int8u*[New->Row_Max];
+                            for (size_t Row_Pos=0; Row_Pos<New->Row_Max; Row_Pos++)
+                            {
+                                Row_Attributes[Row_Pos]=new int8u[New->Column_Max];
+                                std::memcpy(Row_Attributes[Row_Pos], Old->Row_Attributes[Row_Pos], New->Column_Max*sizeof(int8u));
+                            }
+                            New->Row_Attributes=Row_Attributes;
+                        }
+                    }
+                    return;
+                }
+
+                //Shift of the PTS if difference is too huge
+                if (Event->PTS>Events_TimestampShift_Reference_PTS+60000000000LL) // difference more than 60 seconds
+                {
+                    int64u Shift= Event->PTS -Events_TimestampShift_Reference_PTS;
+                    if (Shift>=55555555555555LL-10000000000LL && Shift<=55555555555555LL+10000000000LL) //+/- 10 second
+                        Shift=55555555555555LL;
+                    if (Event->PTS!=(int64u)-1)
+                        Event->PTS-=Shift;
+                    if (Event->DTS!=(int64u)-1)
+                        Event->DTS-=Shift;
+                }
+            }
+        }
+    }
+
     if (Source)
     {
         event_delayed* Event=new event_delayed(Data_Content, Data_Size, File_Name);
@@ -2400,6 +2556,7 @@ void MediaInfo_Config_MediaInfo::Event_Send (File__Analyze* Source, const int8u*
         MEDIAINFO_DEBUG2(   "CallBackFunction",
                             )
     }
+    #if MEDIAINFO_DEMUX
     else if (!File_Name.empty())
     {
         MediaInfo_Event_Generic* Event_Generic=(MediaInfo_Event_Generic*)Data_Content;
@@ -2435,11 +2592,16 @@ void MediaInfo_Config_MediaInfo::Event_Send (File__Analyze* Source, const int8u*
                     File_Name_Final+=__T(".raw");
             }
 
-            File F;
-            F.Open(File_Name_Final, File::Access_Write_Append);
-            F.Write(Event->Content, Event->Content_Size);
+            std::map<Ztring, File>::iterator F = Demux_Files.find(File_Name_Final);
+            if (F == Demux_Files.end())
+            {
+                Demux_Files[File_Name_Final].Open(File_Name_Final, File::Access_Write_Append);
+                F = Demux_Files.find(File_Name_Final);
+            }
+            F->second.Write(Event->Content, Event->Content_Size);
         }
     }
+    #endif //MEDIAINFO_DEMUX
 }
 
 void MediaInfo_Config_MediaInfo::Event_Accepted (File__Analyze* Source)
@@ -2521,6 +2683,65 @@ void MediaInfo_Config_MediaInfo::Event_SubFile_Start(const Ztring &FileName_Abso
     memset(&Event, 0xFF, sizeof(struct MediaInfo_Event_Generic));
     Event.EventCode=MediaInfo_EventCode_Create(0, MediaInfo_Event_General_SubFile_Start, 0);
     Event.EventSize=sizeof(struct MediaInfo_Event_General_SubFile_Start_0);
+    Event.StreamIDs_Size=0;
+
+    std::string FileName_Relative_Ansi=FileName_Relative.To_UTF8();
+    std::wstring FileName_Relative_Unicode=FileName_Relative.To_Unicode();
+    std::string FileName_Absolute_Ansi=FileName_Absolute.To_UTF8();
+    std::wstring FileName_Absolute_Unicode=FileName_Absolute.To_Unicode();
+    Event.FileName_Relative=FileName_Relative_Ansi.c_str();
+    Event.FileName_Relative_Unicode=FileName_Relative_Unicode.c_str();
+    Event.FileName_Absolute=FileName_Absolute_Ansi.c_str();
+    Event.FileName_Absolute_Unicode=FileName_Absolute_Unicode.c_str();
+
+    Event_Send(NULL, (const int8u*)&Event, Event.EventSize);
+}
+
+//---------------------------------------------------------------------------
+void MediaInfo_Config_MediaInfo::Event_SubFile_Missing(const Ztring &FileName_Relative)
+{
+    struct MediaInfo_Event_General_SubFile_Missing_0 Event;
+    memset(&Event, 0xFF, sizeof(struct MediaInfo_Event_Generic));
+    Event.EventCode=MediaInfo_EventCode_Create(0, MediaInfo_Event_General_SubFile_Missing, 0);
+    Event.EventSize=sizeof(struct MediaInfo_Event_General_SubFile_Start_0);
+    Event.StreamIDs_Size=0;
+
+    std::string FileName_Relative_Ansi=FileName_Relative.To_UTF8();
+    std::wstring FileName_Relative_Unicode=FileName_Relative.To_Unicode();
+    Event.FileName_Relative=FileName_Relative_Ansi.c_str();
+    Event.FileName_Relative_Unicode=FileName_Relative_Unicode.c_str();
+    Event.FileName_Absolute=NULL;
+    Event.FileName_Absolute_Unicode=NULL;
+
+    Event_Send(NULL, (const int8u*)&Event, Event.EventSize);
+}
+
+//---------------------------------------------------------------------------
+void MediaInfo_Config_MediaInfo::Event_SubFile_Missing_Absolute(const Ztring &FileName_Absolute)
+{
+    Ztring FileName_Relative;
+    if (File_Names_RootDirectory.empty())
+    {
+        FileName FN(FileName_Absolute);
+        FileName_Relative=FN.Name_Get();
+        if (!FN.Extension_Get().empty())
+        {
+            FileName_Relative+=__T('.');
+            FileName_Relative+=FN.Extension_Get();
+        }
+    }
+    else
+    {
+        Ztring Root=File_Names_RootDirectory+PathSeparator;
+        FileName_Relative=FileName_Absolute;
+        if (FileName_Relative.find(Root)==0)
+            FileName_Relative.erase(0, Root.size());
+    }
+
+    struct MediaInfo_Event_General_SubFile_Missing_0 Event;
+    memset(&Event, 0xFF, sizeof(struct MediaInfo_Event_Generic));
+    Event.EventCode=MediaInfo_EventCode_Create(0, MediaInfo_Event_General_SubFile_Missing, 0);
+    Event.EventSize=sizeof(struct MediaInfo_Event_General_SubFile_Missing_0);
     Event.StreamIDs_Size=0;
 
     std::string FileName_Relative_Ansi=FileName_Relative.To_UTF8();
@@ -2719,6 +2940,22 @@ float64 MediaInfo_Config_MediaInfo::File_GrowingFile_Delay_Get ()
     CriticalSectionLocker CSL(CS);
     float64 Temp=File_GrowingFile_Delay;
     return Temp;
+}
+
+//---------------------------------------------------------------------------
+void MediaInfo_Config_MediaInfo::File_GrowingFile_Force_Set (float64 NewValue)
+{
+    CriticalSectionLocker CSL(CS);
+    if (NewValue)
+    {
+        File_IsGrowing=true;
+        File_IsNotGrowingAnymore=false;
+    }
+    else
+    {
+        File_IsGrowing=false;
+        File_IsNotGrowingAnymore=true;
+    }
 }
 
 //---------------------------------------------------------------------------

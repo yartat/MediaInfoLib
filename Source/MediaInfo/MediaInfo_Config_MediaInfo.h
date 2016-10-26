@@ -130,6 +130,8 @@ public :
     #if MEDIAINFO_ADVANCED
         void          File_DefaultFrameRate_Set (float64 NewValue);
         float64       File_DefaultFrameRate_Get ();
+        void          File_DefaultTimeCode_Set (string NewValue);
+        string        File_DefaultTimeCode_Get ();
     #endif //MEDIAINFO_ADVANCED
 
     #if MEDIAINFO_ADVANCED
@@ -257,6 +259,8 @@ public :
     void          Event_Send(File__Analyze* Source, const int8u* Data_Content, size_t Data_Size, const Ztring &File_Name=Ztring());
     void          Event_Accepted(File__Analyze* Source);
     void          Event_SubFile_Start(const Ztring &FileName_Absolute);
+    void          Event_SubFile_Missing(const Ztring &FileName_Relative);
+    void          Event_SubFile_Missing_Absolute(const Ztring &FileName_Absolute);
     #endif //MEDIAINFO_EVENTS
 
     #if MEDIAINFO_DEMUX
@@ -280,6 +284,7 @@ public :
     int64u        Demux_FirstFrameNumber_Get ();
     void          Demux_InitData_Set (int8u NewValue);
     int8u         Demux_InitData_Get ();
+    std::map<Ztring, File> Demux_Files;
     #endif //MEDIAINFO_DEMUX
 
     #if MEDIAINFO_IBIUSAGE
@@ -324,6 +329,7 @@ public :
     #endif //MEDIAINFO_MACROBLOCKS
     void          File_GrowingFile_Delay_Set(float64 Value);
     float64       File_GrowingFile_Delay_Get();
+    void          File_GrowingFile_Force_Set(float64 Value);
     #if defined(MEDIAINFO_LIBCURL_YES)
     void          File_Curl_Set (const Ztring &NewValue);
     void          File_Curl_Set (const Ztring &Field, const Ztring &NewValue);
@@ -366,6 +372,9 @@ public :
     bool          File_DtvccTransport_Stream_IsPresent;
     bool          File_DtvccTransport_Descriptor_IsPresent;
     #endif //defined(MEDIAINFO_EIA608_YES) || defined(MEDIAINFO_EIA708_YES)
+    #if defined(MEDIAINFO_MPEGPS_YES)
+    bool          File_MpegPs_PTS_Begin_IsNearZero;
+    #endif //defined(MEDIAINFO_MPEGPS_YES)
     int64u        File_Current_Offset;
     int64u        File_Current_Size;
     int64u        File_IgnoreEditsBefore;
@@ -375,6 +384,7 @@ public :
     float32       ParseSpeed;
     #if MEDIAINFO_EVENTS
     MediaInfo_Config_PerPackage* Config_PerPackage;
+    bool          Events_TimestampShift_Disabled;
     Ztring        File_Names_RootDirectory;
     #endif //MEDIAINFO_EVENTS
     #if MEDIAINFO_DEMUX
@@ -408,6 +418,7 @@ private :
         bool                File_IgnoreSequenceFilesCount;
         int64u              File_SequenceFilesSkipFrames;
         float64             File_DefaultFrameRate;
+        string              File_DefaultTimeCode;
         bool                File_Source_List;
         bool                File_RiskyBitRateEstimation;
         bool                File_MergeBitRateInfo;
@@ -487,6 +498,9 @@ private :
     int64u                  SubFile_StreamID;
     bool                    ParseUndecodableFrames;
     Ztring                  SubFile_IDs;
+    int64u                      Events_TimestampShift_Reference_PTS;
+    int64u                      Events_TimestampShift_Reference_ID;
+    std::vector<event_delayed*> Events_TimestampShift_Delayed;
     #endif //MEDIAINFO_EVENTS
 
     #if MEDIAINFO_DEMUX

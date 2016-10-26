@@ -35,7 +35,6 @@ protected :
 public :
     File_Mk();
     ~File_Mk();
-    void Segment_Attachements_AttachedFile_FileName();
 
 private :
     //Buffer
@@ -55,13 +54,16 @@ private :
     void Ebml_DocTypeVersion();
     void Ebml_DocTypeReadVersion();
     void Segment();
-    void Segment_Attachements();
-    void Segment_Attachements_AttachedFile();
-    void Segment_Attachements_AttachedFile_FileData();
-    void Segment_Attachements_AttachedFile_FileDescription();
-    void Segment_Attachements_AttachedFile_FileMimeType();
-    void Segment_Attachements_AttachedFile_FileReferral();
-    void Segment_Attachements_AttachedFile_FileUID();
+    void Segment_Attachments();
+    void Segment_Attachments_AttachedFile();
+    void Segment_Attachments_AttachedFile_FileDescription();
+    void Segment_Attachments_AttachedFile_FileName();
+    void Segment_Attachments_AttachedFile_FileMimeType();
+    void Segment_Attachments_AttachedFile_FileData();
+    void Segment_Attachments_AttachedFile_FileUID();
+    void Segment_Attachments_AttachedFile_FileReferral();
+    void Segment_Attachments_AttachedFile_FileUsedStartTime();
+    void Segment_Attachments_AttachedFile_FileUsedEndTime();
     void Segment_Chapters();
     void Segment_Chapters_EditionEntry();
     void Segment_Chapters_EditionEntry_ChapterAtom();
@@ -97,8 +99,10 @@ private :
     void Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAddID();
     void Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAdditional();
     void Segment_Cluster_BlockGroup_BlockDuration();
-    void Segment_Cluster_BlockGroup_ReferenceBlock();
     void Segment_Cluster_BlockGroup_ReferencePriority();
+    void Segment_Cluster_BlockGroup_ReferenceBlock();
+    void Segment_Cluster_BlockGroup_ReferenceVirtual();
+    void Segment_Cluster_BlockGroup_CodecState();
     void Segment_Cluster_BlockGroup_Slices();
     void Segment_Cluster_BlockGroup_Slices_TimeSlice();
     void Segment_Cluster_BlockGroup_Slices_TimeSlice_Duration();
@@ -115,6 +119,8 @@ private :
     void Segment_Cues_CuePoint_CueTrackPositions();
     void Segment_Cues_CuePoint_CueTrackPositions_CueTrack();
     void Segment_Cues_CuePoint_CueTrackPositions_CueClusterPosition();
+    void Segment_Cues_CuePoint_CueTrackPositions_CueRelativePosition();
+    void Segment_Cues_CuePoint_CueTrackPositions_CueDuration();
     void Segment_Cues_CuePoint_CueTrackPositions_CueBlockNumber();
     void Segment_Info();
     void Segment_Info_ChapterTranslate();
@@ -147,12 +153,12 @@ private :
     void Segment_Tags_Tag_SimpleTag_TagName();
     void Segment_Tags_Tag_SimpleTag_TagString();
     void Segment_Tags_Tag_Targets();
-    void Segment_Tags_Tag_Targets_AttachmentUID();
-    void Segment_Tags_Tag_Targets_ChapterUID();
-    void Segment_Tags_Tag_Targets_EditionUID();
-    void Segment_Tags_Tag_Targets_TargetType();
     void Segment_Tags_Tag_Targets_TargetTypeValue();
-    void Segment_Tags_Tag_Targets_TrackUID();
+    void Segment_Tags_Tag_Targets_TargetType();
+    void Segment_Tags_Tag_Targets_TagTrackUID();
+    void Segment_Tags_Tag_Targets_TagEditionUID();
+    void Segment_Tags_Tag_Targets_TagChapterUID();
+    void Segment_Tags_Tag_Targets_TagAttachmentUID();
     void Segment_Tracks();
     void Segment_Tracks_TrackEntry();
     void Segment_Tracks_TrackEntry_AttachmentLink();
@@ -161,25 +167,29 @@ private :
     void Segment_Tracks_TrackEntry_Audio_Channels();
     void Segment_Tracks_TrackEntry_Audio_OutputSamplingFrequency();
     void Segment_Tracks_TrackEntry_Audio_SamplingFrequency();
+    void Segment_Tracks_TrackEntry_CodecSettings();
+    void Segment_Tracks_TrackEntry_CodecInfoURL();
+    void Segment_Tracks_TrackEntry_CodecDownloadURL();
     void Segment_Tracks_TrackEntry_CodecDecodeAll();
     void Segment_Tracks_TrackEntry_CodecID();
     void Segment_Tracks_TrackEntry_ContentEncodings() {};
     void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding() {};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Order() {UInteger_Info();};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Scope() {UInteger_Info();};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Type() {UInteger_Info();};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Compression();
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Compression_ContentCompAlgo();
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Compression_ContentCompSettings();
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Encryption() {};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Encryption_ContentEncAlgo() {UInteger_Info();};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Encryption_ContentEncKeyID() {Skip_XX(Element_Size, "Data");};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Encryption_ContentSignature() {Skip_XX(Element_Size, "Data");};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Encryption_ContentSigKeyID() {Skip_XX(Element_Size, "Data");};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Encryption_ContentSigAlgo() {UInteger_Info();};
-    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_Encryption_ContentSigHashAlgo() {UInteger_Info();};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncodingOrder() {UInteger_Info();};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncodingScope() {UInteger_Info();};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncodingType() {UInteger_Info();};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentCompression();
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentCompression_ContentCompAlgo();
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentCompression_ContentCompSettings();
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncryption() {};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncryption_ContentEncAlgo() {UInteger_Info();};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncryption_ContentEncKeyID() {Skip_XX(Element_Size, "Data");};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncryption_ContentSignature() {Skip_XX(Element_Size, "Data");};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncryption_ContentSigKeyID() {Skip_XX(Element_Size, "Data");};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncryption_ContentSigAlgo() {UInteger_Info();};
+    void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncryption_ContentSigHashAlgo() {UInteger_Info();};
     void Segment_Tracks_TrackEntry_CodecName();
     void Segment_Tracks_TrackEntry_CodecPrivate();
+    void Segment_Tracks_TrackEntry_CodecPrivate__Parse();
     void Segment_Tracks_TrackEntry_CodecPrivate_auds();
     void Segment_Tracks_TrackEntry_CodecPrivate_auds_ExtensibleWave();
     void Segment_Tracks_TrackEntry_CodecPrivate_vids();
@@ -195,6 +205,7 @@ private :
     void Segment_Tracks_TrackEntry_Name();
     void Segment_Tracks_TrackEntry_TrackNumber();
     void Segment_Tracks_TrackEntry_TrackTimecodeScale();
+    void Segment_Tracks_TrackEntry_TrackOffset();
     void Segment_Tracks_TrackEntry_TrackType();
     void Segment_Tracks_TrackEntry_TrackUID();
     void Segment_Tracks_TrackEntry_Video();
@@ -204,7 +215,14 @@ private :
     void Segment_Tracks_TrackEntry_Video_DisplayUnit();
     void Segment_Tracks_TrackEntry_Video_DisplayWidth();
     void Segment_Tracks_TrackEntry_Video_FlagInterlaced();
+    void Segment_Tracks_TrackEntry_Video_FieldOrder();
     void Segment_Tracks_TrackEntry_Video_FrameRate();
+    void Segment_Tracks_TrackEntry_Video_Colour();
+    void Segment_Tracks_TrackEntry_Video_Colour_MatrixCoefficients();
+    void Segment_Tracks_TrackEntry_Video_Colour_BitsPerChannel();
+    void Segment_Tracks_TrackEntry_Video_Colour_Range();
+    void Segment_Tracks_TrackEntry_Video_Colour_TransferCharacteristics();
+    void Segment_Tracks_TrackEntry_Video_Colour_Primaries();
     void Segment_Tracks_TrackEntry_Video_PixelCropBottom();
     void Segment_Tracks_TrackEntry_Video_PixelCropLeft();
     void Segment_Tracks_TrackEntry_Video_PixelCropRight();
@@ -321,7 +339,7 @@ private :
     typedef std::map<Ztring, Ztring> tagspertrack;
     typedef std::map<int64u, tagspertrack> tags;
     tags    Segment_Tags_Tag_Items;
-    int64u  Segment_Tags_Tag_Targets_TrackUID_Value;
+    int64u  Segment_Tags_Tag_Targets_TagTrackUID_Value;
     bool    CurrentAttachmentIsCover;
     bool    CoverIsSetFromAttachment;
     struct crc32
@@ -366,12 +384,18 @@ private :
     int64u Segment_Cluster_BlockGroup_BlockDuration_Value;
     int64u Segment_Cluster_BlockGroup_BlockDuration_TrackNumber;
 
+    //Hints
+    size_t*                 File_Buffer_Size_Hint_Pointer;
+
     //Helpers
     void JumpTo(int64u GoTo);
     void TestMultipleInstances(size_t* Instances=NULL);
     void CRC32_Check();
     void CRC32_Compute(int32u &CRC32, int32u Init, const int8u* Buffer_Begin, const int8u* Buffer_End);
     void CRC32_Compute(int32u &CRC32, const int8u* Buffer_Begin, const int8u* Buffer_End);
+#if MEDIAINFO_TRACE
+    bool CRC32_Check_In_Node(const std::string& ToSearchInInfo, const std::string& info, element_details::Element_Node *node);
+#endif // MEDIAINFO_TRACE
 };
 
 } //NameSpace
