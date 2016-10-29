@@ -117,6 +117,7 @@
       <SetChecksum>true</SetChecksum>
       <ModuleDefinitionFile>../../../Source/MediaInfoDLL/MediaInfoDLL.def</ModuleDefinitionFile>
       <GenerateDebugInformation>No</GenerateDebugInformation>
+      <IgnoreSpecificDefaultLibraries>libcmt.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

@@ -70,14 +70,14 @@ void General_Start_0 (struct MediaInfo_Event_General_Start_0* Event, struct Even
 {
     echoF("MediaInfo starts\n");
 
-    echo1("Stream_Size=%i\n", Event->Stream_Size);
+    echo1("Stream_Size=%llu\n", Event->Stream_Size);
 }
 
 void General_End_0 (struct MediaInfo_Event_General_End_0* Event, struct Events_UserHandle_struct* UserHandle)
 {
     echoF("MediaInfo ends\n");
 
-    echo1("Stream_Bytes_Analyzed=%i\n", Event->Stream_Bytes_Analyzed);
+    echo1("Stream_Bytes_Analyzed=%llu\n", Event->Stream_Bytes_Analyzed);
 }
 
 void General_Parser_Selected_0 (struct MediaInfo_Event_General_Parser_Selected_0* Event, struct Events_UserHandle_struct* UserHandle)
@@ -91,14 +91,14 @@ void General_Move_Request_0 (struct MediaInfo_Event_General_Move_Request_0* Even
 {
     echoF("MediaInfo has requested to seek\n");
 
-    echo1("StreamOffset=%08x\n", Event->StreamOffset);
+    echo1("StreamOffset=%08llx\n", Event->StreamOffset);
 }
 
 void General_Move_Done_0 (struct MediaInfo_Event_General_Move_Done_0* Event, struct Events_UserHandle_struct* UserHandle)
 {
     echoF("MediaInfo has seek\n");
 
-    echo1("StreamOffset=%08x\n", Event->StreamOffset);
+    echo1("StreamOffset=%08llx\n", Event->StreamOffset);
 }
 
 void General_SubFile_Start_0 (struct MediaInfo_Event_General_SubFile_Start_0* Event, struct Events_UserHandle_struct* UserHandle)
@@ -121,31 +121,31 @@ void Global_Demux_4(struct MediaInfo_Event_Global_Demux_4 *Event, struct Events_
 
     echoF("MediaInfo Demux\n");
 
-    echo1("StreamOffset=%08x,", Event->StreamOffset);
-    echo1(" Frame_Number=%u\n", Event->FrameNumber);
+    echo1("StreamOffset=%08llx,", Event->StreamOffset);
+    echo1(" Frame_Number=%llu\n", Event->FrameNumber);
     echo0("IDs=");
     for (size_t Pos=0; Pos<Event->StreamIDs_Size; Pos++)
         switch (Event->StreamIDs_Width[Pos])
         {
-            case 2: echo1("%02x, ", Event->StreamIDs[Pos]); break;
-            case 4: echo1("%04x, ", Event->StreamIDs[Pos]); break;
-            case 8: echo1("%08x, ", Event->StreamIDs[Pos]); break;
-            default: echo1("%08x, ", Event->StreamIDs[Pos]); break;
+            case 2: echo1("%02llx, ", Event->StreamIDs[Pos]); break;
+            case 4: echo1("%04llx, ", Event->StreamIDs[Pos]); break;
+            case 8: echo1("%08llx, ", Event->StreamIDs[Pos]); break;
+            default: echo1("%08llx, ", Event->StreamIDs[Pos]); break;
         }
     echo0("\n");
-    if (Event->PCR!=(int64u)-1)
+    if (Event->PCR!=static_cast<int64u>(-1))
         echo1("PCR=%s, ", Ztring().Duration_From_Milliseconds(Event->PCR/1000000).To_Local().c_str());
-    if (Event->PTS!=(int64u)-1)
+    if (Event->PTS!=static_cast<int64u>(-1))
         echo1("PTS=%s, ", Ztring().Duration_From_Milliseconds(Event->PTS/1000000).To_Local().c_str());
-    if (Event->DTS!=(int64u)-1)
+    if (Event->DTS!=static_cast<int64u>(-1))
         echo1("DTS=%s, ", Ztring().Duration_From_Milliseconds(Event->DTS/1000000).To_Local().c_str());
-    if (Event->DUR!=(int64u)-1)
+    if (Event->DUR!=static_cast<int64u>(-1))
         echo1("DUR=%s, ", Ztring().Duration_From_Milliseconds(Event->DUR/1000000).To_Local().c_str());
-    if (Event->PCR!=(int64u)-1 || Event->PTS!=(int64u)-1 || Event->DTS!=(int64u)-1 || Event->DUR!=(int64u)-1)
+    if (Event->PCR!=static_cast<int64u>(-1) || Event->PTS!=static_cast<int64u>(-1) || Event->DTS!=static_cast<int64u>(-1) || Event->DUR!=static_cast<int64u>(-1))
         echo0("\n");
     echo1("Content_Type=%i,", Event->Content_Type);
     echo1(" Content_Size=%i,", Event->Content_Size);
-    echo1(" Flags=%08x\n", Event->Flags);
+    echo1(" Flags=%08llx\n", Event->Flags);
 }
 
 void Video_SliceInfo_0(struct MediaInfo_Event_Video_SliceInfo_0 *Event, struct Events_UserHandle_struct* UserHandle)
@@ -155,32 +155,32 @@ void Video_SliceInfo_0(struct MediaInfo_Event_Video_SliceInfo_0 *Event, struct E
 
     echoF("MediaInfo Demux\n");
 
-    echo1("StreamOffset=%08x,", Event->StreamOffset);
-    echo1(" FramePosition=%u,", Event->FrameNumber);
-    echo1(" FieldPosition=%u,", Event->FieldPosition);
-    echo1(" SlicePosition=%u,", Event->SlicePosition);
+    echo1("StreamOffset=%08llx,", Event->StreamOffset);
+    echo1(" FramePosition=%llu,", Event->FrameNumber);
+    echo1(" FieldPosition=%llu,", Event->FieldPosition);
+    echo1(" SlicePosition=%llu,", Event->SlicePosition);
     echo0("IDs=");
     for (size_t Pos=0; Pos<Event->StreamIDs_Size; Pos++)
         switch (Event->StreamIDs_Width[Pos])
         {
-            case 2: echo1("%02x, ", Event->StreamIDs[Pos]); break;
-            case 4: echo1("%04x, ", Event->StreamIDs[Pos]); break;
-            case 8: echo1("%08x, ", Event->StreamIDs[Pos]); break;
-            default: echo1("%08x, ", Event->StreamIDs[Pos]); break;
+            case 2: echo1("%02llx, ", Event->StreamIDs[Pos]); break;
+            case 4: echo1("%04llx, ", Event->StreamIDs[Pos]); break;
+            case 8: echo1("%08llx, ", Event->StreamIDs[Pos]); break;
+            default: echo1("%08llx, ", Event->StreamIDs[Pos]); break;
         }
     echo0("\n");
-    if (Event->PCR!=(int64u)-1)
+    if (Event->PCR!=static_cast<int64u>(-1))
         echo1("PCR=%s, ", Ztring().Duration_From_Milliseconds(Event->PCR/1000000).To_Local().c_str());
-    if (Event->PTS!=(int64u)-1)
+    if (Event->PTS!=static_cast<int64u>(-1))
         echo1("PTS=%s, ", Ztring().Duration_From_Milliseconds(Event->PTS/1000000).To_Local().c_str());
-    if (Event->DTS!=(int64u)-1)
+    if (Event->DTS!=static_cast<int64u>(-1))
         echo1("DTS=%s, ", Ztring().Duration_From_Milliseconds(Event->DTS/1000000).To_Local().c_str());
-    if (Event->DUR!=(int64u)-1)
+    if (Event->DUR!=static_cast<int64u>(-1))
         echo1("DUR=%s, ", Ztring().Duration_From_Milliseconds(Event->DUR/1000000).To_Local().c_str());
-    if (Event->PCR!=(int64u)-1 || Event->PTS!=(int64u)-1 || Event->DTS!=(int64u)-1 || Event->DUR!=(int64u)-1)
+    if (Event->PCR!=static_cast<int64u>(-1) || Event->PTS!=static_cast<int64u>(-1) || Event->DTS!=static_cast<int64u>(-1) || Event->DUR!=static_cast<int64u>(-1))
         echo0("\n");
     echo1("SliceType=%i,", Event->SliceType);
-    echo1(" Flags=%08x\n", Event->Flags);
+    echo1(" Flags=%08llx\n", Event->Flags);
 }
 
 /***************************************************************************/
@@ -193,8 +193,8 @@ void Video_SliceInfo_0(struct MediaInfo_Event_Video_SliceInfo_0 *Event, struct E
 void __stdcall Event_CallBackFunction(unsigned char* Data_Content, size_t Data_Size, void* UserHandle_Void)
 {
     /*Retrieving UserHandle*/
-    struct Events_UserHandle_struct*           UserHandle=(struct Events_UserHandle_struct*)UserHandle_Void;
-    struct MediaInfo_Event_Generic*     Event_Generic=(struct MediaInfo_Event_Generic*) Data_Content;
+    struct Events_UserHandle_struct*           UserHandle=static_cast<struct Events_UserHandle_struct*>(UserHandle_Void);
+    struct MediaInfo_Event_Generic*     Event_Generic=reinterpret_cast<struct MediaInfo_Event_Generic*>(Data_Content);
     unsigned char                       ParserID;
     unsigned short                      EventID;
     unsigned char                       EventVersion;
@@ -221,9 +221,9 @@ void __stdcall Event_CallBackFunction(unsigned char* Data_Content, size_t Data_S
     }
 
     /*Retrieving EventID*/
-    ParserID    =(unsigned char) ((Event_Generic->EventCode&0xFF000000)>>24);
-    EventID     =(unsigned short)((Event_Generic->EventCode&0x00FFFF00)>>8 );
-    EventVersion=(unsigned char) ( Event_Generic->EventCode&0x000000FF     );
+    ParserID    =static_cast<unsigned char>((Event_Generic->EventCode & 0xFF000000) >> 24);
+    EventID     =static_cast<unsigned short>((Event_Generic->EventCode & 0x00FFFF00) >> 8);
+    EventVersion=static_cast<unsigned char>(Event_Generic->EventCode & 0x000000FF);
 
 
     //*Global to all parsers
@@ -314,7 +314,7 @@ void RegressionTest_Events(Ztring Files, Ztring DataBaseDirectory, int32u Scenar
         // form is "CallBack=memory://handlerInDecimal;UserHandler=memory://handlerInDecimal"
         // UserHandler is a unique value wich will be provided to the callback function, in order to know which MediaInfo instance send the event
         wostringstream Event_CallBackFunction_Text;
-        Event_CallBackFunction_Text<<__T("CallBack=memory://")<<(MediaInfo_int64u)Event_CallBackFunction<<__T(";UserHandler=memory://")<<(MediaInfo_int64u)&FilesList[FilesList_Pos];
+        Event_CallBackFunction_Text<<__T("CallBack=memory://")<<reinterpret_cast<MediaInfo_int64u>(Event_CallBackFunction)<<__T(";UserHandler=memory://")<<reinterpret_cast<MediaInfo_int64u>(&FilesList[FilesList_Pos]);
         MI_Result=MI.Option(__T("File_Event_CallBackFunction"), Event_CallBackFunction_Text.str());
         if (!MI_Result.empty())
         {
@@ -404,7 +404,7 @@ void RegressionTest_Events(Ztring Files, Ztring DataBaseDirectory, int32u Scenar
         Ref_ToFind.FindAndReplace(__T("\\Events\\Ref\\"), __T("\\Events\\New\\"));
         size_t New_RefPos=New.Find(Ref_ToFind);
         bool IsDiff=false;
-        if (New_RefPos!=(size_t)-1)
+        if (New_RefPos!=static_cast<size_t>(-1))
         {
             File F_Ref; F_Ref.Open(Ref[Ref_Pos]);
             File F_New; F_New.Open(New[New_RefPos]);
@@ -413,12 +413,12 @@ void RegressionTest_Events(Ztring Files, Ztring DataBaseDirectory, int32u Scenar
                 int64u Size=F_Ref.Size_Get();
                 if (Size>100000000)
                     Size=100000000;
-                int8u* F_Ref_Buffer=new int8u[(size_t)Size];
-                F_Ref.Read(F_Ref_Buffer, (size_t)Size);
-                int8u* F_New_Buffer=new int8u[(size_t)Size];
-                F_New.Read(F_New_Buffer, (size_t)Size);
+                int8u* F_Ref_Buffer=new int8u[static_cast<size_t>(Size)];
+                F_Ref.Read(F_Ref_Buffer, static_cast<size_t>(Size));
+                int8u* F_New_Buffer=new int8u[static_cast<size_t>(Size)];
+                F_New.Read(F_New_Buffer, static_cast<size_t>(Size));
 
-                if (memcmp(F_Ref_Buffer, F_New_Buffer, (size_t)Size))
+                if (memcmp(F_Ref_Buffer, F_New_Buffer, static_cast<size_t>(Size)))
                     IsDiff=true;
 
                 delete[] F_Ref_Buffer;
