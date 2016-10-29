@@ -47,7 +47,7 @@ namespace MediaInfoLib
 //***************************************************************************
 
 //---------------------------------------------------------------------------
-const int8u Hevc_SubWidthC[]=
+static const int8u Hevc_SubWidthC[]=
 {
     1,
     2,
@@ -56,7 +56,7 @@ const int8u Hevc_SubWidthC[]=
 };
 
 //---------------------------------------------------------------------------
-const int8u Hevc_SubHeightC[]=
+static const int8u Hevc_SubHeightC[]=
 {
     1,
     2,
@@ -65,13 +65,13 @@ const int8u Hevc_SubHeightC[]=
 };
 
 //---------------------------------------------------------------------------
-const char* Hevc_tier_flag(bool tier_flag)
+static const char* Hevc_tier_flag(bool tier_flag)
 {
     return tier_flag ? "High" : "Main";
 }
 
 //---------------------------------------------------------------------------
-const char* Hevc_profile_idc(int32u profile_idc)
+static const char* Hevc_profile_idc(int32u profile_idc)
 {
     switch (profile_idc)
     {
@@ -84,7 +84,7 @@ const char* Hevc_profile_idc(int32u profile_idc)
 }
 
 //---------------------------------------------------------------------------
-const char* Hevc_chroma_format_idc(int8u chroma_format_idc)
+static const char* Hevc_chroma_format_idc(int8u chroma_format_idc)
 {
     switch (chroma_format_idc)
     {
@@ -97,7 +97,7 @@ const char* Hevc_chroma_format_idc(int8u chroma_format_idc)
 }
 
 //---------------------------------------------------------------------------
-const char* Hevc_pic_type[]=
+static const char* Hevc_pic_type[]=
 {
     "I",
     "I, P",
@@ -112,7 +112,7 @@ const char* Hevc_pic_type[]=
 };
 
 //---------------------------------------------------------------------------
-const char* Hevc_slice_type(int32u slice_type)
+static const char* Hevc_slice_type(int32u slice_type)
 {
     switch (slice_type)
     {
@@ -209,10 +209,12 @@ void File_Hevc::Streams_Fill()
         Fill(Stream_Video, 0, "MaxCLL", Ztring::ToZtring(maximum_content_light_level) + __T(" cd/m2"));
     if (maximum_frame_average_light_level)
         Fill(Stream_Video, 0, "MaxFALL", Ztring::ToZtring(maximum_frame_average_light_level) + __T(" cd/m2"));
-    if (chroma_sample_loc_type_top_field!=(int32u)-1)
-        Fill(Stream_Video, 0, "ChromaSubsampling_Position", __T("Type ") + Ztring::ToZtring(chroma_sample_loc_type_top_field));
-    if (chroma_sample_loc_type_bottom_field!=(int32u)-1 && chroma_sample_loc_type_bottom_field!=chroma_sample_loc_type_bottom_field)
-        Fill(Stream_Video, 0, "ChromaSubsampling_Position", __T("Type ") + Ztring::ToZtring(chroma_sample_loc_type_bottom_field));
+    if (chroma_sample_loc_type_top_field != (int32u)-1)
+    {
+	Fill(Stream_Video, 0, "ChromaSubsampling_Position", __T("Type ") + Ztring::ToZtring(chroma_sample_loc_type_top_field));
+	if (chroma_sample_loc_type_bottom_field != (int32u)-1 && chroma_sample_loc_type_bottom_field != chroma_sample_loc_type_top_field)
+		Fill(Stream_Video, 0, "ChromaSubsampling_Position", __T("Type ") + Ztring::ToZtring(chroma_sample_loc_type_bottom_field));
+    }
 }
 
 //---------------------------------------------------------------------------

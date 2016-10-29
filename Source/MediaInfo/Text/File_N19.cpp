@@ -37,7 +37,7 @@ namespace MediaInfoLib
 //***************************************************************************
 
 //---------------------------------------------------------------------------
-const char* N19_CodePageNumber(int32u CPN)
+static const char* N19_CodePageNumber(int32u CPN)
 {
     switch (CPN)
     {
@@ -51,7 +51,7 @@ const char* N19_CodePageNumber(int32u CPN)
 }
 
 //---------------------------------------------------------------------------
-const char* N19_CharacterCodeTable(int16u CCT)
+static const char* N19_CharacterCodeTable(int16u CCT)
 {
     switch (CCT)
     {
@@ -65,7 +65,7 @@ const char* N19_CharacterCodeTable(int16u CCT)
 }
 
 //---------------------------------------------------------------------------
-float64 N19_DiskFormatCode_FrameRate(int64u DFC)
+static float64 N19_DiskFormatCode_FrameRate(int64u DFC)
 {
     switch (DFC)
     {
@@ -84,7 +84,7 @@ float64 N19_DiskFormatCode_FrameRate(int64u DFC)
 }
 
 //---------------------------------------------------------------------------
-const char* N19_DisplayStandardCode(int8u DSC)
+static const char* N19_DisplayStandardCode(int8u DSC)
 {
     switch (DSC)
     {
@@ -96,7 +96,7 @@ const char* N19_DisplayStandardCode(int8u DSC)
 }
 
 //---------------------------------------------------------------------------
-const char* N19_LanguageCode(int16u LC)
+static const char* N19_LanguageCode(int16u LC)
 {
     switch (LC)
     {
@@ -357,7 +357,9 @@ void File_N19::FileHeader_Parse()
                 //Fill(Stream_Text, 0, "Delay/String4", TCP);
                 Fill(Stream_Text, 0, "TimeCode_First", TCP);
 
-                TCP_Offset=Delay;
+#if MEDIAINFO_DEMUX
+				TCP_Offset=Delay;
+#endif
             }
         }
         Fill(Stream_Text, 0, Text_Width, MNC.To_int32u());
@@ -442,7 +444,11 @@ void File_N19::Data_Parse()
       +  (int32u)float64_int64s((TCO     &0xFF)      *1000/N19_DiskFormatCode_FrameRate(DFC));
     Param_Info1(Ztring().Duration_From_Milliseconds((int64u)TCO));
     Get_B1    (VP,                                              "VP - Vertical Position");
-    if (VP && IsTeletext)
+    if (VP 
+#if MEDIAINFO_DEMUX
+		&& IsTeletext
+#endif
+		)
         VP--; //1-Based
     Get_B1    (JC,                                              "JC - Justification Code");
     Skip_B1   (                                                 "CF - Comment Flag");

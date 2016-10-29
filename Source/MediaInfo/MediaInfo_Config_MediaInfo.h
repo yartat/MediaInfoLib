@@ -31,7 +31,6 @@
 #include "ZenLib/Translation.h"
 #include "ZenLib/InfoMap.h"
 using namespace ZenLib;
-using namespace std;
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -297,6 +296,10 @@ public :
     void          Ibi_Create_Set (bool NewValue);
     bool          Ibi_Create_Get ();
     #endif //MEDIAINFO_IBIUSAGE
+    #if MEDIAINFO_FIXITY
+    void          TryToFix_Set (bool NewValue);
+    bool          TryToFix_Get ();
+    #endif //MEDIAINFO_FIXITY
 
     //Specific
     void          File_MpegTs_ForceMenu_Set (bool NewValue);
@@ -523,6 +526,9 @@ private :
     #if MEDIAINFO_IBIUSAGE
     bool                    Ibi_Create;
     #endif //MEDIAINFO_IBIUSAGE
+    #if MEDIAINFO_FIXITY
+    bool                    TryToFix;
+    #endif //MEDIAINFO_SEEK
 
     //Specific
     bool                    File_MpegTs_ForceMenu;

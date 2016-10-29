@@ -159,7 +159,7 @@ namespace Elements
 }
 
 //---------------------------------------------------------------------------
-Ztring Mpeg4_Encoded_Library(int32u Vendor)
+static Ztring Mpeg4_Encoded_Library(int32u Vendor)
 {
     switch (Vendor)
     {
@@ -173,7 +173,7 @@ Ztring Mpeg4_Encoded_Library(int32u Vendor)
 }
 
 //---------------------------------------------------------------------------
-Ztring Mpeg4_Language_Apple(int16u Language)
+static Ztring Mpeg4_Language_Apple(int16u Language)
 {
     switch (Language)
     {
@@ -2323,7 +2323,7 @@ bool File_Mpeg4::BookMark_Needed()
                             // Hash can not be computed with jumps.
                             delete Hash; Hash=NULL;
                         }
-                    #endif MEDIAINFO_HASH
+                    #endif //MEDIAINFO_HASH
                 }
             }
         #endif // MEDIAINFO_DEMUX

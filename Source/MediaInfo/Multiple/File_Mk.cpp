@@ -90,6 +90,7 @@
 #endif //MEDIAINFO_EVENTS
 #include "MediaInfo/MediaInfo_Config_MediaInfo.h"
 #include <cstring>
+#include <cmath>
 #include <algorithm>
 #include "base64.h"
 //---------------------------------------------------------------------------
@@ -311,7 +312,7 @@ namespace Elements
 // for each data byte do
 //     CRC32=(CRC32>>8) ^ Mk_CRC32_Table[(CRC32&0xFF)^*Buffer_Current++];
 // End: CRC32 ^= 0;
-int32u Mk_CRC32_Table[256] =
+static const int32u Mk_CRC32_Table[256] =
 {
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
     0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
@@ -380,7 +381,7 @@ int32u Mk_CRC32_Table[256] =
 };
 
 //---------------------------------------------------------------------------
-const char* Mk_ContentCompAlgo(int64u Algo)
+static const char* Mk_ContentCompAlgo(int64u Algo)
 {
     switch (Algo)
     {
@@ -393,7 +394,7 @@ const char* Mk_ContentCompAlgo(int64u Algo)
 }
 
 //---------------------------------------------------------------------------
-const char* Mk_StereoMode(int64u StereoMode)
+static const char* Mk_StereoMode(int64u StereoMode)
 {
     switch (StereoMode)
     {
@@ -417,7 +418,7 @@ const char* Mk_StereoMode(int64u StereoMode)
 }
 
 //---------------------------------------------------------------------------
-const char* Mk_StereoMode_v2(int64u StereoMode)
+static const char* Mk_StereoMode_v2(int64u StereoMode)
 {
     switch (StereoMode)
     {
@@ -430,7 +431,7 @@ const char* Mk_StereoMode_v2(int64u StereoMode)
 }
 
 //---------------------------------------------------------------------------
-const char* Mk_OriginalSourceMedium_From_Source_ID (const Ztring &Value)
+static const char* Mk_OriginalSourceMedium_From_Source_ID (const Ztring &Value)
 {
     if (Value.size()==6 && Value[0] == __T('0') && Value[1] == __T('0'))
         return "Blu-ray";
@@ -440,7 +441,7 @@ const char* Mk_OriginalSourceMedium_From_Source_ID (const Ztring &Value)
 }
 
 //---------------------------------------------------------------------------
-Ztring Mk_ID_From_Source_ID (const Ztring &Value)
+static Ztring Mk_ID_From_Source_ID (const Ztring &Value)
 {
     if (Value.size()==6 && Value[0] == __T('0') && Value[1] == __T('0'))
     {
@@ -490,7 +491,7 @@ Ztring Mk_ID_From_Source_ID (const Ztring &Value)
 }
 
 //---------------------------------------------------------------------------
-Ztring Mk_ID_String_From_Source_ID (const Ztring &Value)
+static Ztring Mk_ID_String_From_Source_ID (const Ztring &Value)
 {
     if (Value.size()==6 && Value[0] == __T('0') && Value[1] == __T('0'))
     {
@@ -773,7 +774,7 @@ void File_Mk::Streams_Finish()
                     float64 Duration_1000 = Statistics_FrameCount / float64_int64s(FrameRate_FromTags) * 1.001001;
                     bool CanBe1001 = false;
                     bool CanBe1000 = false;
-                    if (abs((Duration_1000 - Duration_1001) * 10000) >= 15)
+                    if (fabs((Duration_1000 - Duration_1001) * 10000) >= 15)
                     {
                         Ztring DurationS; DurationS.From_Number(Statistics_Duration, 3);
                         Ztring DurationS_1001; DurationS_1001.From_Number(Duration_1001, 3);
@@ -1103,6 +1104,30 @@ void File_Mk::Header_Parse()
     {
     Get_EB (Name,                                               "Name");
     Get_EB (Size,                                               "Size");
+
+    //Detection of 0-sized Segment expected to be -1-sized (unlimited)
+    if (Name==Elements::Segment && Size==0)
+    {
+        Param_Info1("Incoherent, changed to unlimited");
+        Size=0xFFFFFFFFFFFFFFLL; //Unlimited
+        Fill(Stream_General, 0, "SegmentSizeIsZero", "Yes");
+
+        #if MEDIAINFO_FIXITY
+            if (Config->TryToFix_Get())
+            {
+                size_t Pos=(size_t)(Element_Offset-1);
+                while (!Buffer[Buffer_Offset+Pos])
+                    Pos--;
+                size_t ToWrite_Size=Element_Offset-Pos; 
+                if (ToWrite_Size<=8)
+                {
+                    int8u ToWrite[8];
+                    int64u2BigEndian(ToWrite, ((int64u)-1)>>(ToWrite_Size-1));
+                    FixFile(File_Offset+Buffer_Offset+Pos, ToWrite, ToWrite_Size)?Param_Info1("Fixed"):Param_Info1("Not fixed");
+                }
+            }
+        #endif //MEDIAINFO_FIXITY
+    }
 
     //Filling
     Header_Fill_Code(Name, Ztring().From_Number(Name, 16));
