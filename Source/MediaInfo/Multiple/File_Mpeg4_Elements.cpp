@@ -2726,7 +2726,9 @@ void File_Mpeg4::moov_meta_ilst_xxxx_data()
                         else if (Value==__T("143460")) Value=__T("Australia");
                         else if (Value==__T("143461")) Value=__T("New Zealand");
                         else if (Value==__T("143462")) Value=__T("Japan");
-                        else Value=__T("Unknown Country");
+                        else if (Value==__T("143463")) Value=__T("Hong Kong");
+                        else if (Value==__T("143469")) Value=__T("Russia");
+                        else if (Value==__T("143470")) Value=__T("Taiwan");
                     }
                     if (!Parameter.empty())
                     {
@@ -3491,7 +3493,7 @@ void File_Mpeg4::moov_trak_mdia_minf_gmhd_tmcd_tcmi()
         Skip_Flags(TextFace, 4,                                 "Shadow");
         Skip_Flags(TextFace, 5,                                 "Condense");
         Skip_Flags(TextFace, 6,                                 "Extend");
-    if (Element_Size>=25 && 25+Buffer[Buffer_Offset+24]==Element_Size)
+    if (Element_Size>=25 && 25+(int64u)Buffer[Buffer_Offset+24]==Element_Size)
         Skip_BFP4(16,                                           "Text size"); //Non-Standard, but found in several files
     else
         Skip_B2(                                                "Text size");
@@ -4004,9 +4006,9 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_tmcd()
         Open_Buffer_Init(Parser);
         mdat_Pos_ToParseInPriority_StreamIDs.push_back(moov_trak_tkhd_TrackID);
         Streams[moov_trak_tkhd_TrackID].IsPriorityStream=true;
-        ((File_Mpeg4_TimeCode*)Parser)->NumberOfFrames=NumberOfFrames; //tc->FrameDuration?(((float64)tc->TimeScale)/tc->FrameDuration):0;
-        ((File_Mpeg4_TimeCode*)Parser)->DropFrame=tc->DropFrame;
-        ((File_Mpeg4_TimeCode*)Parser)->NegativeTimes=tc->NegativeTimes;
+        Parser->NumberOfFrames=NumberOfFrames; //tc->FrameDuration?(((float64)tc->TimeScale)/tc->FrameDuration):0;
+        Parser->DropFrame=tc->DropFrame;
+        Parser->NegativeTimes=tc->NegativeTimes;
         Streams[moov_trak_tkhd_TrackID].Parsers.push_back(Parser);
         mdat_MustParse=true; //Data is in MDAT
     FILLING_ELSE();
@@ -4372,7 +4374,8 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxxSound()
             #endif // MEDIAINFO_DEMUX
 
             //Creating the parser
-            if ((Channels==1 && (StreamPos_Last%2)==0)
+            #if defined(MEDIAINFO_SMPTEST0337_YES)
+                if ((Channels==1 && (StreamPos_Last%2)==0)
              || (Streams.find(moov_trak_tkhd_TrackID-1)!=Streams.end() && Streams[moov_trak_tkhd_TrackID-1].IsPcmMono))
             {
                 File_ChannelGrouping* Parser=new File_ChannelGrouping;
@@ -4394,7 +4397,7 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxxSound()
 
                 Streams[moov_trak_tkhd_TrackID].Parsers.push_back(Parser);
             }
-
+            #endif // MEDIAINFO_SMPTEST0337_YES
             //Specific cases
             #if defined(MEDIAINFO_SMPTEST0337_YES)
             if (Channels==2 && SampleSize<=32 && SampleRate==48000) //Some SMPTE ST 337 streams are hidden in PCM stream
@@ -5988,7 +5991,9 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_wave_enda()
                     ((File_Pcm*)Streams[moov_trak_tkhd_TrackID].Parsers[0])->Endianness=Endianness?'L':'B';
                 if (Streams[moov_trak_tkhd_TrackID].Parsers.size()==2)
                 {
+#if defined(MEDIAINFO_SMPTEST0337_YES)
                     ((File_ChannelGrouping*)Streams[moov_trak_tkhd_TrackID].Parsers[0])->Endianness=Endianness?'L':'B';
+#endif // MEDIAINFO_SMPTEST0337_YES
                     ((File_Pcm*)Streams[moov_trak_tkhd_TrackID].Parsers[1])->Endianness=Endianness?'L':'B';
                 }
             }

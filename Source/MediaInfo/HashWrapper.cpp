@@ -52,7 +52,8 @@ namespace MediaInfoLib
 // info
 //***************************************************************************
 
-const char* HashWrapper_Hex = "0123456789abcdef";
+static const char HashWrapper_Hex[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
+
 
 //***************************************************************************
 // Constructor/Destructor
@@ -132,7 +133,7 @@ HashWrapper::~HashWrapper ()
         delete (sha512_ctx*)((void**)m)[SHA512];
     #endif //MEDIAINFO_SHA2
 
-    delete[] m;
+    delete[] (void**)m;
 }
 
 void HashWrapper::Update (const int8u* Buffer, const size_t Buffer_Size)

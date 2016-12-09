@@ -64,7 +64,7 @@ namespace MediaInfoLib
 namespace Http
 {
     //Helpers
-    void CutHead(std::string &Input, std::string &Output, std::string Delimiter)
+   static  void CutHead(std::string &Input, std::string &Output, const std::string& Delimiter)
     {
         // Remove the delimiter and everything that precedes
         size_t Delimiter_Pos = Input.find(Delimiter);
@@ -75,7 +75,7 @@ namespace Http
             Input           = Input.substr(Begin, Input.size() - Begin);
         }
     }
-    void CutTail(std::string &Input, std::string &Output, const std::string &Delimiter, bool KeepDelimiter=false)
+    static void CutTail(std::string &Input, std::string &Output, const std::string &Delimiter, bool KeepDelimiter=false)
     {
         // Remove the delimiter and everything that follows
         size_t Delimiter_Pos = Input.find(Delimiter);
@@ -518,7 +518,7 @@ Ztring Reader_libcurl_ExpandFileName(const Ztring &FileName)
         if (env)
             FileName_Modified.FindAndReplace(__T("$HOME"), Ztring().From_Local(env));
     }
-    if (FileName_Modified.find(__T("~"))==0)
+    if (FileName_Modified.find(__T('~'))==0)
     {
         char* env=getenv("HOME");
         if (env)
@@ -1125,7 +1125,7 @@ size_t Reader_libcurl::Format_Test_PerParser_Continue (MediaInfo_Internal* MI)
                         MessageString.From_Local(curl_easy_strerror(Result));
                     if (Result==CURLE_PEER_FAILED_VERIFICATION)
                     {
-                        size_t Protocol_Limit=Curl_Data->File_Name.find(__T(":"));
+                        size_t Protocol_Limit=Curl_Data->File_Name.find(__T(':'));
                         if (Protocol_Limit!=string::npos)
                         {
                             Ztring Protocol=Curl_Data->File_Name;

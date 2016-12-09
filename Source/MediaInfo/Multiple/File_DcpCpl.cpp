@@ -60,6 +60,8 @@ File_DcpCpl::File_DcpCpl()
 
     //Temp
     ReferenceFiles=NULL;
+    //PKL
+    PKL_Pos = (size_t)-1;
 }
 
 //---------------------------------------------------------------------------
@@ -222,9 +224,9 @@ bool File_DcpCpl::FileHeader_Begin()
             {
                 for (XMLElement* EssenceDescriptorList_Item=CompositionPlaylist_Item->FirstChildElement(); EssenceDescriptorList_Item; EssenceDescriptorList_Item=EssenceDescriptorList_Item->NextSiblingElement())
                 {
-                const char* EssenceDescriptorList_Item_Value=EssenceDescriptorList_Item->Value();
-                if (!EssenceDescriptorList_Item_Value)
-                    continue;
+                    const char* EssenceDescriptorList_Item_Value=EssenceDescriptorList_Item->Value();
+                    if (!EssenceDescriptorList_Item_Value)
+                        continue;
 
                     //TimecodeDropFrame
                     if (!strcmp(EssenceDescriptorList_Item_Value, "EssenceDescriptor"))

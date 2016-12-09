@@ -110,13 +110,7 @@ void File_Als::FileHeader_Parse()
     BS_End();
 
     FILLING_BEGIN();
-        if (SampleRate==0)
-            return;
-        Duration=((int64u)Samples)*1000/SampleRate;
-        if (Duration==0)
-            return;
-        UncompressedSize=((int64u)Samples)*Channels*(BitsPerSample+1/8);
-        if (UncompressedSize==0)
+        if (!CalcDurationUncompressedSize(Samples, SampleRate, (BitsPerSample+1)*8, Channels))
             return;
 
         File__Tags_Helper::Accept("ALS");

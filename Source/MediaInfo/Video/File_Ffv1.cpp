@@ -78,7 +78,7 @@ static size_t Ffv1_TryToFixCRC(const int8u* Buffer, size_t Buffer_Size)
     int8u* Buffer2=new int8u[Buffer_Size];
     memcpy(Buffer2, Buffer, Buffer_Size);
     vector<size_t> BitPositions;
-    size_t BitPosition_Max=Buffer_Size;
+    size_t BitPosition_Max=Buffer_Size*8;
     for (size_t BitPosition=0; BitPosition<BitPosition_Max; BitPosition++)
     {
         size_t BytePosition=BitPosition>>3;
@@ -1117,10 +1117,13 @@ int File_Ffv1::slice(states &States)
     if (!coder_type && ((version == 3 && micro_version > 1) || version > 3))
         BS_End();
 
-    if (coder_type && version > 2)
+    if (coder_type)
     {
-        int8u s = 129;
-        RC->get_rac(&s);
+        if (version > 2)
+        {
+            int8u s = 129;
+            RC->get_rac(&s);
+        }
         Element_Offset+=RC->BytesUsed();
     }
 
@@ -1266,7 +1269,7 @@ void File_Ffv1::rgb()
 
     current_slice->run_index = 0;
 
-    for (int x = 0; x < c_max; x++) {
+    for (size_t x = 0; x < c_max; x++) {
         sample[x][0] = current_slice->sample_buffer +  x * 2      * (current_slice->w + 6) + 3;
         sample[x][1] = sample[x][0] + current_slice->w + 6;
     }
@@ -1597,7 +1600,7 @@ void File_Ffv1::read_quant_table(int i, int j, size_t scale)
             return;
         }
 
-        for (size_t a=0; a<=len_minus1; a++)
+        for (int32u a=0; a<=len_minus1; a++)
         {
             quant_tables[i][j][k] = scale * v;
             k++;

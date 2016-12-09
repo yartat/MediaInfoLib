@@ -750,7 +750,14 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
                 {
                     if (Languages[Pos].size()>=1)
                     {
-                        Ztring Language_Translated=MediaInfoLib::Config.Language_Get(__T("Language_")+Languages[Pos][0]);
+                        Ztring Language_Translated;
+                        if (Languages[Pos].size()==2)
+                            Language_Translated=MediaInfoLib::Config.Language_Get(__T("Language_")+Languages[Pos].Read()); //Testing in case the langauge file has the complex form
+                        if (Language_Translated.find(__T("Language_"))==0)
+                            Language_Translated.clear(); //No translation found
+                        if (Language_Translated.empty())
+                        {
+                        Language_Translated=MediaInfoLib::Config.Language_Get(__T("Language_")+Languages[Pos][0]);
                         if (Language_Translated.find(__T("Language_"))==0)
                             Language_Translated=Languages[Pos][0]; //No translation found
                         if (Languages[Pos].size()>=2)
@@ -767,6 +774,7 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
                                     Language_Translated+=__T('-'); //As the original string
                                     Language_Translated+=Languages[Pos][Pos2];
                                 }
+                        }
                         }
                         Language1.push_back(Language_Translated);
                         if (Languages[Pos][0].size()==2)
@@ -807,10 +815,10 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
         if (Parameter==Fill_Parameter(StreamKind, Generic_ServiceName)
          || Parameter==Fill_Parameter(StreamKind, Generic_ServiceProvider))
         {
-            if (Retrieve(StreamKind, StreamPos, Parameter).find(__T(" - "))==string::npos && (Retrieve(StreamKind, StreamPos, Parameter).find(__T(":"))==2 || Retrieve(StreamKind, StreamPos, Parameter).find(__T(":"))==3))
+            if (Retrieve(StreamKind, StreamPos, Parameter).find(__T(" - "))==string::npos && (Retrieve(StreamKind, StreamPos, Parameter).find(__T(':'))==2 || Retrieve(StreamKind, StreamPos, Parameter).find(__T(':'))==3))
             {
                 Ztring Temp=Retrieve(StreamKind, StreamPos, Parameter);
-                Temp.erase(0, Retrieve(StreamKind, StreamPos, Parameter).find(__T(":"))+1);
+                Temp.erase(0, Retrieve(StreamKind, StreamPos, Parameter).find(__T(':'))+1);
                 (*Stream)[StreamKind][StreamPos](Parameter)=Temp;
             }
         }
@@ -1428,7 +1436,7 @@ size_t File__Analyze::Merge(File__Analyze &ToAdd, stream_t StreamKind, size_t St
         }
         if (!colour_description_present_Temp.empty())
         {
-            if (!colour_description_present_Temp.empty() && !Retrieve(Stream_Video, StreamPos_To, Video_colour_description_present).empty()
+            if (!Retrieve(Stream_Video, StreamPos_To, Video_colour_description_present).empty()
              && (colour_primaries_Temp!=Retrieve(Stream_Video, StreamPos_To, Video_colour_primaries)
               || transfer_characteristics_Temp!=Retrieve(Stream_Video, StreamPos_To, Video_transfer_characteristics)
               || matrix_coefficients_Temp!=Retrieve(Stream_Video, StreamPos_To, Video_matrix_coefficients)))
