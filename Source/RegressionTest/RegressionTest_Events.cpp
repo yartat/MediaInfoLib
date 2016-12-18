@@ -144,7 +144,7 @@ void Global_Demux_4(struct MediaInfo_Event_Global_Demux_4 *Event, struct Events_
     if (Event->PCR!=static_cast<int64u>(-1) || Event->PTS!=static_cast<int64u>(-1) || Event->DTS!=static_cast<int64u>(-1) || Event->DUR!=static_cast<int64u>(-1))
         echo0("\n");
     echo1("Content_Type=%i,", Event->Content_Type);
-    echo1(" Content_Size=%i,", Event->Content_Size);
+    echo1(" Content_Size=%llu,", Event->Content_Size);
     echo1(" Flags=%08llx\n", Event->Flags);
 }
 
