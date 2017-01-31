@@ -124,12 +124,12 @@ void File_Eia608::Streams_Fill()
                 ID+='1'+(cc_type*2)+(Pos%2);
                 Fill(Stream_Text, StreamPos_Last, Text_ID, ID);
                 Fill(Stream_Text, StreamPos_Last, "CaptionServiceName", ID);
-                (*Stream_More)[StreamKind_Last][StreamPos_Last](Ztring().From_Local("CaptionServiceName"), Info_Options)=__T("N NT");
+                Fill_SetOptions(StreamKind_Last, StreamKind_Last, "CaptionServiceName", "N NT");
             }
             if (Config->ParseSpeed>=1.0)
             {
                 Fill(Stream_Text, StreamPos_Last, "CaptionServiceContent_IsPresent", DataDetected[Pos+1]?"Yes":"No", Unlimited, true, true); //1 bit per service, starting at 1
-                (*Stream_More)[Stream_Text][StreamPos_Last](Ztring().From_Local("CaptionServiceContent_IsPresent"), Info_Options)=__T("N NT");
+                Fill_SetOptions(Stream_Text, StreamPos_Last, "CaptionServiceContent_IsPresent", "N NT");
             }
             if (ServiceDescriptors)
             {
@@ -139,12 +139,12 @@ void File_Eia608::Streams_Fill()
                     if (Pos==0 && Retrieve(Stream_Text, StreamPos_Last, Text_Language).empty()) //Only CC1/CC3
                         Fill(Stream_Text, StreamPos_Last, Text_Language, ServiceDescriptor->second.language, true);
                     Fill(Stream_Text, StreamPos_Last, "CaptionServiceDescriptor_IsPresent", "Yes", Unlimited, true, true);
-                    (*Stream_More)[Stream_Text][StreamPos_Last](Ztring().From_Local("CaptionServiceDescriptor_IsPresent"), Info_Options)=__T("N NT");
+                    Fill_SetOptions(Stream_Text, StreamPos_Last, "CaptionServiceDescriptor_IsPresent", "N NT");
                 }
                 else //ServiceDescriptors pointer is for the support by the transport layer of the info
                 {
                     Fill(Stream_Text, StreamPos_Last, "CaptionServiceDescriptor_IsPresent", "No", Unlimited, true, true);
-                    (*Stream_More)[Stream_Text][StreamPos_Last](Ztring().From_Local("CaptionServiceDescriptor_IsPresent"), Info_Options)=__T("N NT");
+                    Fill_SetOptions(Stream_Text, StreamPos_Last, "CaptionServiceDescriptor_IsPresent", "N NT");
                 }
             }
         }
@@ -204,6 +204,11 @@ void File_Eia608::Read_Buffer_Unsynched()
 //---------------------------------------------------------------------------
 void File_Eia608::Read_Buffer_Init()
 {
+    if (!IsSub)
+    {
+        FrameInfo.DTS=0; //No DTS in container
+        FrameInfo.PTS=0; //No PTS in container
+    }
     #if MEDIAINFO_DEMUX
         if (Frame_Count_NotParsedIncluded==(int64u)-1)
             Frame_Count_NotParsedIncluded=Config->Demux_FirstFrameNumber_Get();
@@ -212,13 +217,6 @@ void File_Eia608::Read_Buffer_Init()
         if (FrameInfo.DTS==(int64u)-1)
             FrameInfo.DTS=Config->Demux_FirstDts_Get();
     #endif //MEDIAINFO_DEMUX
-    if (FrameInfo.DUR!=(int64u)-1)
-    {
-        if (FrameInfo.DTS==(int64u)-1)
-            FrameInfo.DTS=0;
-        if (FrameInfo.PTS==(int64u)-1)
-            FrameInfo.PTS=0;
-    }
 
     #if MEDIAINFO_EVENTS
         if (MuxingMode==(int8u)-1)
@@ -254,8 +252,15 @@ void File_Eia608::Read_Buffer_AfterParsing()
         Frame_Count_NotParsedIncluded++;
     if (FrameInfo.DUR!=(int64u)-1)
     {
-        FrameInfo.DTS+=FrameInfo.DUR;
-        FrameInfo.PTS=FrameInfo.DTS;
+        if (FrameInfo.DTS!=(int64u)-1)
+            FrameInfo.DTS+=FrameInfo.DUR;
+        if (FrameInfo.PTS!=(int64u)-1)
+            FrameInfo.PTS+=FrameInfo.DUR;
+    }
+    else
+    {
+        FrameInfo.DTS=(int64u)-1;
+        FrameInfo.PTS=(int64u)-1;
     }
 }
 

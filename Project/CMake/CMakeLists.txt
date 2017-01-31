@@ -6,7 +6,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 set(MediaInfoLib_MAJOR_VERSION 0)
 set(MediaInfoLib_MINOR_VERSION 7)
-set(MediaInfoLib_PATCH_VERSION 91)
+set(MediaInfoLib_PATCH_VERSION 92)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION}.${MediaInfoLib_PATCH_VERSION})
 
 if (NOT WIN32)
@@ -266,6 +266,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Skm.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Swf.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Umf.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Vbi.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Wm.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Wm_Elements.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Xdcam_Clip.cpp

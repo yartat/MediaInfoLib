@@ -170,6 +170,21 @@ File_Hevc::File_Hevc()
 //---------------------------------------------------------------------------
 File_Hevc::~File_Hevc()
 {
+    Clean_Seq_Parameter();
+}
+//---------------------------------------------------------------------------
+void File_Hevc::Clean_Seq_Parameter()
+{
+    for (size_t Pos = 0; Pos < seq_parameter_sets.size(); Pos++)
+        delete seq_parameter_sets[Pos]; //seq_parameter_sets[Pos]=NULL;
+    seq_parameter_sets.clear();
+    for (size_t Pos = 0; Pos<pic_parameter_sets.size(); Pos++)
+        delete pic_parameter_sets[Pos]; //pic_parameter_sets[Pos]=NULL;
+    pic_parameter_sets.clear();
+    for (size_t Pos = 0; Pos<video_parameter_sets.size(); Pos++)
+        delete video_parameter_sets[Pos]; //video_parameter_sets[Pos]=NULL;
+    video_parameter_sets.clear();
+    
 }
 
 //***************************************************************************
@@ -255,6 +270,8 @@ void File_Hevc::Streams_Fill(std::vector<seq_parameter_set_struct*>::iterator se
     if ((*seq_parameter_set_Item)->bit_depth_luma_minus8==(*seq_parameter_set_Item)->bit_depth_chroma_minus8)
         Fill(Stream_Video, 0, Video_BitDepth, (*seq_parameter_set_Item)->bit_depth_luma_minus8+8);
 
+    if (preferred_transfer_characteristics!=2)
+        Fill(Stream_Video, 0, Video_transfer_characteristics, Mpegv_transfer_characteristics(preferred_transfer_characteristics));
     if ((*seq_parameter_set_Item)->vui_parameters)
     {
         if ((*seq_parameter_set_Item)->vui_parameters->timing_info_present_flag)
@@ -420,6 +437,12 @@ bool File_Hevc::Demux_UnpacketizeContainer_Test()
         while (Buffer_Offset+lengthSizeMinusOne+1+1<=Buffer_Size)
         {
             size_t Size;
+            if (Buffer_Offset+lengthSizeMinusOne>Buffer_Size)
+            {
+                Size=0;
+                Buffer_Offset=Buffer_Size;
+            }
+            else
             switch (lengthSizeMinusOne)
             {
                 case 0: Size=Buffer[Buffer_Offset];
@@ -726,7 +749,7 @@ void File_Hevc::Synched_Init()
 {
     //FrameInfo
     PTS_End=0;
-    if (FrameInfo.DTS==(int64u)-1)
+    if (!IsSub)
         FrameInfo.DTS=0; //No DTS in container
     DTS_Begin=FrameInfo.DTS;
     DTS_End=FrameInfo.DTS;
@@ -739,6 +762,7 @@ void File_Hevc::Synched_Init()
     chroma_sample_loc_type_bottom_field=(int32u)-1;
     maximum_content_light_level=0;
     maximum_frame_average_light_level=0;
+    preferred_transfer_characteristics=2;
 
     //Default values
     Streams.resize(0x100);
@@ -1810,12 +1834,13 @@ void File_Hevc::sei_message(int32u &seq_parameter_set_id)
         case   1 :   sei_message_pic_timing(seq_parameter_set_id, payloadSize); break;
         //case   4 :   sei_message_user_data_registered_itu_t_t35(); break;
         case   5 :   sei_message_user_data_unregistered(payloadSize); break;
-        //case   6 :   sei_message_recovery_point(); break;
+        case   6 :   sei_message_recovery_point(); break;
         //case  32 :   sei_message_mainconcept(payloadSize); break;
         case 129 :   sei_message_active_parameter_sets(); break;
         case 132 :   sei_message_decoded_picture_hash(payloadSize); break;
         case 137 :   sei_message_mastering_display_colour_volume(); break;
         case 144 :   sei_message_light_level(); break;
+        case 147 :   sei_alternative_transfer_characteristics(); break;
         default :
                     Element_Info1("unknown");
                     Skip_XX(payloadSize,                        "data");
@@ -2072,6 +2097,20 @@ void File_Hevc::sei_message_user_data_unregistered_x265(int32u payloadSize)
 }
 
 //---------------------------------------------------------------------------
+// SEI - 6
+void File_Hevc::sei_message_recovery_point()
+{
+    Element_Info1("recovery_point");
+
+    //Parsing
+    BS_Begin();
+    Skip_SE(                                                    "recovery_poc_cnt");
+    Skip_SB(                                                    "exact_match_flag");
+    Skip_SB(                                                    "broken_link_flag");
+    BS_End();
+}
+
+//---------------------------------------------------------------------------
 void File_Hevc::sei_message_active_parameter_sets()
 {
     Element_Info1("active_parameter_sets");
@@ -2159,6 +2198,15 @@ void File_Hevc::sei_message_light_level()
     //Parsing
     Get_B2(maximum_content_light_level,                         "maximum_content_light_level");
     Get_B2(maximum_frame_average_light_level,                   "maximum_frame_average_light_level");
+}
+
+//---------------------------------------------------------------------------
+void File_Hevc::sei_alternative_transfer_characteristics()
+{
+    Element_Info1("alternative_transfer_characteristics");
+
+    //Parsing
+    Get_B1(preferred_transfer_characteristics,                  "preferred_transfer_characteristics"); Param_Info1(Mpegv_transfer_characteristics(preferred_transfer_characteristics));
 }
 
 //***************************************************************************

@@ -603,6 +603,14 @@ bool File_DashMpd::FileHeader_Begin()
                                             for (XMLElement* SegmentBase_Item=Representation_Item->FirstChildElement(); SegmentBase_Item; SegmentBase_Item=SegmentBase_Item->NextSiblingElement())
                                             {
                                                 //Initialization
+                                                if (string(SegmentBase_Item->Value())=="Initialization")
+                                                {
+                                                    Attribute=SegmentBase_Item->Attribute("sourceURL");
+                                                    if (Attribute)
+                                                        Template_Generic_PerRepresentation.Sequence->AddFileName(BaseURL+Ztring().From_UTF8(Attribute), 0);
+                                                }
+
+                                                //SegmentURL
                                                 if (string(SegmentBase_Item->Value())=="SegmentURL")
                                                 {
                                                     bool IsSupported=true;
@@ -634,7 +642,6 @@ bool File_DashMpd::FileHeader_Begin()
                         if (string(Period_Item->Value())=="Representation")
                         {
                             sequence* Sequence=new sequence;
-                            int64u duration=1;
 
                             //Attributes - mineType
                             Attribute=Period_Item->Attribute("mimeType");
@@ -657,13 +664,6 @@ bool File_DashMpd::FileHeader_Begin()
                                 //SegmentInfo
                                 if (string(AdaptationSet_Item->Value())=="SegmentInfo")
                                 {
-                                    //Attributes - duration
-                                    Attribute=AdaptationSet_Item->Attribute("duration");
-                                    if (Attribute)
-                                    {
-                                        duration=Ztring().From_UTF8(Attribute).To_int64u();
-                                    }
-
                                     //Sub
                                     for (XMLElement* SegmentInfo_Item=AdaptationSet_Item->FirstChildElement(); SegmentInfo_Item; SegmentInfo_Item=SegmentInfo_Item->NextSiblingElement())
                                     {

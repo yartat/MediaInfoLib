@@ -178,7 +178,7 @@ size_t File__Analyze::Stream_Prepare (stream_t KindOfStream, size_t StreamPos)
             Fill(StreamKind_Last, StreamPos_Last, Fill_Temp[Fill_Temp_StreamKind][Pos].Parameter.To_UTF8().c_str(), Fill_Temp[Fill_Temp_StreamKind][Pos].Value);
             #if MEDIAINFO_DEMUX
                 if (!Retrieve(KindOfStream, StreamPos_Last, "Demux_InitBytes").empty())
-                    (*Stream_More)[KindOfStream][StreamPos_Last](Ztring().From_Local("Demux_InitBytes"), Info_Options)=__T("N NT"); //TODO: find a better way to hide additional fields by default
+                    Fill_SetOptions(KindOfStream, StreamPos_Last, "Demux_InitBytes", "N NT");
             #endif //MEDIAINFO_DEMUX
         }
     Fill_Temp[Fill_Temp_StreamKind].clear();
@@ -260,6 +260,34 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, size_t Paramete
     //Integrity
     if (StreamKind>Stream_Max || Parameter==(size_t)-1)
         return;
+
+    //Format_Profile split (see similar code in MediaInfo_Inform.cpp, dedicated to MIXML)
+    #if MEDIAINFO_ADVANCED
+        if (Parameter==Fill_Parameter(StreamKind, Generic_Format_Profile) && MediaInfoLib::Config.Format_Profile_Split_Get())
+        {
+            size_t SeparatorPos=Value.find(__T('@'));
+            if (SeparatorPos!=string::npos && Value.find(__T(" / "))==string::npos) //TODO: better support of compatibility modes (e.g. "Multiview") and sequences (e.g. different profiles in different files "BCS@L3 / BCS@L2 / BCS@L3")
+            {
+                Ztring Value2(Value);
+                Ztring Format_Profile_More=Value2.substr(SeparatorPos+1);
+                Value2.erase(SeparatorPos);
+                if (Format_Profile_More.size()>=2 && Format_Profile_More[0]==__T('L') && Format_Profile_More[1]>=__T('0') && Format_Profile_More[1]<=__T('9'))
+                    Format_Profile_More.erase(0, 1);
+                size_t SeparatorPos=Format_Profile_More.find(__T('@'));
+                Fill(StreamKind, StreamPos, Fill_Parameter(StreamKind, Generic_Format_Profile), Value2, Replace);
+                if (SeparatorPos!=string::npos)
+                {
+                    Fill(StreamKind, StreamPos, Fill_Parameter(StreamKind, Generic_Format_Level), Format_Profile_More.substr(0, SeparatorPos));
+                    Fill(StreamKind, StreamPos, Fill_Parameter(StreamKind, Generic_Format_Tier), Format_Profile_More.substr(SeparatorPos+1));
+                }
+                else
+                {
+                    Fill(StreamKind, StreamPos, Fill_Parameter(StreamKind, Generic_Format_Level), Format_Profile_More);
+                }
+                return;
+            }
+        }
+    #endif //MEDIAINFO_ADVANCED
 
     //Handling values with \r\n inside
     if (Value.find(__T('\r'))!=string::npos || Value.find(__T('\n'))!=string::npos)
@@ -989,7 +1017,7 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, const char* Par
         {
             Target=Value; //First value
             (*Stream_More)[StreamKind][StreamPos](Ztring().From_ISO_8859_1(Parameter), Info_Name_Text)=MediaInfoLib::Config.Language_Get(Ztring().From_Local(Parameter));
-            (*Stream_More)[StreamKind][StreamPos](Ztring().From_ISO_8859_1(Parameter), Info_Options)=__T("Y NT");
+            Fill_SetOptions(StreamKind, StreamPos, Parameter, "Y NT");
         }
         else
         {
@@ -998,6 +1026,31 @@ void File__Analyze::Fill (stream_t StreamKind, size_t StreamPos, const char* Par
         }
     }
     Fill(StreamKind, StreamPos, (size_t)General_Count, Count_Get(StreamKind, StreamPos), 10, true);
+}
+
+//---------------------------------------------------------------------------
+void File__Analyze::Fill_SetOptions(stream_t StreamKind, size_t StreamPos, const char* Parameter, const char* Options)
+{
+    //Integrity
+    if (!Status[IsAccepted] || StreamKind>Stream_Max || Parameter==NULL || Parameter[0]=='\0')
+        return;
+
+    //Handle Value before StreamKind
+    if (StreamKind==Stream_Max || StreamPos>=(*Stream)[StreamKind].size())
+    {
+        //TODO: implement support of options when the stream is not yet prepared
+        return; //No streams
+    }
+
+    //Handling of well known parameters
+    size_t Pos=MediaInfoLib::Config.Info_Get(StreamKind).Find(Ztring().From_Local(Parameter));
+    if (Pos!=Error)
+    {
+        //We can not change that
+        return;
+    }
+
+    (*Stream_More)[StreamKind][StreamPos](Ztring().From_ISO_8859_1(Parameter), Info_Options).From_UTF8(Options);
 }
 
 //---------------------------------------------------------------------------
@@ -1292,7 +1345,7 @@ size_t File__Analyze::Merge(File__Analyze &ToAdd, bool Erase)
 size_t File__Analyze::Merge(File__Analyze &ToAdd, stream_t StreamKind, size_t StreamPos_From, size_t StreamPos_To, bool Erase)
 {
     //Integrity
-    if (&ToAdd==NULL || StreamKind>=Stream_Max || !ToAdd.Stream || StreamPos_From>=(*ToAdd.Stream)[StreamKind].size())
+    if (StreamKind>=Stream_Max || !ToAdd.Stream || StreamPos_From>=(*ToAdd.Stream)[StreamKind].size())
         return 0;
 
     //Destination
@@ -1369,7 +1422,7 @@ size_t File__Analyze::Merge(File__Analyze &ToAdd, stream_t StreamKind, size_t St
             else
             {
                 Fill(StreamKind, StreamPos_To, ToAdd.Get(StreamKind, StreamPos_From, Pos, Info_Name).To_UTF8().c_str(), ToFill_Value, true);
-                (*Stream_More)[StreamKind][StreamPos_To](ToAdd.Get(StreamKind, StreamPos_From, Pos, Info_Name), Info_Options)=ToAdd.Get(StreamKind, StreamPos_From, Pos, Info_Options);
+                Fill_SetOptions(StreamKind, StreamPos_To, ToAdd.Get(StreamKind, StreamPos_From, Pos, Info_Name).To_UTF8().c_str(), ToAdd.Get(StreamKind, StreamPos_From, Pos, Info_Options).To_UTF8().c_str());
             }
             Count++;
         }
@@ -2290,6 +2343,7 @@ void File__Analyze::PixelAspectRatio_Fill(const Ztring &Value, stream_t StreamKi
 
     if (Retrieve(StreamKind, StreamPos, Parameter_DisplayAspectRatio).empty())
     {
+        //TODO: trash this crazy test after PAR is in num/den format.
         float32 PAR=Value.To_float32();
         if (PAR>(float32)12/(float32)11*0.999 && PAR<(float32)12/(float32)11*1.001)
             PAR=(float32)12/(float32)11;
@@ -2297,6 +2351,8 @@ void File__Analyze::PixelAspectRatio_Fill(const Ztring &Value, stream_t StreamKi
             PAR=(float32)10/(float32)11;
         if (PAR>(float32)16/(float32)11*0.999 && PAR<(float32)16/(float32)11*1.001)
             PAR=(float32)16/(float32)11;
+        if (PAR>(float32)16/(float32)15*0.999 && PAR<(float32)16/(float32)15*1.001)
+            PAR=(float32)16/(float32)15;
         if (PAR>(float32)40/(float32)33*0.999 && PAR<(float32)40/(float32)33*1.001)
             PAR=(float32)40/(float32)33;
         if (PAR>(float32)24/(float32)11*0.999 && PAR<(float32)24/(float32)11*1.001)
@@ -2387,6 +2443,7 @@ size_t File__Analyze::Fill_Parameter(stream_t StreamKind, generic StreamPos)
                                     case Generic_Format_Commercial : return General_Format_Commercial;
                                     case Generic_Format_Commercial_IfAny : return General_Format_Commercial_IfAny;
                                     case Generic_Format_Profile : return General_Format_Profile;
+                                    case Generic_Format_Level: return General_Format_Level;
                                     case Generic_Format_Settings : return General_Format_Settings;
                                     case Generic_InternetMediaType : return General_InternetMediaType;
                                     case Generic_CodecID : return General_CodecID;
@@ -2440,6 +2497,8 @@ size_t File__Analyze::Fill_Parameter(stream_t StreamKind, generic StreamPos)
                                     case Generic_Format_Commercial_IfAny : return Video_Format_Commercial_IfAny;
                                     case Generic_Format_Version : return Video_Format_Version;
                                     case Generic_Format_Profile : return Video_Format_Profile;
+                                    case Generic_Format_Level: return Video_Format_Level;
+                                    case Generic_Format_Tier: return Video_Format_Tier;
                                     case Generic_Format_Settings : return Video_Format_Settings;
                                     case Generic_InternetMediaType : return Video_InternetMediaType;
                                     case Generic_CodecID : return Video_CodecID;
@@ -2555,6 +2614,7 @@ size_t File__Analyze::Fill_Parameter(stream_t StreamKind, generic StreamPos)
                                     case Generic_Format_Commercial_IfAny : return Audio_Format_Commercial_IfAny;
                                     case Generic_Format_Version : return Audio_Format_Version;
                                     case Generic_Format_Profile : return Audio_Format_Profile;
+                                    case Generic_Format_Level: return Audio_Format_Level;
                                     case Generic_Format_Settings : return Audio_Format_Settings;
                                     case Generic_InternetMediaType : return Audio_InternetMediaType;
                                     case Generic_CodecID : return Audio_CodecID;

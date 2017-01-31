@@ -290,7 +290,7 @@ void File__Analyze::TestContinuousFileNames(size_t CountOfFiles, Ztring FileExte
                 Temp.erase(0, SourcePath_Size);
                 Fill(Stream_General, 0, "Source_List", Temp);
             }
-            (*Stream_More)[Stream_General][0](Ztring().From_Local("Source_List"), Info_Options)=__T("N NT");
+            Fill_SetOptions(Stream_General, 0, "Source_List", "N NT");
         }
     #endif //MEDIAINFO_ADVANCED
 }
@@ -418,8 +418,23 @@ void File__Analyze::Streams_Finish_StreamOnly(stream_t StreamKind, size_t Pos)
 }
 
 //---------------------------------------------------------------------------
-void File__Analyze::Streams_Finish_StreamOnly_General(size_t UNUSED(StreamPos))
+void File__Analyze::Streams_Finish_StreamOnly_General(size_t StreamPos)
 {
+    //File extension test
+    if (Retrieve(Stream_General, StreamPos, "FileExtension_Invalid").empty())
+    {
+        InfoMap &FormatList=MediaInfoLib::Config.Format_Get();
+        InfoMap::iterator Format=FormatList.find(Retrieve(Stream_General, StreamPos, General_Format));
+        if (Format!=FormatList.end())
+        {
+            ZtringList ValidExtensions;
+            ValidExtensions.Separator_Set(0, __T(" "));
+            ValidExtensions.Write(FormatList.Get(Format->first, InfoFormat_Extensions));
+            const Ztring& Extension=Retrieve(Stream_General, StreamPos, General_FileExtension);
+            if (!ValidExtensions.empty() && ValidExtensions.Find(Extension)==string::npos)
+                Fill(Stream_General, StreamPos, "FileExtension_Invalid", ValidExtensions.Read());
+        }
+    }
 }
 
 //---------------------------------------------------------------------------

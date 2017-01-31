@@ -28,6 +28,9 @@
 #if defined(MEDIAINFO_DVDIF_YES)
     #include "MediaInfo/Multiple/File_DvDif.h"
 #endif
+#if defined(MEDIAINFO_VBI_YES)
+    #include "MediaInfo/Multiple/File_Vbi.h"
+#endif
 #if defined(MEDIAINFO_AVC_YES)
     #include "MediaInfo/Video/File_Avc.h"
 #endif
@@ -220,7 +223,7 @@ namespace Elements
     UUID(060E2B34, 01010105, 04010602, 020A0000, 0000, "SMPTE ST 381-2", Mpeg4VisualDescriptor_ProfileAndLevel, "")
     UUID(060E2B34, 01010105, 04010602, 020B0000, 0000, "SMPTE ST 381-2", Mpeg4VisualDescriptor_BitRate, "")
 
-    //                             02 - JPEG 2000 Coding Parameters
+    //                             03 - JPEG 2000 Coding Parameters
     UUID(060E2B34, 0101010A, 04010603, 01000000, 0000, "", JPEG2000PictureSubDescriptor_Rsiz, "")
     UUID(060E2B34, 0101010A, 04010603, 02000000, 0000, "", JPEG2000PictureSubDescriptor_Xsiz, "")
     UUID(060E2B34, 0101010A, 04010603, 03000000, 0000, "", JPEG2000PictureSubDescriptor_Ysiz, "")
@@ -234,6 +237,24 @@ namespace Elements
     UUID(060E2B34, 0101010A, 04010603, 0B000000, 0000, "", JPEG2000PictureSubDescriptor_PictureComponentSizing, "")
     UUID(060E2B34, 0101010A, 04010603, 0C000000, 0000, "", JPEG2000PictureSubDescriptor_CodingStyleDefault, "")
     UUID(060E2B34, 0101010A, 04010603, 0D000000, 0000, "", JPEG2000PictureSubDescriptor_QuantizationDefault, "")
+
+    //                             06 - AVC Parameters
+    //                                 01 - AVC Parameters
+    UUID(060E2B34, 01010105, 04010606, 01030000, 0000, "SMPTE ST 381-3", AVCDescriptor_ConstantBFrames, "")
+    UUID(060E2B34, 01010105, 04010606, 01040000, 0000, "SMPTE ST 381-3", AVCDescriptor_CodedContentType, "")
+    UUID(060E2B34, 01010105, 04010606, 01060000, 0000, "SMPTE ST 381-3", AVCDescriptor_ClosedGOP, "")
+    UUID(060E2B34, 01010105, 04010606, 01070000, 0000, "SMPTE ST 381-3", AVCDescriptor_IdenticalGOP, "")
+    UUID(060E2B34, 01010105, 04010606, 01080000, 0000, "SMPTE ST 381-3", AVCDescriptor_MaxGOP, "")
+    UUID(060E2B34, 01010105, 04010606, 01090000, 0000, "SMPTE ST 381-3", AVCDescriptor_BPictureCount, "")
+    UUID(060E2B34, 01010105, 04010606, 010A0000, 0000, "SMPTE ST 381-3", AVCDescriptor_Profile, "")
+    UUID(060E2B34, 01010105, 04010606, 010B0000, 0000, "SMPTE ST 381-3", AVCDescriptor_MaximumBitRate, "")
+    UUID(060E2B34, 01010105, 04010606, 010C0000, 0000, "SMPTE ST 381-3", AVCDescriptor_ProfileConstraint, "")
+    UUID(060E2B34, 01010105, 04010606, 010D0000, 0000, "SMPTE ST 381-3", AVCDescriptor_Level, "")
+    UUID(060E2B34, 01010105, 04010606, 010E0000, 0000, "SMPTE ST 381-3", AVCDescriptor_DecodingDelay, "")
+    UUID(060E2B34, 01010105, 04010606, 010F0000, 0000, "SMPTE ST 381-3", AVCDescriptor_MaximumRefFrames, "")
+    UUID(060E2B34, 01010105, 04010606, 01100000, 0000, "SMPTE ST 381-3", AVCDescriptor_SequenceParameterSetFlag, "")
+    UUID(060E2B34, 01010105, 04010606, 01110000, 0000, "SMPTE ST 381-3", AVCDescriptor_PictureParameterSetFlag, "")
+    UUID(060E2B34, 01010105, 04010606, 01140000, 0000, "SMPTE ST 381-3", AVCDescriptor_AverageBitRate, "")
 
     //                         02 - Audio Essence Characteristics
     //                           04 - Audio Compression Parameters
@@ -313,12 +334,13 @@ namespace Elements
     UUID(060E2B34, 02530101, 0D010101, 01016400, 0000, "SMPTE ST 429-5", TimedTextDescriptor, "")
     UUID(060E2B34, 02530101, 0D010101, 01016500, 0000, "SMPTE ST 429-5", TimedTextResourceSubDescriptor, "")
     UUID(060E2B34, 02530101, 0D010101, 01016600, 0000, "SMPTE ST 377-1", ApplicationObject, "Application Object")
-    UUID(060E2B34, 02530101, 0D010101, 01016700, 0000, "SMPTE ST ?", Unknown67SubDescriptor, "Unknown 0x67 Sub-Descriptor")
+    UUID(060E2B34, 02530101, 0D010101, 01016700, 0000, "SMPTE ST ?", ContainerConstraintsSubDescriptor, "Container Constraints Sub-Descriptor")
     UUID(060E2B34, 02530101, 0D010101, 01016800, 0000, "SMPTE ST 381-2", Mpeg4VisualSubDescriptor, "MPEG-4 Visual Sub-Descriptor")
     UUID(060E2B34, 02530101, 0D010101, 01016A00, 0000, "SMPTE ST 377-4", MCALabelSubDescriptor, "")
     UUID(060E2B34, 02530101, 0D010101, 01016B00, 0000, "SMPTE ST 377-4", AudioChannelLabelSubDescriptor, "")
     UUID(060E2B34, 02530101, 0D010101, 01016C00, 0000, "SMPTE ST 377-4", SoundfieldGroupLabelSubDescriptor, "")
     UUID(060E2B34, 02530101, 0D010101, 01016D00, 0000, "SMPTE ST 377-4", GroupOfSoundfieldGroupsLabelSubDescriptor, "")
+    UUID(060E2B34, 02530101, 0D010101, 01016E00, 0000, "SMPTE ST 381-3", AVCSubDescriptor, "AVC Sub-Descriptor")
 
     //                           02 - MXF File Structure
     //                             01 - Version 1
@@ -440,6 +462,7 @@ namespace Elements
 extern const char* Mpegv_profile_and_level_indication_profile[];
 extern const char* Mpegv_profile_and_level_indication_level[];
 extern const char* Mpeg4v_Profile_Level(int32u Profile_Level);
+extern const char* Avc_profile_idc(int8u profile_idc);
 extern string Jpeg2000_Rsiz(int16u Rsiz);
 
 //---------------------------------------------------------------------------
@@ -519,6 +542,27 @@ static const char* Mxf_MPEG2_CodedContentType(int8u CodedContentType)
         case 0x01 : return "Progressive";
         case 0x02 : return "Interlaced";
         case 0x03 : return ""; //Mixed
+        default   : return "";
+    }
+}
+
+//---------------------------------------------------------------------------
+static const char* Mxf_AVC_SequenceParameterSetFlag_Constancy(bool Constancy)
+{
+    if (Constancy)
+        return "";
+    else
+        return "Constant";
+}
+
+//---------------------------------------------------------------------------
+static const char* Mxf_AVC_ParameterSetFlag_Location(int8u Location)
+{
+    switch (Location)
+    {
+        case 0x01 : return "First access unit";
+        case 0x02 : return "Every access unit";
+        case 0x03 : return "Every GOP";
         default   : return "";
     }
 }
@@ -1259,6 +1303,7 @@ static const char* Mxf_TransferCharacteristic(const int128u TransferCharacterist
         case 0x08 : return "xvYCC";
         case 0x09 : return "BT.2020";
         case 0x0A : return "SMPTE ST 2084";
+        case 0x0B : return "HLG";
         default   : return "";
     }
 }
@@ -1273,100 +1318,6 @@ static const char* Mxf_CodingEquations(const int128u CodingEquations)
         case 0x02 : return "BT.709";
         case 0x03 : return "SMPTE 240M";
         case 0x06 : return "BT.2020";
-        default   : return "";
-    }
-}
-
-//---------------------------------------------------------------------------
-static const char* Mxf_ChannelAssignment_ChannelPositions(const int128u ChannelLayout, int32u ChannelsCount)
-{
-    //Sound Channel Labeling
-    if ((ChannelLayout.hi&0xFFFFFFFFFFFFFF00LL)!=0x060E2B3404010100LL && (ChannelLayout.lo&0xFFFFFFFF00000000LL)!=0x0402021000000000LL)
-        return "";
-
-    int8u Code5=(int8u)((ChannelLayout.lo&0x00000000FF000000LL)>>24);
-    int8u Code6=(int8u)((ChannelLayout.lo&0x0000000000FF0000LL)>>16);
-    int8u Code7=(int8u)((ChannelLayout.lo&0x000000000000FF00LL)>> 8);
-
-    switch (Code5)
-    {
-        case 0x03 : //SMPTE 429-2
-                    switch (Code6)
-                    {
-                        case 0x01 : //Sets
-                                    switch (Code7)
-                                    {
-                                        case 0x01 : //Config 1
-                                                    switch (ChannelsCount)
-                                                    {
-                                                        case  6 : return "Front: L C R, Side: L R, LFE";
-                                                        default : return "Front: L C R, Side: L R, LFE, HI, VI-N";
-                                                    }
-                                        case 0x02 : //Config 2
-                                                    switch (ChannelsCount)
-                                                    {
-                                                        case  6 : return "Front: L C R, Side: L R, LFE";
-                                                        case  8 : return "Front: L C R, Side: L R, Back: C, LFE";
-                                                        default : return "Front: L C R, Side: L R, Back: C, LFE, HI, VI-N";
-                                                    }
-                                        case 0x03 : //Config 3
-                                                    switch (ChannelsCount)
-                                                    {
-                                                        case  6 : return "Front: L C R, Side: L R, LFE";
-                                                        case  8 : return "Front: L C R, Side: L R, Back: L R, LFE";
-                                                        default : return "Front: L C R, Side: L R, Back: L R, LFE, HI, VI-N";
-                                                    }
-                                        default   : return "";
-                                    }
-                        default   : return "";
-                    }
-        default   : return "";
-    }
-}
-
-//---------------------------------------------------------------------------
-static const char* Mxf_ChannelAssignment_ChannelPositions2(const int128u& ChannelLayout, int32u ChannelsCount=(int32u)-1)
-{
-    //Sound Channel Labeling
-    if ((ChannelLayout.hi&0xFFFFFFFFFFFFFF00LL)!=0x060E2B3404010100LL && (ChannelLayout.lo&0xFFFFFFFF00000000LL)!=0x0402021000000000LL)
-        return "";
-
-    int8u Code5=(int8u)((ChannelLayout.lo&0x00000000FF000000LL)>>24);
-    int8u Code6=(int8u)((ChannelLayout.lo&0x0000000000FF0000LL)>>16);
-    int8u Code7=(int8u)((ChannelLayout.lo&0x000000000000FF00LL)>> 8);
-
-    switch (Code5)
-    {
-        case 0x03 : //SMPTE 429-2
-                    switch (Code6)
-                    {
-                        case 0x01 : //Sets
-                                    switch (Code7)
-                                    {
-                                        case 0x01 : //Config 1
-                                                    switch (ChannelsCount)
-                                                    {
-                                                        case  6 : return "3/2/0.1";
-                                                        default : return "3/2/0.1+2";
-                                                    }
-                                        case 0x02 : //Config 2
-                                                    switch (ChannelsCount)
-                                                    {
-                                                        case  6 : return "3/2/0.1";
-                                                        case  8 : return "3/2/1.1";
-                                                        default : return "3/2/1.1+2";
-                                                    }
-                                        case 0x03 : //Config 3
-                                                    switch (ChannelsCount)
-                                                    {
-                                                        case  6 : return "3/2/0.1";
-                                                        case  8 : return "3/2/2.1";
-                                                        default : return "3/2/2.1+2";
-                                                    }
-                                        default   : return "";
-                                    }
-                        default   : return "";
-                    }
         default   : return "";
     }
 }
@@ -2535,12 +2486,12 @@ void File_Mxf::Streams_Finish()
     if (PrimaryPackageIsSourcePackage && !PrimaryPackageIsMaterialPackage)
     {
         Fill(Stream_General, 0, "PrimaryPackage", "Source Package");
-        (*Stream_More)[Stream_General][0](Ztring().From_Local("PrimaryPackage"), Info_Options)=__T("N NT");
+        Fill_SetOptions(Stream_General, 0, "PrimaryPackage", "N NT");
     }
     if (!PrimaryPackageIsSourcePackage && PrimaryPackageIsMaterialPackage)
     {
         Fill(Stream_General, 0, "PrimaryPackage", "Material Package");
-        (*Stream_More)[Stream_General][0](Ztring().From_Local("PrimaryPackage"), Info_Options)=__T("N NT");
+        Fill_SetOptions(Stream_General, 0, "PrimaryPackage", "N NT");
     }
 
     //CameraUnitMetadata
@@ -2567,16 +2518,16 @@ void File_Mxf::Streams_Finish()
                             case  5 : //NearFocusDistance
                             case  6 : //FarFocusDistance
                             case  8 : //EntrancePupilPosition
-                                (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                                Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                                 if (AcquisitionMetadataLists[0xE203] && !AcquisitionMetadataLists[0xE203]->empty()) //Calibration Type
                                     Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadata_Sony_E201_Lists[i])[0].Value+' '+(*AcquisitionMetadataLists[0xE203])[0].Value);
                                 break;
                             case  3 : //EffectiveFocaleLength
-                                (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                                Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                                 Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadata_Sony_E201_Lists[i])[0].Value+" mm");
                                 break;
                             case  7 : //HorizontalFieldOfView
-                                (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                                Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                                 Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadata_Sony_E201_Lists[i])[0].Value+"\xc2\xB0");
                                 break;
                             default : ;
@@ -2586,8 +2537,8 @@ void File_Mxf::Streams_Finish()
                             Fill(Stream_Other, 0, ElementName_Values.c_str(), (*AcquisitionMetadata_Sony_E201_Lists[i])[List_Pos].Value);
                             Fill(Stream_Other, 0, ElementName_FrameCounts.c_str(), (*AcquisitionMetadata_Sony_E201_Lists[i])[List_Pos].FrameCount);
                         }
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_Values.c_str()), Info_Options)=__T("N NT");
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FrameCounts.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_Values.c_str(), "N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FrameCounts.c_str(), "N NT");
                     }
             }
             else if (AcquisitionMetadataLists[Pos] && !AcquisitionMetadataLists[Pos]->empty())
@@ -2601,12 +2552,12 @@ void File_Mxf::Streams_Finish()
                 {
                     case 0x8001 : //FocusPosition_ImagePlane
                     case 0x8002 : //FocusPosition_FrontLensVertex
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" m");
                         break;
                     case 0x8004 : //LensZoom35mmStillCameraEquivalent
                     case 0x8005 : //LensZoomActualFocalLength
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" mm");
                         break;
                     case 0x8006 : //OpticalExtenderMagnification
@@ -2617,45 +2568,45 @@ void File_Mxf::Streams_Finish()
                     case 0x810F : //CameraMasterBlackLevel
                     case 0x8110 : //CameraKneePoint
                     case 0x8112 : //CameraLuminanceDynamicRange
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+"%");
                         break;
                     case 0x8104 : //ImagerDimension_EffectiveWidth
                     case 0x8105 : //ImagerDimension_EffectiveHeight
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" mm");
                         break;
                     case 0x8106 : //CaptureFrameRate
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" fps");
                         break;
                     case 0x8108 : //ShutterSpeed_Angle
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+"\xc2\xB0");
                         break;
                     case 0x8109 : //ShutterSpeed_Time
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" s");
                         break;
                     case 0x810A : //CameraMasterGainAdjustment
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" dB");
                         break;
                     case 0x810E : //WhiteBalance
-                        (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                        Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                         Fill(Stream_Other, 0, (ElementName_FirstFrame+"/String").c_str(), (*AcquisitionMetadataLists[Pos])[0].Value+" K");
                         break;
                     default : ;
                 }
                 if (UserDefinedAcquisitionMetadata_UdamSetIdentifier_IsSony && Pos==0xE203) // Calibration Type, not for display
-                    (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FirstFrame.c_str()), Info_Options)=__T("N NT");
+                    Fill_SetOptions(Stream_Other, 0, ElementName_FirstFrame.c_str(), "N NT");
                 for (size_t List_Pos=0; List_Pos<AcquisitionMetadataLists[Pos]->size(); List_Pos++)
                 {
                     Fill(Stream_Other, 0, ElementName_Values.c_str(), (*AcquisitionMetadataLists[Pos])[List_Pos].Value);
                     Fill(Stream_Other, 0, ElementName_FrameCounts.c_str(), (*AcquisitionMetadataLists[Pos])[List_Pos].FrameCount);
                 }
-                (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_Values.c_str()), Info_Options)=__T("N NT");
-                (*Stream_More)[Stream_Other][0](Ztring().From_UTF8(ElementName_FrameCounts.c_str()), Info_Options)=__T("N NT");
+                Fill_SetOptions(Stream_Other, 0, ElementName_Values.c_str(), "N NT");
+                Fill_SetOptions(Stream_Other, 0, ElementName_FrameCounts.c_str(), "N NT");
             }
         }
     }
@@ -2911,7 +2862,7 @@ void File_Mxf::Streams_Finish_Essence(int32u EssenceUID, int128u TrackUID)
     {
         Fill(StreamKind_Last, StreamPos_Last, "Delay_SDTI", SDTI_TimeCode_StartTimecode.ToMilliseconds());
         if (StreamKind_Last!=Stream_Max)
-            (*Stream_More)[StreamKind_Last][StreamPos_Last](Ztring().From_Local("Delay_SDTI"), Info_Options)=__T("N NT");
+            Fill_SetOptions(StreamKind_Last, StreamPos_Last, "Delay_SDTI", "N NT");
 
         //Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_TimeCode_FirstFrame), SDTI_TimeCode_StartTimecode.c_str());
         //Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_TimeCode_Source), "SDTI");
@@ -2920,7 +2871,7 @@ void File_Mxf::Streams_Finish_Essence(int32u EssenceUID, int128u TrackUID)
     {
         Fill(StreamKind_Last, StreamPos_Last, "Delay_SystemScheme1", SystemScheme1_TimeCodeArray_StartTimecode_ms);
         if (StreamKind_Last!=Stream_Max)
-            (*Stream_More)[StreamKind_Last][StreamPos_Last](Ztring().From_Local("Delay_SystemScheme1"), Info_Options)=__T("N NT");
+            Fill_SetOptions(StreamKind_Last, StreamPos_Last, "Delay_SystemScheme1", "N NT");
 
         //Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_TimeCode_FirstFrame), SystemScheme1_TimeCodeArray_StartTimecode.c_str());
         //Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_TimeCode_Source), "System scheme 1");
@@ -2991,9 +2942,9 @@ void File_Mxf::Streams_Finish_Essence(int32u EssenceUID, int128u TrackUID)
             {
                 Fill(StreamKind_Last, StreamPos_Last, StreamMoreSave(Pos, 0).To_Local().c_str(), StreamMoreSave(Pos, 1));
                 if (StreamMoreSave(Pos, Info_Name)==__T("Delay_SDTI"))
-                    (*Stream_More)[StreamKind_Last][StreamPos_Last](Ztring().From_Local("Delay_SDTI"), Info_Options)=__T("N NT");
+                    Fill_SetOptions(StreamKind_Last, StreamPos_Last, "Delay_SDTI", "N NT");
                 if (StreamMoreSave(Pos, Info_Name)==__T("Delay_SystemScheme1"))
-                    (*Stream_More)[StreamKind_Last][StreamPos_Last](Ztring().From_Local("Delay_SystemScheme1"), Info_Options)=__T("N NT");
+                    Fill_SetOptions(StreamKind_Last, StreamPos_Last, "Delay_SystemScheme1", "N NT");
             }
 
             for (size_t Pos=0; Pos<DMScheme1s_List.size(); Pos++)
@@ -3643,9 +3594,10 @@ void File_Mxf::Streams_Finish_Descriptor(const int128u DescriptorUID, const int1
         if (StreamKind_Last==Stream_Audio && Descriptor->second.BlockAlign!=(int16u)-1)
         {
             if (Retrieve(Stream_Audio, StreamPos_Last, "BlockAlignment").empty()) //TODO: check the reason it is sometimes call several times.
+            {
                 Fill(Stream_Audio, StreamPos_Last, "BlockAlignment", Descriptor->second.BlockAlign);
-            if (StreamPos_Last<Count_Get(Stream_Audio))
-                (*Stream_More)[Stream_Audio][StreamPos_Last](Ztring().From_Local("BlockAlignment"), Info_Options)=__T("N NT");
+                Fill_SetOptions(Stream_Audio, StreamPos_Last, "BlockAlignment", "N NT");
+            }
         }
 
         //Subs and ChannelAssignment
@@ -3702,6 +3654,29 @@ void File_Mxf::Streams_Finish_Descriptor(const int128u DescriptorUID, const int1
                                                 #endif //MEDIAINFO_ADVANCED
                     }
 
+                    //Special cases
+                    std::map<std::string, Ztring>::iterator Info_Level=SubDescriptor->second.Infos.find("Temp_AVC_Format_Level");
+                    std::map<std::string, Ztring>::iterator Info_constraint=SubDescriptor->second.Infos.find("Temp_AVC_constraint_set3_flag");
+                    if (Info_Level!=SubDescriptor->second.Infos.end() || Info_Level!=SubDescriptor->second.Infos.end())
+                    {
+                        //AVC Descriptor creates that, adapting
+                        std::map<std::string, Ztring>::iterator Info_Profile=SubDescriptor->second.Infos.find("Format_Profile");
+                        if (Info_Profile!=SubDescriptor->second.Infos.end())
+                        {
+                            if (Info_constraint!=SubDescriptor->second.Infos.end())
+                            {
+                                if (Info_constraint->second==__T("1"))
+                                    Info_Profile->second+=__T(" Intra");
+                                SubDescriptor->second.Infos.erase(Info_constraint);
+                            }
+                            if (Info_Level!=SubDescriptor->second.Infos.end())
+                            {
+                                Info_Profile->second+=__T("@L")+Info_Level->second;
+                                SubDescriptor->second.Infos.erase(Info_Level);
+                            }
+                        }
+                    }
+                    
                     for (std::map<std::string, Ztring>::iterator Info=SubDescriptor->second.Infos.begin(); Info!=SubDescriptor->second.Infos.end(); ++Info)
                         if (Retrieve(StreamKind_Last, StreamPos_Last, Info->first.c_str()).empty())
                             Fill(StreamKind_Last, StreamPos_Last, Info->first.c_str(), Info->second);
@@ -4043,7 +4018,7 @@ void File_Mxf::Streams_Finish_Component_ForAS11(const int128u ComponentUID, floa
                                                             }
                                                     }
                                                     Fill(Stream_Other, StreamPos_Last, "PrimaryAudioLanguage", AS11->second.PrimaryAudioLanguage);
-                                                    //(*Stream_More)[Stream_Other][StreamPos_Last](Ztring().From_Local("PrimaryAudioLanguage"), Info_Options)=__T("N NT");
+                                                    //Fill_SetOptions(Stream_Other][StreamPos_Last](Ztring().From_Local("PrimaryAudioLanguage", "N NT");
                                                     //if (MediaInfoLib::Config.Iso639_Find(AS11->second.PrimaryAudioLanguage).empty())
                                                     //    Fill(Stream_Other, StreamPos_Last, "PrimaryAudioLanguage/String", MediaInfoLib::Config.Iso639_Translate(AS11->second.PrimaryAudioLanguage));
                                                     if (AS11->second.ClosedCaptionsPresent<2)
@@ -4782,14 +4757,18 @@ size_t File_Mxf::Read_Buffer_Seek (size_t Method, int64u Value, int64u ID)
         if (SingleDescriptor!=Descriptors.end() && SingleDescriptor->second.StreamKind==Stream_Audio)
         {
             //Configuring bitrate is not available in descriptor
-            if (Descriptors.begin()->second.ByteRate==(int32u)-1 && Descriptors.begin()->second.Infos.find("SamplingRate")!=Descriptors.begin()->second.Infos.end())
+            if (Descriptors.begin()->second.ByteRate==(int32u)-1)
             {
-                int32u SamplingRate=Descriptors.begin()->second.Infos["SamplingRate"].To_int32u();
+                std::map<std::string, Ztring>::const_iterator i=Descriptors.begin()->second.Infos.find("SamplingRate");
+                if (i!=Descriptors.begin()->second.Infos.end())
+                {
+                    int32u SamplingRate=i->second.To_int32u();
 
-                if (Descriptors.begin()->second.BlockAlign!=(int16u)-1)
-                    Descriptors.begin()->second.ByteRate=SamplingRate*Descriptors.begin()->second.BlockAlign;
-                else if (Descriptors.begin()->second.QuantizationBits!=(int8u)-1)
-                    Descriptors.begin()->second.ByteRate=SamplingRate*Descriptors.begin()->second.QuantizationBits/8;
+                    if (Descriptors.begin()->second.BlockAlign!=(int16u)-1)
+                        Descriptors.begin()->second.ByteRate=SamplingRate*Descriptors.begin()->second.BlockAlign;
+                    else if (Descriptors.begin()->second.QuantizationBits!=(int8u)-1)
+                        Descriptors.begin()->second.ByteRate=SamplingRate*Descriptors.begin()->second.QuantizationBits / 8;
+                }
             }
         }
 
@@ -5727,11 +5706,12 @@ void File_Mxf::Data_Parse()
     ELEMENT(MCALabelSubDescriptor,                              "MCA Label Sub-Descriptor")
     ELEMENT(TimedTextDescriptor,                                "Timed Text Descriptor")
     ELEMENT(TimedTextResourceSubDescriptor,                     "Timed Text Resource Sub-Descriptor")
-    ELEMENT(Unknown67SubDescriptor,                             "Unknown 0x67 Sub-Descriptor")
+    ELEMENT(ContainerConstraintsSubDescriptor,                  "Container Constraints Sub-Descriptor")
     ELEMENT(Mpeg4VisualSubDescriptor,                           "MPEG-4 Visual Sub-Descriptor")
     ELEMENT(AudioChannelLabelSubDescriptor,                     "Audio Channel Label Sub-Descriptor")
     ELEMENT(SoundfieldGroupLabelSubDescriptor,                  "Soundfield Group Label Sub-Descriptor")
     ELEMENT(GroupOfSoundfieldGroupsLabelSubDescriptor,          "Group Of Soundfield Groups Label Sub-Descriptor")
+    ELEMENT(AVCSubDescriptor,                                   "AVC Sub-Descriptor")
     ELEMENT(OpenIncompleteHeaderPartition,                      "Open and Incomplete Header Partition Pack")
     ELEMENT(ClosedIncompleteHeaderPartition,                    "Closed and Iomplete Header Partition Pack")
     ELEMENT(OpenCompleteHeaderPartition,                        "Open and Complete Header Partition Pack")
@@ -5807,14 +5787,18 @@ void File_Mxf::Data_Parse()
             if (SingleDescriptor!=Descriptors.end() && SingleDescriptor->second.StreamKind==Stream_Audio)
             {
                 //Configuring bitrate is not available in descriptor
-                if (SingleDescriptor->second.ByteRate==(int32u)-1 && SingleDescriptor->second.Infos.find("SamplingRate")!=SingleDescriptor->second.Infos.end())
+                if (SingleDescriptor->second.ByteRate==(int32u)-1)
                 {
-                    int32u SamplingRate=SingleDescriptor->second.Infos["SamplingRate"].To_int32u();
+                    std::map<std::string, Ztring>::const_iterator i=Descriptors.begin()->second.Infos.find("SamplingRate");
+                    if (i != SingleDescriptor->second.Infos.end())
+                    {
+                        int32u SamplingRate=i->second.To_int32u();
 
-                    if (SingleDescriptor->second.BlockAlign!=(int16u)-1)
-                        SingleDescriptor->second.ByteRate=SamplingRate*SingleDescriptor->second.BlockAlign;
-                    else if (SingleDescriptor->second.QuantizationBits!=(int8u)-1)
-                        SingleDescriptor->second.ByteRate=SamplingRate*SingleDescriptor->second.QuantizationBits/8;
+                        if (SingleDescriptor->second.BlockAlign != (int16u)-1)
+                            SingleDescriptor->second.ByteRate = SamplingRate*SingleDescriptor->second.BlockAlign;
+                        else if (SingleDescriptor->second.QuantizationBits != (int8u)-1)
+                            SingleDescriptor->second.ByteRate = SamplingRate*SingleDescriptor->second.QuantizationBits / 8;
+                    }
                 }
             }
 
@@ -5870,8 +5854,14 @@ void File_Mxf::Data_Parse()
                 }
 
             //Format_Settings_Wrapping
-            if (SingleDescriptor!=Descriptors.end() && (SingleDescriptor->second.Infos.find("Format_Settings_Wrapping")==SingleDescriptor->second.Infos.end() || SingleDescriptor->second.Infos["Format_Settings_Wrapping"].empty()) && (Buffer_End?(Buffer_End-Buffer_Begin):Element_Size)>File_Size/2) //Divided by 2 for testing if this is a big chunk = Clip based and not frames.
-                SingleDescriptor->second.Infos["Format_Settings_Wrapping"]=__T("Clip"); //By default, not sure about it, should be from descriptor
+            if (SingleDescriptor!=Descriptors.end())
+            {
+                std::map<std::string, Ztring>::iterator i=SingleDescriptor->second.Infos.find("Format_Settings_Wrapping");
+                if ((i==SingleDescriptor->second.Infos.end() || i->second.empty()) && (Buffer_End?(Buffer_End-Buffer_Begin):Element_Size)>File_Size/2) //Divided by 2 for testing if this is a big chunk = Clip based and not frames.
+                {
+                    i->second=__T("Clip"); //By default, not sure about it, should be from descriptor
+                }
+            }
 
             //Searching the corresponding Track (for TrackID)
             if (!Essence->second.TrackID_WasLookedFor)
@@ -5935,14 +5925,18 @@ void File_Mxf::Data_Parse()
 
                     Essence->second.StreamPos_Initial=Essence->second.StreamPos=Code_Compare4&0x000000FF;
 
-                    if (Descriptor->second.StreamKind==Stream_Audio && Descriptor->second.Infos.find("Format_Settings_Endianness")==Descriptor->second.Infos.end())
+                    if (Descriptor->second.StreamKind==Stream_Audio)
                     {
-                        Ztring Format;
-                        Format.From_Local(Mxf_EssenceCompression(Descriptor->second.EssenceCompression));
-                        if (Format.empty())
-                            Format.From_Local(Mxf_EssenceContainer(Descriptor->second.EssenceContainer));
-                        if (Format.find(__T("PCM"))==0)
-                            Descriptor->second.Infos["Format_Settings_Endianness"]=__T("Little");
+                        std::map<std::string, Ztring>::iterator i=Descriptor->second.Infos.find("Format_Settings_Endianness");
+                        if (i==Descriptor->second.Infos.end())
+                        {
+                            Ztring Format;
+                            Format.From_Local(Mxf_EssenceCompression(Descriptor->second.EssenceCompression));
+                            if (Format.empty())
+                                Format.From_Local(Mxf_EssenceContainer(Descriptor->second.EssenceContainer));
+                            if (Format.find(__T("PCM"))==0)
+                                Descriptor->second.Infos["Format_Settings_Endianness"]=__T("Little");
+                        }
                     }
 
                     ChooseParser(Essence, Descriptor); //Searching by the descriptor
@@ -7016,7 +7010,7 @@ void File_Mxf::MultipleDescriptor()
 
     switch(Code2)
     {
-        ELEMENT(3F01, MultipleDescriptor_SubDescriptorUIDs,     "SubDescriptorUIDs")
+        ELEMENT(3F01, MultipleDescriptor_FileDescriptors,       "FileDescriptors")
         default: FileDescriptor();
     }
 }
@@ -7746,7 +7740,7 @@ void File_Mxf::TimedTextResourceSubDescriptor()
 }
 
 //---------------------------------------------------------------------------
-void File_Mxf::Unknown67SubDescriptor()
+void File_Mxf::ContainerConstraintsSubDescriptor()
 {
     //switch(Code2)
     //{
@@ -7903,6 +7897,52 @@ void File_Mxf::GroupOfSoundfieldGroupsLabelSubDescriptor()
     //{
     //    default:
                 MCALabelSubDescriptor();
+    //}
+}
+
+//---------------------------------------------------------------------------
+void File_Mxf::AVCSubDescriptor()
+{
+    if (Code2>=0x8000)
+    {
+        // Not a short code
+        std::map<int16u, int128u>::iterator Primer_Value=Primer_Values.find(Code2);
+        if (Primer_Value!=Primer_Values.end())
+        {
+            int32u Code_Compare1=Primer_Value->second.hi>>32;
+            int32u Code_Compare2=(int32u)Primer_Value->second.hi;
+            int32u Code_Compare3=Primer_Value->second.lo>>32;
+            int32u Code_Compare4=(int32u)Primer_Value->second.lo;
+            if(0);
+            ELEMENT_UUID(AVCDescriptor_ConstantBFrames,                 "Number of B frames always constant")
+            ELEMENT_UUID(AVCDescriptor_CodedContentType,                "Coded content type")
+            ELEMENT_UUID(AVCDescriptor_ClosedGOP,                       "Closed GOP")
+            ELEMENT_UUID(AVCDescriptor_IdenticalGOP,                    "Identical GOP")
+            ELEMENT_UUID(AVCDescriptor_MaxGOP,                          "Maximum occurring spacing between I frames")
+            ELEMENT_UUID(AVCDescriptor_BPictureCount,                   "Maximum number of B pictures between P or I frames")
+            ELEMENT_UUID(AVCDescriptor_Profile,                         "Profile")
+            ELEMENT_UUID(AVCDescriptor_MaximumBitRate,                  "Maximum bit rate")
+            ELEMENT_UUID(AVCDescriptor_ProfileConstraint,               "Profile Constraint")
+            ELEMENT_UUID(AVCDescriptor_Level,                           "Level")
+            ELEMENT_UUID(AVCDescriptor_DecodingDelay,                   "Decoding delay")
+            ELEMENT_UUID(AVCDescriptor_MaximumRefFrames,                "Maximum reference frames")
+            ELEMENT_UUID(AVCDescriptor_SequenceParameterSetFlag,        "Sequence parameter set flag")
+            ELEMENT_UUID(AVCDescriptor_PictureParameterSetFlag,         "Picture parameter set flag")
+            ELEMENT_UUID(AVCDescriptor_AverageBitRate,                  "Average bit rate")
+            else
+            {
+                Element_Info1(Ztring().From_UUID(Primer_Value->second));
+                Skip_XX(Length2,                                        "Data");
+            }
+
+            return;
+        }
+    }
+
+    //switch(Code2)
+    //{
+    //    default:
+                GenerationInterchangeObject();
     //}
 }
 
@@ -9527,20 +9567,6 @@ void File_Mxf::GenericSoundEssenceDescriptor_ChannelCount()
     FILLING_BEGIN();
         Descriptors[InstanceUID].ChannelCount=Value;
         Descriptor_Fill("Channel(s)", Ztring().From_Number(Value));
-
-        //if (Descriptors[InstanceUID].ChannelAssignment.lo!=(int64u)-1)
-        //{
-            //Descriptors[InstanceUID].Infos["ChannelLayout"]=Mxf_ChannelAssignment_ChannelLayout(Descriptors[InstanceUID].ChannelAssignment, Value);
-            //Ztring ChannelLayoutID;
-            //ChannelLayoutID.From_Number(Descriptors[InstanceUID].ChannelAssignment.lo, 16);
-            //if (ChannelLayoutID.size()<16)
-            //    ChannelLayoutID.insert(0, 16-ChannelLayoutID.size(), __T('0'));
-            //Descriptors[InstanceUID].Infos["ChannelLayoutID"]=ChannelLayoutID;
-            //Descriptors[InstanceUID].Infos["ChannelPositions"]=Mxf_ChannelAssignment_ChannelPositions(Descriptors[InstanceUID].ChannelAssignment, Value);
-            //if (Descriptors[InstanceUID].Infos["ChannelPositions"].empty())
-            //    Descriptors[InstanceUID].Infos["ChannelPositions"]=ChannelLayoutID;
-            //Descriptors[InstanceUID].Infos["ChannelPositions/String2"]=Mxf_ChannelAssignment_ChannelPositions2(Descriptors[InstanceUID].ChannelAssignment, Value);
-        //}
     FILLING_END();
 }
 
@@ -10256,11 +10282,129 @@ void File_Mxf::Mpeg4VisualDescriptor_ProfileAndLevel()
 
 //---------------------------------------------------------------------------
 // 0x
+void File_Mxf::AVCDescriptor_Profile()
+{
+    //Parsing
+    int8u profile_idc;
+    Get_B1 (profile_idc,                                        "profile_idc"); Element_Info1(Avc_profile_idc(profile_idc));
+
+    FILLING_BEGIN();
+        if (profile_idc)
+            Descriptor_Fill("Format_Profile", Avc_profile_idc(profile_idc));
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+// 0x
 void File_Mxf::MPEG2VideoDescriptor_BitRate()
 {
     //Parsing
     int32u Data;
     Get_B4 (Data,                                               "Data"); Element_Info1(Data);
+
+    FILLING_BEGIN();
+        Descriptor_Fill("BitRate", Ztring().From_Number(Data));
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+// 0x
+void File_Mxf::AVCDescriptor_MaximumBitRate()
+{
+    //Parsing
+    int32u Data;
+    Get_B4 (Data,                                               "Data"); Element_Info1(Data);
+
+    FILLING_BEGIN();
+        Descriptor_Fill("BitRate_Maximum", Ztring().From_Number(Data));
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+// 0x
+void File_Mxf::AVCDescriptor_ProfileConstraint()
+{
+    //Parsing
+    BS_Begin();
+    bool constraint_set3_flag;
+    Element_Begin1("constraints");
+        Skip_SB(                                                "constraint_set0_flag");
+        Skip_SB(                                                "constraint_set1_flag");
+        Skip_SB(                                                "constraint_set2_flag");
+        Get_SB (constraint_set3_flag,                           "constraint_set3_flag");
+        Skip_SB(                                                "constraint_set4_flag");
+        Skip_SB(                                                "constraint_set5_flag");
+        Skip_BS(2,                                              "reserved_zero_2bits");
+    Element_End0();
+    BS_End();
+
+    FILLING_BEGIN();
+        Descriptor_Fill("Temp_AVC_constraint_set3_flag", Ztring::ToZtring(constraint_set3_flag?1:0));
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+// 0x
+void File_Mxf::AVCDescriptor_Level()
+{
+    //Parsing
+    int8u level_idc;
+    Get_B1 (level_idc,                                          "level_idc"); Element_Info1(Ztring().From_Number(((float)level_idc)/10, (level_idc%10)?1:0));
+
+    FILLING_BEGIN();
+        if (level_idc)
+            Descriptor_Fill("Temp_AVC_Format_Level", Ztring().From_Number(((float)level_idc)/10, (level_idc%10)?1:0));
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+// 0x
+void File_Mxf::AVCDescriptor_DecodingDelay()
+{
+    //Parsing
+    Info_B1(Data,                                               "Data"); Element_Info1(Data==0xFF?"":(Data?"Yes":"No"));
+}
+
+//---------------------------------------------------------------------------
+// 0x
+void File_Mxf::AVCDescriptor_MaximumRefFrames()
+{
+    //Parsing
+    Info_B1(Data,                                               "max_num_ref_frames"); Element_Info1(Data);
+}
+
+//---------------------------------------------------------------------------
+// 0x
+void File_Mxf::AVCDescriptor_SequenceParameterSetFlag()
+{
+    //Parsing
+    BS_Begin();
+    bool constraint_set3_flag;
+    Info_SB(   Constancy,                                       "Constancy");
+    Info_BS(3, Location,                                        "In-band location"); Element_Info1(Mxf_AVC_SequenceParameterSetFlag_Constancy(Constancy));
+    Skip_BS(4,                                                  "reserved"); Element_Info1(Mxf_AVC_SequenceParameterSetFlag_Constancy(Location));
+    BS_End();
+}
+
+//---------------------------------------------------------------------------
+// 0x
+void File_Mxf::AVCDescriptor_PictureParameterSetFlag()
+{
+    //Parsing
+    BS_Begin();
+    Info_SB(   Constancy,                                       "Constancy");
+    Info_BS(3, Location,                                        "In-band location"); Element_Info1(Mxf_AVC_SequenceParameterSetFlag_Constancy(Constancy));
+    Skip_BS(4,                                                  "reserved"); Element_Info1(Mxf_AVC_SequenceParameterSetFlag_Constancy(Location));
+    BS_End();
+}
+
+//---------------------------------------------------------------------------
+// 0x
+void File_Mxf::AVCDescriptor_AverageBitRate()
+{
+    //Parsing
+    int32u Data;
+    Get_B4 (Data,                                               "Data");
 
     FILLING_BEGIN();
         Descriptor_Fill("BitRate", Ztring().From_Number(Data));
@@ -10282,7 +10426,7 @@ void File_Mxf::NetworkLocator_URLString()
 
 //---------------------------------------------------------------------------
 // 0x3F01
-void File_Mxf::MultipleDescriptor_SubDescriptorUIDs()
+void File_Mxf::MultipleDescriptor_FileDescriptors()
 {
     Descriptors[InstanceUID].SubDescriptors.clear();
 
@@ -16214,7 +16358,12 @@ void File_Mxf::ChooseParser__Aaf_GC_Data(const essences::iterator &Essence, cons
     switch (Code_Compare4_3)
     {
         case 0x01 : //VBI, SMPTE ST 436
-                    Essence->second.Parsers.push_back(new File__Analyze());
+                    #if defined(MEDIAINFO_VBI_YES)
+                        MayHaveCaptionsInStream=true;
+                        Essence->second.Parsers.push_back(new File_Vbi());
+                    #else
+                        Essence->second.Parsers.push_back(new File__Analyze());
+                    #endif //defined(MEDIAINFO_VBI_YES)
                     break;
         case 0x02 : //Ancillary
                     #if defined(MEDIAINFO_ANCILLARY_YES)
@@ -16527,17 +16676,22 @@ void File_Mxf::ChooseParser_ChannelGrouping(const essences::iterator &Essence, c
         {
             Parser=new File_ChannelGrouping;
             Parser->Channel_Pos=0;
-            if (Descriptor!=Descriptors.end() && Descriptor->second.Infos.find("SamplingRate")!=Descriptor->second.Infos.end())
-                Parser->SamplingRate=Descriptor->second.Infos["SamplingRate"].To_int16u();
+            if (Descriptor!=Descriptors.end())
+            {
+                std::map<std::string, Ztring>::const_iterator i=Descriptor->second.Infos.find("SamplingRate");
+                if (i!=Descriptor->second.Infos.end())
+                    Parser->SamplingRate=i->second.To_int16u();
+            }
             Essence->second.IsChannelGrouping=true;
         }
         Parser->Channel_Total=2;
         if (Descriptor!=Descriptors.end())
         {
             Parser->BitDepth=(int8u)(Descriptor->second.BlockAlign<=4?(Descriptor->second.BlockAlign*8):(Descriptor->second.BlockAlign*4)); //In one file, BlockAlign is size of the aggregated channelgroup
-            if (Descriptor->second.Infos.find("Format_Settings_Endianness")!=Descriptor->second.Infos.end())
+            std::map<std::string, Ztring>::const_iterator i=Descriptor->second.Infos.find("Format_Settings_Endianness");
+            if (i!=Descriptor->second.Infos.end())
             {
-                if (Descriptor->second.Infos["Format_Settings_Endianness"]==__T("Big"))
+                if (i->second==__T("Big"))
                     Parser->Endianness='B';
                 else
                     Parser->Endianness='L';
@@ -16590,8 +16744,9 @@ void File_Mxf::ChooseParser_Pcm(const essences::iterator &Essence, const descrip
     int8u Channels=0;
     if (Descriptor!=Descriptors.end())
     {
-        if (Descriptor->second.Infos.find("Channel(s)")!=Descriptor->second.Infos.end())
-            Channels=Descriptor->second.Infos["Channel(s)"].To_int8u();
+        std::map<std::string, Ztring>::const_iterator i=Descriptor->second.Infos.find("Channel(s)");
+        if (i!=Descriptor->second.Infos.end())
+            Channels=i->second.To_int8u();
 
         //Handling some buggy cases
         if (Channels>1 && Descriptor->second.BlockAlign!=(int16u)-1 && Descriptor->second.QuantizationBits!=(int32u)-1)
@@ -16608,14 +16763,19 @@ void File_Mxf::ChooseParser_Pcm(const essences::iterator &Essence, const descrip
         {
             if (Channels)
                 Parser->Channels=Channels;
-            if (Descriptor->second.Infos.find("SamplingRate")!=Descriptor->second.Infos.end())
-                Parser->SamplingRate=Descriptor->second.Infos["SamplingRate"].To_int16u();
+            std::map<std::string, Ztring>::const_iterator i=Descriptor->second.Infos.find("SamplingRate");
+            if (i!=Descriptor->second.Infos.end())
+                Parser->SamplingRate=i->second.To_int16u();
             if (Parser->Channels && Descriptor->second.BlockAlign!=(int16u)-1)
                 Parser->BitDepth=(int8u)(Descriptor->second.BlockAlign*8/Parser->Channels);
             else if (Descriptor->second.QuantizationBits<256)
                 Parser->BitDepth=(int8u)Descriptor->second.QuantizationBits;
-            else if (Descriptor->second.Infos.find("BitDepth")!=Descriptor->second.Infos.end())
-                Parser->BitDepth=Descriptor->second.Infos["BitDepth"].To_int8u();
+            else
+            {
+                i=Descriptor->second.Infos.find("BitDepth");
+                if (i!=Descriptor->second.Infos.end())
+                    Parser->BitDepth=i->second.To_int8u();
+            }
             //Handling of quantization bits not being same as BlockAlign/Channels
             if (Channels && Descriptor->second.BlockAlign!=(int16u)-1 && Descriptor->second.QuantizationBits!=(int32u)-1)
             {
@@ -16629,9 +16789,10 @@ void File_Mxf::ChooseParser_Pcm(const essences::iterator &Essence, const descrip
                     Parser->BitDepth=((int8u)Descriptor->second.BlockAlign)*8/Channels;
                 }
             }
-            if (Descriptor->second.Infos.find("Format_Settings_Endianness")!=Descriptor->second.Infos.end())
+            i = Descriptor->second.Infos.find("Format_Settings_Endianness");
+            if (i!=Descriptor->second.Infos.end())
             {
-                if (Descriptor->second.Infos["Format_Settings_Endianness"]==__T("Big"))
+                if (i->second==__T("Big"))
                     Parser->Endianness='B';
                 else
                     Parser->Endianness='L';
@@ -16691,9 +16852,10 @@ void File_Mxf::ChooseParser_SmpteSt0337(const essences::iterator &Essence, const
                 Parser->Container_Bits=(int8u)(Descriptor->second.BlockAlign*4);
             else if (Descriptor->second.QuantizationBits!=(int32u)-1)
                 Parser->Container_Bits=(int8u)Descriptor->second.QuantizationBits;
-            if (Descriptor->second.Infos.find("Format_Settings_Endianness")!=Descriptor->second.Infos.end())
+            std::map<std::string, Ztring>::const_iterator i=Descriptor->second.Infos.find("Format_Settings_Endianness");
+            if (i!=Descriptor->second.Infos.end())
             {
-                if (Descriptor->second.Infos["Format_Settings_Endianness"]==__T("Big"))
+                if (i->second==__T("Big"))
                     Parser->Endianness='B';
                 else
                     Parser->Endianness='L';
@@ -16871,7 +17033,7 @@ void File_Mxf::Locators_Test()
             else
             {
                 Fill(Stream_General, 0, "UnsupportedSources", Locator->second.EssenceLocator);
-                (*Stream_More)[Stream_General][0](Ztring().From_Local("UnsupportedSources"), Info_Options)=__T("N NT");
+                Fill_SetOptions(Stream_General, 0, "UnsupportedSources", "N NT");
             }
 
         ReferenceFiles->ParseReferences();
