@@ -97,8 +97,8 @@ CSCD;CamStudio;4CC;V;;;RenderSoft CamStudio lossless (LZO & GZIP compression);
 CT10;TalkingShow;4CC;V;;;CyberLink Corporation;http://www.cyberlink.com
 CTRX;Citrix;4CC;V;;;Citrix Scalable Video;
 CUVC;Canopus HQ;4CC;V;;;Canopus HQ;
-CVID;Cinepack;4CC;V;;;Cinepak by CTi (ex. Radius) Vector Quantization;http://www.cinepak.com/text.html
-cvid;Cinepack;4CC;V;;;Cinepak by CTi (ex. Radius) Vector Quantization;http://www.apple.com/quicktime/download/standalone.html
+CVID;Cinepak;4CC;V;;;Cinepak by CTi (ex. Radius) Vector Quantization;http://www.cinepak.com/text.html
+cvid;Cinepak;4CC;V;;;Cinepak by CTi (ex. Radius) Vector Quantization;http://www.apple.com/quicktime/download/standalone.html
 CWLT;WLT;4CC;V;;;Microsoft Color WLT DIB;
 CYUV;YUV;4CC;V;YUV;;Creative Labs YUV 4:2:2;http://www.fourcc.org/indexyuv.htm
 CYUY;YUV;4CC;V;YUV;;ATI Technologies YUV;http://www.fourcc.org/indexyuv.htm
@@ -1077,7 +1077,9 @@ S_TEXT/UTF8;UTF-8;Mk;T;;;UTF-8 Plain Text;
 S_TEXT/SSA;SSA;Mk;T;;;Sub Station Alpha;
 S_TEXT/ASS;ASS;Mk;T;;;Advanced Sub Station Alpha;
 S_TEXT/USF;USF;Mk;T;;;Universal Subtitle Format;
+S_KATE;KATE;Mk;T;;;Karaoke And Text Encapsulation;
+S_DVBSUB;DVB Subtitle;Mk;T;;;Picture based subtitle format used on DVBs;
 S_IMAGE/BMP;Bitmap;Mk;T;;;Basic image based subtitle format;
-S_VOBSUB;VobSub;Mk;T;;;Picture based subtitle format used on DVDs
-S_HDMV/PGS;PGS;Mk;T;;;Picture based subtitle format used on BDs/HD-DVDs
-S_HDMV/TEXTST;TEXTST;Mk;T;;;Text based subtitle format used on BDs
+S_VOBSUB;VobSub;Mk;T;;;Picture based subtitle format used on DVDs;
+S_HDMV/PGS;PGS;Mk;T;;;Picture based subtitle format used on BDs/HD-DVDs;
+S_HDMV/TEXTST;TEXTST;Mk;T;;;Text based subtitle format used on BDs;
