@@ -6,7 +6,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 set(MediaInfoLib_MAJOR_VERSION 0)
 set(MediaInfoLib_MINOR_VERSION 7)
-set(MediaInfoLib_PATCH_VERSION 93)
+set(MediaInfoLib_PATCH_VERSION 94)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION}.${MediaInfoLib_PATCH_VERSION})
 
 if (NOT WIN32)
@@ -112,7 +112,6 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/ThirdParty/sha1-gladman/sha1.c
   ${MediaInfoLib_SOURCES_PATH}/ThirdParty/sha2-gladman/sha2.c
   ${MediaInfoLib_SOURCES_PATH}/ThirdParty/hmac-gladman/hmac.c
-  ${MediaInfoLib_SOURCES_PATH}/ThirdParty/hmac-gladman/pwd2key.c
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze_Buffer.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/File__Analyze_Buffer_MinimizeSize.cpp

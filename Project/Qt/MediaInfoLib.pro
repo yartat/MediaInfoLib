@@ -470,11 +470,9 @@ SOURCES += \
         ../../Source/ThirdParty/aes-gladman/aeskey.c \
         ../../Source/ThirdParty/aes-gladman/aestab.c \
         ../../Source/ThirdParty/hmac-gladman/hmac.c \
-        ../../Source/ThirdParty/hmac-gladman/pwd2key.c \
         ../../Source/ThirdParty/md5/md5.c \
         ../../Source/ThirdParty/sha1-gladman/sha1.c \
         ../../Source/ThirdParty/sha2-gladman/sha2.c \
-        ../../Source/ThirdParty/sha2-gladman/shasum.c \
         ../../Source/ThirdParty/tinyxml2/tinyxml2.cpp
 
 HEADERS += \
@@ -488,7 +486,6 @@ HEADERS += \
         ../../Source/ThirdParty/aes-gladman/brg_types.h \
         ../../Source/ThirdParty/base64/base64.h \
         ../../Source/ThirdParty/hmac-gladman/hmac.h \
-        ../../Source/ThirdParty/hmac-gladman/pwd2key.h \
         ../../Source/ThirdParty/md5/md5.h \
         ../../Source/ThirdParty/sha1-gladman/sha1.h \
         ../../Source/ThirdParty/sha2-gladman/sha2.h \

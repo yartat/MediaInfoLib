@@ -758,14 +758,8 @@
 			<CppCompile Include="..\..\..\Source\ThirdParty\aes-gladman\aes_modes.c">
 				<BuildOrder>214</BuildOrder>
 			</CppCompile>
-			<CppCompile Include="..\..\..\Source\ThirdParty\aes-gladman\tablegen.c">
-				<BuildOrder>219</BuildOrder>
-			</CppCompile>
 			<CppCompile Include="..\..\..\Source\ThirdParty\hmac-gladman\hmac.c">
 				<BuildOrder>219</BuildOrder>
-			</CppCompile>
-			<CppCompile Include="..\..\..\Source\ThirdParty\hmac-gladman\pwd2key.c">
-				<BuildOrder>218</BuildOrder>
 			</CppCompile>
 			<CppCompile Include="..\..\..\Source\ThirdParty\md5\md5.c">
 				<BuildOrder>209</BuildOrder>
@@ -775,9 +769,6 @@
 			</CppCompile>
 			<CppCompile Include="..\..\..\Source\ThirdParty\sha2-gladman\sha2.c">
 				<BuildOrder>216</BuildOrder>
-			</CppCompile>
-			<CppCompile Include="..\..\..\Source\ThirdParty\sha2-gladman\shasum.c">
-				<BuildOrder>215</BuildOrder>
 			</CppCompile>
 			<CppCompile Include="..\..\..\Source\ThirdParty\tinyxml2\tinyxml2.cpp">
 				<BuildOrder>209</BuildOrder>
