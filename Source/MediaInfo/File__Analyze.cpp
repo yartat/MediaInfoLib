@@ -1196,6 +1196,7 @@ void File__Analyze::Open_Buffer_SegmentChange ()
 void File__Analyze::Open_Buffer_Unsynch ()
 {
     Status[IsFinished]=false;
+    Config->IsFinishing=false;
     FrameInfo=frame_info();
     FrameInfo_Previous=frame_info();
     FrameInfo_Next=frame_info();
@@ -1258,11 +1259,19 @@ void File__Analyze::Open_Buffer_Update ()
 //---------------------------------------------------------------------------
 void File__Analyze::Open_Buffer_Finalize (bool NoBufferModification)
 {
-    //File with unknown size (stream...), finnishing
-    if (!NoBufferModification && File_Size==(int64u)-1)
+    //Indication to the parser that this is finishing
+    if (!NoBufferModification && !Config->IsFinishing)
     {
+        Config->IsFinishing=true;
         File_Size=File_Offset+Buffer_Size;
         Open_Buffer_Continue((const int8u*)NULL, 0);
+        #if MEDIAINFO_DEMUX
+            if (Config->Demux_EventWasSent)
+            {
+                Config->IsFinishing=false; // Need to parse again
+                return;
+            }
+        #endif //MEDIAINFO_DEMUX
     }
 
     //Element must be Finish
@@ -3076,6 +3085,8 @@ void File__Analyze::ForceFinish ()
             if (Config->Demux_EventWasSent)
                 return;
         #endif //MEDIAINFO_DEMUX
+        if (FrameInfo.DTS==(int64u)-1 && FrameInfo_Previous.DTS!=(int64u)-1)
+            FrameInfo=FrameInfo_Previous;
         Streams_Finish();
         #if MEDIAINFO_DEMUX
             if (Config->Demux_EventWasSent)

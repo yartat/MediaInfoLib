@@ -113,6 +113,12 @@ Ztring MediaInfo_Internal::Inform()
             return Export_EbuCore().Transform(*this, Export_EbuCore::Version_1_5);
         if (MediaInfoLib::Config.Inform_Get()==__T("EBUCore_1.6"))
             return Export_EbuCore().Transform(*this, Export_EbuCore::Version_1_6);
+        if (MediaInfoLib::Config.Inform_Get()==__T("EBUCore_1.8"))
+            return Export_EbuCore().Transform(*this, Export_EbuCore::Version_1_8, (Export_EbuCore::acquisitiondataoutputmode)MediaInfoLib::Config.AcquisitionDataOutputMode_Get());
+        if (MediaInfoLib::Config.Inform_Get()==__T("EBUCore_1.8_parameterSegment") || MediaInfoLib::Config.Inform_Get()==__T("EBUCore_1.8_ps"))
+            return Export_EbuCore().Transform(*this, Export_EbuCore::Version_1_8, Export_EbuCore::AcquisitionDataOutputMode_parameterSegment);
+        if (MediaInfoLib::Config.Inform_Get()==__T("EBUCore_1.8_segmentParameter") || MediaInfoLib::Config.Inform_Get()==__T("EBUCore_1.8_sp"))
+            return Export_EbuCore().Transform(*this, Export_EbuCore::Version_1_8, Export_EbuCore::AcquisitionDataOutputMode_segmentParameter);
         if (MediaInfoLib::Config.Inform_Get()==__T("EBUCore"))
             return Export_EbuCore().Transform(*this);
     #endif //defined(MEDIAINFO_EBUCORE_YES)
@@ -703,7 +709,9 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
     while (Retour.find(__T('%'), PosX)!=(size_t)-1)
     {
         PosX=Retour.find(__T('%'), PosX);
-        if (Retour.size() > PosX + 2 && Retour[PosX + 1] >= __T('A') && Retour[PosX + 1] <= __T('Z')) //To keep out "%" without any signification
+        if (Retour.size() > PosX + 2
+         && ((Retour[PosX + 1] >= __T('a') && Retour[PosX + 1] <= __T('z'))
+          || (Retour[PosX + 1] >= __T('A') && Retour[PosX + 1] <= __T('Z')))) //To keep out "%" without any signification
         {
             Ztring ARemplacer = Ztring(__T("%") + Retour.SubString(__T("%"), __T("%"), PosX)) + __T("%");
             Ztring RemplacerPar = Get(StreamKind, StreamPos, Retour.SubString(__T("%"), __T("%"), PosX));
