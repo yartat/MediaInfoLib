@@ -20,6 +20,8 @@
 #endif //MEDIAINFO_LIBRARY
 #include <iostream>
 #include <iomanip>
+#include "MediaInfo/MediaInfo_Internal_Const.h"
+#include <atlbase.h>
 using namespace MediaInfoNameSpace;
 
 #ifdef __MINGW32__
@@ -30,7 +32,7 @@ using namespace MediaInfoNameSpace;
     #endif //_UNICODE
 #endif //__MINGW32
 
-int main (int /*argc*/, Char * /*argv[]*/)
+int main (int argc, char* argv[])
 {
     //Information about MediaInfo
     MediaInfo MI;
@@ -44,7 +46,17 @@ int main (int /*argc*/, Char * /*argv[]*/)
 
     //An example of how to use the library
     To_Display += __T("\r\n\r\nOpen\r\n");
-    MI.Open(__T("Example.ogg"));
+	if (argc > 1)
+	{
+		auto len = strlen(argv[1]);
+		Char *buffer = new Char[len + 1];
+		SHAnsiToUnicode(argv[1], buffer, len + 1);
+		MI.Open(buffer);
+	}
+	else
+	{
+		MI.Open(__T("Example.ogg"));
+	}
 
     To_Display += __T("\r\n\r\nInform with Complete=false\r\n");
     MI.Option(__T("Complete"));
@@ -86,7 +98,7 @@ int main (int /*argc*/, Char * /*argv[]*/)
     MI.Close();
 
     #ifdef _UNICODE
-        std::wcout << To_Display;
+        //std::wcout << To_Display;
     #else
         std::cout  << To_Display;
     #endif
