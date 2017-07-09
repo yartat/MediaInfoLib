@@ -6,7 +6,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 set(MediaInfoLib_MAJOR_VERSION 0)
 set(MediaInfoLib_MINOR_VERSION 7)
-set(MediaInfoLib_PATCH_VERSION 96)
+set(MediaInfoLib_PATCH_VERSION 97)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION}.${MediaInfoLib_PATCH_VERSION})
 
 if (NOT WIN32)
@@ -348,6 +348,7 @@ if(NOT CURL_FOUND)
 else()
   include_directories(${CURL_INCLUDE_DIRS})
   target_link_libraries(mediainfo "${CURL_LIBRARIES}")
+  set(CURL_PC "libcurl")
 endif()
 
 target_include_directories(mediainfo PRIVATE
@@ -402,7 +403,8 @@ foreach(HEADER ${MediaInfoLib_PUBLIC_HDRS})
 endforeach(HEADER ${MediaInfoLib_PUBLIC_HDRS})
 
 # pkg-config
-if(NOT WIN32)
+find_package(PkgConfig)
+if(PKG_CONFIG_FOUND)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libmediainfo.pc.in
                  ${CMAKE_CURRENT_BINARY_DIR}/libmediainfo.pc
                  @ONLY)

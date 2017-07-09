@@ -5,7 +5,7 @@ dnl #########################################################################
 dnl -------------------------------------------------------------------------
 dnl Name and version
 dnl
-AC_INIT([libmediainfo], [0.7.96])
+AC_INIT([libmediainfo], [0.7.97])
 
 dnl -------------------------------------------------------------------------
 dnl Test if we are at the good place
@@ -506,6 +506,7 @@ elif pkg-config --exists libcurl; then
 		MediaInfoLib_LIBS="$MediaInfoLib_LIBS $(pkg-config --libs libcurl)"
 		MediaInfoLib_LIBS_Static="$MediaInfoLib_LIBS_Static $(pkg-config --libs libcurl)"
 	fi
+	Curl_Require="libcurl"
 elif test -e /usr/bin/curl-config; then
 	CXXFLAGS="$CXXFLAGS $(/usr/bin/curl-config --cflags)"
 	if test "$enable_staticlibs" = "yes"; then
@@ -856,6 +857,7 @@ AC_SUBST(MediaInfoLib_LIBS)
 AC_SUBST(MediaInfoLib_LIBS_Static)
 AC_SUBST(MediaInfoLib_Unicode)
 AC_SUBST(MediaInfoLib_LibName)
+AC_SUBST(Curl_Require)
 AC_CONFIG_FILES(libmediainfo-config, [chmod u+x libmediainfo-config])
 AC_CONFIG_FILES(libmediainfo.pc)
 

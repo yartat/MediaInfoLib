@@ -1,7 +1,7 @@
-%define libmediainfo_version      0.7.96
+%define libmediainfo_version      0.7.97
 %define libzen_version            0.4.35
 
-%if 0%{?fedora} || 0%{?centos_version} >= 600 || 0%{?rhel_version} >= 600
+%if 0%{?fedora_version} || 0%{?centos_version} >= 600 || 0%{?rhel_version} >= 600
 %define package_with_0_ending 0
 %define libmediainfo_name libmediainfo
 %else
@@ -163,7 +163,11 @@ pushd Project/GNU/Library
 %if 0%{?rhel} && 0%{?rhel} < 6
 %configure --enable-shared --disable-static --enable-visibility
 %else
+%if 0%{?mageia} > 5
+%configure --enable-shared --disable-static --enable-visibility --with-libcurl --disable-dependency-tracking
+%else
 %configure --enable-shared --disable-static --enable-visibility --with-libcurl
+%endif
 %endif
 
 make %{?_smp_mflags}
@@ -198,7 +202,7 @@ rm -f %{buildroot}%{_libdir}/%{name_without_0_ending}.la
 %files
 %defattr(-,root,root,-)
 %doc History.txt ReadMe.txt
-%if 0%{?fedora} || 0%{?centos_version} >= 700 || 0%{?rhel_version} >= 700
+%if 0%{?fedora_version} || 0%{?centos_version} >= 700 || 0%{?rhel_version} >= 700
 %license License.html
 %else
 %doc License.html
@@ -222,7 +226,7 @@ rm -f %{buildroot}%{_libdir}/%{name_without_0_ending}.la
 %{_libdir}/%{name_without_0_ending}.so
 
 %changelog
-* Sun Jan 01 2012 MediaArea.net SARL <info@mediaarea.net> - 0.7.96-0
+* Sun Jan 01 2012 MediaArea.net SARL <info@mediaarea.net> - 0.7.97-0
 - See History.txt for more info and real dates
 - Previous packages made by Toni Graffy <toni@links2linux.de>
 - Fedora style made by Vasiliy N. Glazov <vascom2@gmail.com>
