@@ -20,6 +20,7 @@ namespace MediaInfoLib
 
 ZenLib::Ztring XML_Encode (const ZenLib::Ztring& Data);
 std::string XML_Encode (const std::string& Data);
+std::string JSON_Encode (const std::string& Data);
 
 typedef std::pair<std::string, std::string> Attribute;
 typedef std::vector<Attribute> Attributes;
@@ -113,7 +114,18 @@ struct Node
         if (!Value.empty())
             Add_Child(Name, Value, Multiple);
     };
-    void Add_Child_IfNotEmpty(MediaInfo_Internal &MI, stream_t StreamKind, size_t StreamPos, const char* FieldName, std::string Name, std::string Name2, bool Multiple=false)
+    void Add_Child_IfNotEmpty(MediaInfo_Internal &MI, stream_t StreamKind, size_t StreamPos, size_t FieldName, std::string Name, const char* Name2, bool Multiple=false)
+    {
+        if (StreamKind==Stream_Max || StreamPos==(size_t)-1)
+            return;
+        const ZenLib::Ztring& Value=MI.Get(StreamKind, StreamPos, FieldName);
+        if (!Value.empty())
+        {
+            Node* Child=Add_Child(Name, std::string(), Multiple);
+            Child->Add_Child(Name2, Value.To_UTF8());
+        }
+    };
+    void Add_Child_IfNotEmpty(MediaInfo_Internal &MI, stream_t StreamKind, size_t StreamPos, const char* FieldName, std::string Name, const char* Name2, bool Multiple=false)
     {
         if (StreamKind==Stream_Max || StreamPos==(size_t)-1)
             return;
@@ -140,7 +152,7 @@ struct Node
         if (!Value.empty())
             Add_Child(Name, Value, Atribute_Name, Attribute_Value, Multiple);
     };
-    void Add_Child_IfNotEmpty(MediaInfo_Internal &MI, stream_t StreamKind, size_t StreamPos, size_t FieldName, std::string Name, const char* Atribute_Name, const char* Attribute_Value, std::string Name2, bool Multiple=false)
+    void Add_Child_IfNotEmpty(MediaInfo_Internal &MI, stream_t StreamKind, size_t StreamPos, size_t FieldName, std::string Name, const char* Atribute_Name, const char* Attribute_Value, const char* Name2, bool Multiple=false)
     {
         if (StreamKind==Stream_Max || StreamPos==(size_t)-1)
             return;
@@ -151,7 +163,7 @@ struct Node
             Child->Add_Child(Name2, Value.To_UTF8());
         }
     };
-    void Add_Child_IfNotEmpty(MediaInfo_Internal &MI, stream_t StreamKind, size_t StreamPos, const char* FieldName, std::string Name, const char* Atribute_Name, const char* Attribute_Value, std::string Name2, bool Multiple=false)
+    void Add_Child_IfNotEmpty(MediaInfo_Internal &MI, stream_t StreamKind, size_t StreamPos, const char* FieldName, std::string Name, const char* Atribute_Name, const char* Attribute_Value, const char* Name2, bool Multiple=false)
     {
         if (StreamKind==Stream_Max || StreamPos==(size_t)-1)
             return;
@@ -195,6 +207,7 @@ struct Node
 };
 
 std::string To_XML (Node& Cur_Node, const int& Level);
+std::string To_JSON (Node& Cur_Node, const int& Level);
 
 } //NameSpace
 
