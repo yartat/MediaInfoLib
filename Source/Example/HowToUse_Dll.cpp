@@ -98,7 +98,7 @@ int main (int argc, char* argv[])
     MI.Close();
 
     #ifdef _UNICODE
-        //std::wcout << To_Display;
+        std::wcout << To_Display;
     #else
         std::cout  << To_Display;
     #endif

@@ -6,7 +6,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 set(MediaInfoLib_MAJOR_VERSION 0)
 set(MediaInfoLib_MINOR_VERSION 7)
-set(MediaInfoLib_PATCH_VERSION 97)
+set(MediaInfoLib_PATCH_VERSION 98)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION}.${MediaInfoLib_PATCH_VERSION})
 
 if (NOT WIN32)
@@ -45,8 +45,6 @@ else()
   if(UNIX AND BUILD_SHARED_LIBS)
     target_compile_options(zen PRIVATE -fPIC)
   endif()
-else()
-
 endif()
 
 if (NOT BUILD_ZLIB)
@@ -325,6 +323,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Vp8.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Y4m.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/XmlUtils.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/OutputHelpers.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfoDLL/MediaInfoDLL.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfoDLL/MediaInfoDLL.def
 )
@@ -348,7 +347,8 @@ if(NOT CURL_FOUND)
 else()
   include_directories(${CURL_INCLUDE_DIRS})
   target_link_libraries(mediainfo "${CURL_LIBRARIES}")
-  set(CURL_PC "libcurl")
+  set(CURL_PC " libcurl")
+  set(CURL_LIB " -lcurl")
 endif()
 
 target_include_directories(mediainfo PRIVATE

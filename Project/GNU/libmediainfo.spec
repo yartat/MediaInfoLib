@@ -1,5 +1,5 @@
-%define libmediainfo_version      0.7.97
-%define libzen_version            0.4.35
+%define libmediainfo_version      0.7.98
+%define libzen_version            0.4.36
 
 %if 0%{?fedora_version} || 0%{?centos_version} >= 600 || 0%{?rhel_version} >= 600
 %define package_with_0_ending 0
@@ -109,6 +109,16 @@ Summary:        Most relevant technical and tag data for video and audio files -
 Group:          Development/Libraries
 Requires:       %{name}%{?_isa} = %{version}
 Requires:       libzen-devel%{?_isa} >= %{libzen_version}
+%if 0%{?rhel_version} || 0%{?centos_version}
+%if 0%{?rhel_version} > 599
+Requires:  libcurl-devel
+%endif
+%if 0%{?centos_version} > 599
+Requires:  libcurl-devel
+%endif
+%else
+Requires:  libcurl-devel
+%endif
 
 %description    -n %{name_without_0_ending}-devel
 MediaInfo is a convenient unified display of the most relevant technical
@@ -226,7 +236,7 @@ rm -f %{buildroot}%{_libdir}/%{name_without_0_ending}.la
 %{_libdir}/%{name_without_0_ending}.so
 
 %changelog
-* Sun Jan 01 2012 MediaArea.net SARL <info@mediaarea.net> - 0.7.97-0
+* Sun Jan 01 2012 MediaArea.net SARL <info@mediaarea.net> - 0.7.98-0
 - See History.txt for more info and real dates
 - Previous packages made by Toni Graffy <toni@links2linux.de>
 - Fedora style made by Vasiliy N. Glazov <vascom2@gmail.com>
