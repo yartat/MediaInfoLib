@@ -51,7 +51,7 @@
       <HeaderFileName>MediaInfoShellExt.h</HeaderFileName>
       <InterfaceIdentifierFileName>MediaInfoShellExt_i.c</InterfaceIdentifierFileName>
       <ProxyFileName>MediaInfoShellExt_p.c</ProxyFileName>
-      <ValidateAllParameters>false</ValidateAllParameters>
+      <ValidateAllParameters>true</ValidateAllParameters>
     </Midl>
     <ClCompile>
       <AdditionalIncludeDirectories>..\..\..\..\MediaInfoLib\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>

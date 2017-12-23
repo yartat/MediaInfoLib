@@ -662,7 +662,16 @@ const char* Mpegv_colour_primaries(int8u colour_primaries);
 const char* Mpegv_transfer_characteristics(int8u transfer_characteristics);
 const char* Mpegv_matrix_coefficients(int8u matrix_coefficients);
 const char* Mpegv_matrix_coefficients_ColorSpace(int8u matrix_coefficients);
-extern const char* Avc_video_full_range[];
+
+const char* Mk_Video_Colour_Range(int8u range)
+{
+    switch (range)
+    {
+        case 1: return "Limited";
+        case 2: return "Full";
+        default: return "";
+    }
+}
 
 //***************************************************************************
 // Constructor/Destructor
@@ -2449,7 +2458,7 @@ void File_Mk::Segment_Cluster_BlockGroup_Block_Lace()
     if (streamItem.ContentCompAlgo!=(int32u)-1 && streamItem.ContentCompAlgo!=3)
         streamItem.Searching_Payload=false; //Unsupported
 
-    if (streamItem.Searching_Payload)
+    if (streamItem.Searching_Payload && streamItem.Parser)
     {
         Element_Parser(streamItem.Parser->ParserName.c_str());
 
@@ -2927,6 +2936,7 @@ void File_Mk::Segment_Tracks_TrackEntry()
     InfoCodecID_Format_Type=InfoCodecID_Format_Matroska;
     TrackType=(int64u)-1;
     TrackNumber=(int64u)-1;
+    AudioBitDepth=(int64u)-1;
     TrackVideoDisplayWidth=0;
     TrackVideoDisplayHeight=0;
     AvgBytesPerSec=0;
@@ -2950,7 +2960,14 @@ void File_Mk::Segment_Tracks_TrackEntry_Audio_BitDepth()
         if (Segment_Info_Count>1)
             return; //First element has the priority
         if (UInteger)
+        {
             Fill(StreamKind_Last, StreamPos_Last, "BitDepth", UInteger, 10, true);
+
+            #ifdef MEDIAINFO_PCM_YES
+                if (Stream[TrackNumber].Parser && Retrieve(Stream_Audio, StreamPos_Last, Audio_Format)==__T("PCM"))
+                    ((File_Pcm*)Stream[TrackNumber].Parser)->Sign=(UInteger==8?'U':'S');
+            #endif //MEDIAINFO_PCM_YES
+        }
     FILLING_END();
 }
 
@@ -3542,15 +3559,14 @@ void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_BitsPerChannel()
 void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_Range()
 {
     //Parsing
-    int64u UInteger=UInteger_Get(); Element_Info1C(UInteger<2, Avc_video_full_range[UInteger]);
+    int64u UInteger=UInteger_Get(); Element_Info1(Mk_Video_Colour_Range(UInteger));
 
     //Filling
     FILLING_BEGIN();
         if (Segment_Info_Count>1)
             return; //First element has the priority
         Stream[TrackNumber].Infos["colour_description_present"]="Yes";
-        if (UInteger<2)
-            Stream[TrackNumber].Infos["colour_range"]=Avc_video_full_range[UInteger];
+        Stream[TrackNumber].Infos["colour_range"]=Mk_Video_Colour_Range(UInteger);
     FILLING_END();
 }
 
@@ -4234,6 +4250,8 @@ void File_Mk::CodecID_Manage()
     else if (Format==__T("PCM"))
     {
         File_Pcm* parser = new File_Pcm;
+        if (AudioBitDepth!=(int64u)-1)
+            parser->BitDepth=AudioBitDepth;
         streamItem.Parser = parser;
         parser->Codec=CodecID;
     }
@@ -4403,10 +4421,10 @@ void File_Mk::CRC32_Check ()
                                 if (Config->TryToFix_Get() && CRC32Compute[i].Computed!=CRC32Compute[i].Expected)
                                 {
                                     size_t NewBuffer_Size=(size_t)(CRC32Compute[i].UpTo-CRC32Compute[i].From);
-                                    int8u* NewBuffer=new int8u[NewBuffer_Size];
                                     File F;
                                     if (F.Open(File_Name))
                                     {
+                                        int8u* NewBuffer = new int8u[NewBuffer_Size];
                                         F.GoTo(CRC32Compute[i].From);
                                         F.Read(NewBuffer, NewBuffer_Size);
                                         int8u Modified=0;
@@ -4418,8 +4436,8 @@ void File_Mk::CRC32_Check ()
                                             Modified^=1<<BitInBytePosition;
                                             FixFile(CRC32Compute[i].From+BytePosition, &Modified, 1)?Param_Info1("Fixed"):Param_Info1("Not fixed");
                                         }
+                                        delete[] NewBuffer; //NewBuffer=NULL;
                                     }
-                                    delete[] NewBuffer; //NewBuffer=NULL;
                                 }
                             #endif //MEDIAINFO_FIXITY
 

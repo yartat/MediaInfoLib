@@ -11,6 +11,7 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/File__Base.cpp \
                        ../../../Source/MediaInfo/File__MultipleParsing.cpp \
                        ../../../Source/MediaInfo/File__Duplicate.cpp \
+                       ../../../Source/MediaInfo/File__HasReferences.cpp \
                        ../../../Source/MediaInfo/File_Dummy.cpp \
                        ../../../Source/MediaInfo/File_Other.cpp \
                        ../../../Source/MediaInfo/File_Unknown.cpp \
@@ -215,8 +216,7 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/Video/File_Vp8.cpp \
                        ../../../Source/MediaInfo/Video/File_Y4m.cpp \
                        ../../../Source/MediaInfo/XmlUtils.cpp \
-                       ../../../Source/MediaInfo/OutputHelpers.cpp \
-                       ../../../Source/MediaInfoDLL/MediaInfoDLL.cpp
+                       ../../../Source/MediaInfo/OutputHelpers.cpp
 
 @MediaInfoLib_LibName@includedir = $(includedir)/MediaInfo
 @MediaInfoLib_LibName@include_HEADERS = \
@@ -225,10 +225,15 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
  ../../../Source/MediaInfo/MediaInfo_Const.h \
  ../../../Source/MediaInfo/MediaInfo_Events.h
 
+if COMPILE_DLL
+lib@MediaInfoLib_LibName@_la_SOURCES += \
+                       ../../../Source/MediaInfoDLL/MediaInfoDLL.cpp
+
 @MediaInfoLib_LibName@DLLincludedir = $(includedir)/MediaInfoDLL
 @MediaInfoLib_LibName@DLLinclude_HEADERS = \
  ../../../Source/MediaInfoDLL/MediaInfoDLL.h \
  ../../../Source/MediaInfoDLL/MediaInfoDLL_Static.h
+endif
 
 if COMPILE_AES
 lib@MediaInfoLib_LibName@_la_SOURCES += \

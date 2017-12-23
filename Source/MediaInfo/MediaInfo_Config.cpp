@@ -115,7 +115,9 @@
 //---------------------------------------------------------------------------
 #include "MediaInfo/MediaInfo_Config.h"
 #include "ZenLib/ZtringListListF.h"
+#if defined(MEDIAINFO_FILE_YES)
 #include "ZenLib/File.h"
+#endif //defined(MEDIAINFO_REFERENCES_YES)
 #include <algorithm>
 #if defined(MEDIAINFO_LIBCURL_YES)
     #include "MediaInfo/Reader/Reader_libcurl.h"
@@ -131,7 +133,7 @@ namespace MediaInfoLib
 {
 
 //---------------------------------------------------------------------------
-const Char*  MediaInfo_Version=__T("MediaInfoLib - v17.10");
+const Char*  MediaInfo_Version=__T("MediaInfoLib - v17.12");
 const Char*  MediaInfo_Url=__T("http://MediaArea.net/MediaInfo");
       Ztring EmptyZtring;       //Use it when we can't return a reference to a true Ztring
 const Ztring EmptyZtring_Const; //Use it when we can't return a reference to a true Ztring, const version
@@ -443,6 +445,7 @@ Ztring MediaInfo_Config::Option (const String &Option, const String &Value_Raw)
 
     //Parsing pointer to a file
     Ztring Value;
+    #if defined(MEDIAINFO_FILE_YES)
     if (Value_Raw.find(__T("file://"))==0)
     {
         //Open
@@ -465,7 +468,9 @@ Ztring MediaInfo_Config::Option (const String &Option, const String &Value_Raw)
         //Merge
         Value=FromFile;
     }
-    else if (Value_Raw.substr(0, 7)==__T("cstr://"))
+    else
+    #endif //defined(MEDIAINFO_FILE_YES)
+    if (Value_Raw.substr(0, 7)==__T("cstr://"))
     {
         Value=_DecodeEscapeC(Value_Raw.begin() + 7, Value_Raw.end());
     }
@@ -1792,6 +1797,12 @@ Ztring MediaInfo_Config::Language_Get ()
     return ToReturn;
 }
 
+Ztring MediaInfo_Config::Language_Get_Translate(const Ztring &Par, const Ztring &Value)
+{
+    const Ztring Translated = Language_Get(Par + Value);
+    return Translated.find(Par.c_str()) ? Translated : Value;
+}
+
 Ztring MediaInfo_Config::Language_Get (const Ztring &Value)
 {
     CriticalSectionLocker CSL(CS);
@@ -1951,6 +1962,7 @@ void MediaInfo_Config::Inform_Set (const ZtringListList &NewValue)
     CriticalSectionLocker CSL(CS);
 
     //Parsing pointers to files in streams
+    #if defined(MEDIAINFO_FILE_YES)
     for (size_t Pos=0; Pos<Custom_View.size(); Pos++)
     {
         if (Custom_View[Pos].size()>1 && Custom_View(Pos, 1).find(__T("file://"))==0)
@@ -1976,6 +1988,7 @@ void MediaInfo_Config::Inform_Set (const ZtringListList &NewValue)
             Custom_View(Pos, 1)=FromFile;
         }
     }
+    #endif //defined(MEDIAINFO_FILE_YES)
 }
 
 Ztring MediaInfo_Config::Inform_Get ()
