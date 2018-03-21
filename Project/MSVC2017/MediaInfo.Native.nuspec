@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+    <metadata>
+        <id>MediaInfo.Native</id>
+        <version>17.12</version>
+        <title>MediaInfolib native package</title>
+        <authors>MediaArea.net SARL.</authors>
+        <owners>yartat</owners>
+        <licenseUrl>https://github.com/MediaArea/MediaInfoLib/blob/master/LICENSE</licenseUrl>
+        <projectUrl>https://github.com/MediaArea/MediaInfoLib</projectUrl>
+        <iconUrl>https://mediaarea.net/_/img/MediaInfo_90x90.png</iconUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>MediaInfo(Lib) is a convenient unified display of the most relevant technical and tag data for video and audio files.
+MediaInfolib with support network AV streams</description>
+        <summary>BSD 2-Clause License
+
+Copyright (c) 2002-2017, MediaArea.net SARL
+All rights reserved.</summary>
+        <releaseNotes>Release 17.12 MediaInfo with support network AV streams, 1.1.1 OpenSSL, 7.56 libcurl and 1.8 libssh2</releaseNotes>
+        <copyright>Copyright (c) MediaArea.net SARL. All Rights Reserved.</copyright>
+        <language />
+        <tags>MediaInfo native nativepackage</tags>
+    </metadata>
+    <files>
+        <file src="x64\libcrypto-1_1-x64.dll" target="build\native\x64\libcrypto-1_1-x64.dll" />
+        <file src="x64\libcurl.dll" target="build\native\x64\libcurl.dll" />
+        <file src="x64\libssh2.dll" target="build\native\x64\libssh2.dll" />
+        <file src="x64\libssl-1_1-x64.dll" target="build\native\x64\libssl-1_1-x64.dll" />
+        <file src="x64\MediaInfo.dll" target="build\native\x64\MediaInfo.dll" />
+        <file src="x86\libcrypto-1_1.dll" target="build\native\x86\libcrypto-1_1.dll" />
+        <file src="x86\libcurl.dll" target="build\native\x86\libcurl.dll" />
+        <file src="x86\libssl-1_1.dll" target="build\native\x86\libssl-1_1.dll" />
+        <file src="x86\libssh2.dll" target="build\native\x86\libssh2.dll" />
+        <file src="x86\MediaInfo.dll" target="build\native\x86\MediaInfo.dll" />
+        <file src="MediaInfo.Native.targets" target="build\MediaInfo.Native.targets" />
+        <file src="History_MediaInfo.txt" target="build\History_MediaInfo.txt" />
+        <file src="History_OpenSSL.txt" target="build\History_OpenSSL.txt" />
+        <file src="Release-Notes_LibSSH2.txt" target="build\Release-Notes_LibSSH2.txt" />
+        <file src="History_Curl.txt" target="build\History_Curl.txt" />
+    </files>
+</package>
