@@ -289,6 +289,10 @@ protected :
     void GenericPictureEssenceDescriptor_ActiveFormatDescriptor();//3218
     void GenericPictureEssenceDescriptor_ColorPrimaries();      //3219
     void GenericPictureEssenceDescriptor_CodingEquations();     //321A
+    void MasteringDisplayPrimaries();
+    void MasteringDisplayWhitePointChromaticity();
+    void MasteringDisplayMaximumLuminance();
+    void MasteringDisplayMinimumLuminance();
     void GenericSoundEssenceDescriptor_QuantizationBits();      //3D01
     void GenericSoundEssenceDescriptor_Locked();                //3D02
     void GenericSoundEssenceDescriptor_AudioSamplingRate();     //3D03
@@ -1144,6 +1148,7 @@ protected :
     void           ChooseParser_SmpteSt0331(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
     void           ChooseParser_SmpteSt0337(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
     void           ChooseParser_Jpeg2000(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
+    void           ChooseParser_ProRes(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
 
     //Helpers
     int32u Vector(int32u ExpectedLength=(int32u)-1);

@@ -263,16 +263,24 @@ void File_Flac::PICTURE()
     Get_B4 (Data_Size,                                          "Data size");
     if (Element_Offset+Data_Size>Element_Size)
         return; //There is a problem
-    std::string Data_Raw((const char*)(Buffer+(size_t)(Buffer_Offset+Element_Offset)), Data_Size);
-    std::string Data_Base64(Base64::encode(Data_Raw));
-    Skip_XX(Element_Size-Element_Offset, "Data");
 
     //Filling
     Fill(Stream_General, 0, General_Cover, "Yes");
     Fill(Stream_General, 0, General_Cover_Description, Description);
     Fill(Stream_General, 0, General_Cover_Type, Id3v2_PictureType((int8u)PictureType));
     Fill(Stream_General, 0, General_Cover_Mime, MimeType);
-    Fill(Stream_General, 0, General_Cover_Data, Data_Base64);
+    #if MEDIAINFO_ADVANCED
+        if (MediaInfoLib::Config.Flags1_Get(Flags_Cover_Data_base64))
+        {
+            std::string Data_Raw((const char*)(Buffer+(size_t)(Buffer_Offset+Element_Offset)), Data_Size);
+            std::string Data_Base64(Base64::encode(Data_Raw));
+            Fill(Stream_General, 0, General_Cover_Data, Data_Base64);
+        }
+    #endif //MEDIAINFO_ADVANCED
+
+    Skip_XX(Data_Size,                                          "Data");
+    if (Element_Offset<Element_Size)
+        Skip_XX(Element_Size-Element_Offset,                    "?");
 }
 
 } //NameSpace

@@ -4,9 +4,9 @@ cmake_minimum_required(VERSION 2.8.11)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-set(MediaInfoLib_MAJOR_VERSION 17)
-set(MediaInfoLib_MINOR_VERSION 12)
-set(MediaInfoLib_PATCH_VERSION 0)
+set(MediaInfoLib_MAJOR_VERSION 18)
+set(MediaInfoLib_MINOR_VERSION 03)
+set(MediaInfoLib_PATCH_VERSION 1)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION})
 
 if (MediaInfoLib_PATCH_VERSION)
@@ -310,6 +310,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Text/File_Ttml.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Aic.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_AfdBarData.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Av1.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Avc.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Avc_Duplicate.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_AvsV.cpp

@@ -133,7 +133,7 @@ namespace MediaInfoLib
 {
 
 //---------------------------------------------------------------------------
-const Char*  MediaInfo_Version=__T("MediaInfoLib - v17.12");
+const Char*  MediaInfo_Version=__T("MediaInfoLib - v18.03.1");
 const Char*  MediaInfo_Url=__T("http://MediaArea.net/MediaInfo");
       Ztring EmptyZtring;       //Use it when we can't return a reference to a true Ztring
 const Ztring EmptyZtring_Const; //Use it when we can't return a reference to a true Ztring, const version
@@ -186,12 +186,13 @@ static const char* OutputFormats_JSONFields[output_formats_item_size] =
     "mime",
 };
 typedef const char* output_formats_item[output_formats_item_size];
-static const size_t output_formats_size = 12;
+static const size_t output_formats_size = 14;
 static output_formats_item OutputFormats[output_formats_size] =
 {
     { "Text",                   "Text",                                                         "text/plain",       },
     { "HTML",                   "HTML",                                                         "text/html",        },
     { "XML",                    "MediaInfo XML",                                                "text/xml",         },
+    { "JSON",                   "MediaInfo JSON",                                               "text/json",        },
     { "EBUCore_1.8_ps",         "EBUCore 1.8 (XML; acq. metadata: parameter then segment)",     "text/xml",         },
     { "EBUCore_1.8_sp",         "EBUCore 1.8 (XML; acq. metadata: segment then parameter)",     "text/xml",         },
     { "EBUCore_1.8_ps_JSON",    "EBUCore 1.8 (JSON; acq. metadata: parameter then segment)",    "text/json",        },
@@ -199,6 +200,7 @@ static output_formats_item OutputFormats[output_formats_size] =
     { "EBUCore_1.6",            "EBUCore 1.6",                                                  "text/xml",         },
     { "FIMS_1.3",               "FIMS 1.3",                                                     "text/xml",         },
     { "MPEG-7",                 "MPEG-7",                                                       "text/xml",         },
+    { "PBCore_2.1",             "PBCore 2.1",                                                   "text/xml",         },
     { "PBCore_2.0",             "PBCore 2.0",                                                   "text/xml",         },
     { "PBCore_1.2",             "PBCore 1.2",                                                   "text/xml",         },
 };
@@ -246,6 +248,8 @@ void MediaInfo_Config::Init()
     #endif //MEDIAINFO_ADVANCED
     #if defined(MEDIAINFO_EBUCORE_YES)
         AcquisitionDataOutputMode=Export_EbuCore::AcquisitionDataOutputMode_Default;
+        ExternalMetadata=Ztring();
+        ExternalMetaDataConfig=Ztring();
     #endif //defined(MEDIAINFO_EBUCORE_YES)
     Complete=0;
     BlockMethod=0;
@@ -288,6 +292,12 @@ void MediaInfo_Config::Init()
     #if MEDIAINFO_FIXITY
         TryToFix=false;
     #endif //MEDIAINFO_FIXITY
+    #if MEDIAINFO_FLAG1
+        Flags1=0;
+    #endif //MEDIAINFO_FLAGX
+    #if MEDIAINFO_FLAGX
+        FlagsX=0;
+    #endif //MEDIAINFO_FLAGX
 
     }
 
@@ -758,6 +768,34 @@ Ztring MediaInfo_Config::Option (const String &Option, const String &Value_Raw)
     {
         return Inform_Get();
     }
+    #if MEDIAINFO_ADVANCED
+        if (Option_Lower==__T("cover_data"))
+        {
+            return Cover_Data_Set(Value.c_str());
+        }
+        if (Option_Lower==__T("cover_data_get"))
+        {
+            return Cover_Data_Get();
+        }
+    #endif //MEDIAINFO_COMPRESS
+    #if MEDIAINFO_COMPRESS
+        if (Option_Lower==__T("inform_compress"))
+        {
+            return Inform_Compress_Set(Value.c_str());
+        }
+        if (Option_Lower==__T("inform_compress_get"))
+        {
+            return Inform_Compress_Get();
+        }
+        if (Option_Lower==__T("input_compressed"))
+        {
+            return Input_Compressed_Set(Value.c_str());
+        }
+        if (Option_Lower==__T("input_compressed_get"))
+        {
+            return Input_Compressed_Get();
+        }
+    #endif //MEDIAINFO_COMPRESS
     if (Option_Lower==__T("details")) //Legacy for trace_level
     {
         if (Value == __T("0"))
@@ -860,6 +898,14 @@ Ztring MediaInfo_Config::Option (const String &Option, const String &Value_Raw)
     if (Option_Lower==__T("detailsmodificator_get"))
     {
         return Trace_Modificator_Get(Value);
+    }
+    if (Option_Lower==__T("hideparameter"))
+    {
+        return HideShowParameter(Value, __T('N'));
+    }
+    if (Option_Lower==__T("showparameter"))
+    {
+        return HideShowParameter(Value, __T('Y'));
     }
     if (Option_Lower==__T("info_parameters"))
     {
@@ -1124,6 +1170,24 @@ Ztring MediaInfo_Config::Option (const String &Option, const String &Value_Raw)
                 AcquisitionDataOutputMode_Set(Export_EbuCore::AcquisitionDataOutputMode_segmentParameter);
             else
                 return __T("Invalid value");
+            return Ztring();
+        #else // MEDIAINFO_EBUCORE_YES
+            return __T("EBUCore features are disabled due to compilation options");
+        #endif // MEDIAINFO_EBUCORE_YES
+    }
+    if (Option_Lower==__T("externalmetadata"))
+    {
+        #if defined(MEDIAINFO_EBUCORE_YES)
+            ExternalMetadata_Set(Value);
+            return Ztring();
+        #else // MEDIAINFO_EBUCORE_YES
+            return __T("EBUCore features are disabled due to compilation options");
+        #endif // MEDIAINFO_EBUCORE_YES
+    }
+    if (Option_Lower==__T("externalmetadataconfig"))
+    {
+        #if defined(MEDIAINFO_EBUCORE_YES)
+            ExternalMetaDataConfig_Set(Value);
             return Ztring();
         #else // MEDIAINFO_EBUCORE_YES
             return __T("EBUCore features are disabled due to compilation options");
@@ -2026,6 +2090,120 @@ ZtringListList MediaInfo_Config::Inform_Replace_Get_All ()
 }
 
 //---------------------------------------------------------------------------
+#if MEDIAINFO_ADVANCED
+Ztring MediaInfo_Config::Cover_Data_Set (const Ztring &NewValue_)
+{
+    Ztring NewValue(NewValue_);
+    transform(NewValue.begin(), NewValue.end(), NewValue.begin(), (int(*)(int))tolower); //(int(*)(int)) is a patch for unix
+    const int64u Mask=~((1<<Flags_Cover_Data_base64));
+    int64u Value;
+    if (NewValue.empty())
+        Value=0;
+    else if (NewValue==__T("base64"))
+        Value=(1<< Flags_Cover_Data_base64);
+    else
+        return __T("Unsupported");
+
+    CriticalSectionLocker CSL(CS);
+    Flags1&=Mask;
+    Flags1|=Value;
+    return Ztring();
+}
+
+Ztring MediaInfo_Config::Cover_Data_Get ()
+{
+    CriticalSectionLocker CSL(CS);
+    Ztring ToReturn;
+    if (Flags1&(1<< Flags_Cover_Data_base64))
+        ToReturn=__T("base64");
+
+    return ToReturn;
+}
+#endif //MEDIAINFO_ADVANCED
+
+//---------------------------------------------------------------------------
+#if MEDIAINFO_COMPRESS
+Ztring MediaInfo_Config::Inform_Compress_Set (const Ztring &NewValue_)
+{
+    Ztring NewValue(NewValue_);
+    transform(NewValue.begin(), NewValue.end(), NewValue.begin(), (int(*)(int))tolower); //(int(*)(int)) is a patch for unix
+    const int64u Mask=~((1<<Flags_Inform_zlib)|(1<<Flags_Inform_base64));
+    int64u Value;
+    if (NewValue.empty())
+        Value=0;
+    else if (NewValue== __T("base64"))
+        Value=(1<<Flags_Inform_base64);
+    else if (NewValue== __T("zlib+base64"))
+        Value=(1<<Flags_Inform_zlib)|(1<<Flags_Inform_base64);
+    else
+        return __T("Unsupported");
+
+    CriticalSectionLocker CSL(CS);
+    FlagsX&=Mask;
+    FlagsX|=Value;
+    return Ztring();
+}
+
+Ztring MediaInfo_Config::Inform_Compress_Get ()
+{
+    CriticalSectionLocker CSL(CS);
+    Ztring ToReturn;
+    if (FlagsX&(1<<Flags_Inform_zlib))
+        ToReturn=__T("zlib");
+    if (FlagsX&(1<<Flags_Inform_base64))
+    {
+        if (!ToReturn.empty())
+            ToReturn+=__T('+');
+        ToReturn+=__T("base64");
+    }
+
+    return ToReturn;
+}
+#endif //MEDIAINFO_COMPRESS
+
+//---------------------------------------------------------------------------
+#if MEDIAINFO_COMPRESS
+Ztring MediaInfo_Config::Input_Compressed_Set (const Ztring &NewValue_)
+{
+    Ztring NewValue(NewValue_);
+    transform(NewValue.begin(), NewValue.end(), NewValue.begin(), (int(*)(int))tolower); //(int(*)(int)) is a patch for unix
+    const int64u Mask=~((1<<Flags_Input_zlib)|(1<<Flags_Input_base64));
+    int64u Value;
+    if (NewValue.empty())
+        Value=0;
+    else if (NewValue== __T("zlib"))
+        Value=(1<<Flags_Input_zlib);
+    else if (NewValue== __T("base64"))
+        Value=(1<<Flags_Input_base64);
+    else if (NewValue== __T("zlib+base64"))
+        Value=(1<<Flags_Input_zlib)|(1<<Flags_Input_base64);
+    else
+        return __T("Unsupported");
+
+    CriticalSectionLocker CSL(CS);
+    FlagsX&=Mask;
+    FlagsX|=Value;
+    return Ztring();
+}
+
+Ztring MediaInfo_Config::Input_Compressed_Get ()
+{
+    CriticalSectionLocker CSL(CS);
+    Ztring ToReturn;
+    if (FlagsX&(1<<Flags_Input_zlib))
+        ToReturn=__T("zlib");
+    if (FlagsX&(1<<Flags_Input_base64))
+    {
+        if (!ToReturn.empty())
+            ToReturn+=__T('+');
+        ToReturn+=__T("base64");
+    }
+
+    return ToReturn;
+}
+#endif //MEDIAINFO_COMPRESS
+
+//---------------------------------------------------------------------------
 const Ztring &MediaInfo_Config::Format_Get (const Ztring &Value, infoformat_t KindOfFormatInfo)
 {
     //Loading codec table if not yet done
@@ -2352,6 +2530,65 @@ Ztring MediaInfo_Config::Info_Parameters_Get (bool Complete)
     Language_Set(Ztring()); //TODO: it is reseted to English, it should actually not modify the language config (MediaInfo_Config_xxx() modifies the language config)
 
     return ToReturn.Read();
+}
+
+//---------------------------------------------------------------------------
+Ztring MediaInfo_Config::HideShowParameter(const Ztring &Value, Char Show)
+{
+    ZtringList List;
+    List.Separator_Set(0, __T(","));
+    List.Write(Value);
+
+    for (size_t j=0; j<List.size(); j++)
+    {
+        String KindOfStreamS=List[j].substr(0, List[j].find(__T('_')));
+        stream_t StreamKind=Stream_Max;
+        if (KindOfStreamS==__T("General")) StreamKind=Stream_General;
+        if (KindOfStreamS==__T("Video")) StreamKind=Stream_Video;
+        if (KindOfStreamS==__T("Audio")) StreamKind= Stream_Audio;
+        if (KindOfStreamS==__T("Text")) StreamKind= Stream_Text;
+        if (KindOfStreamS==__T("Other")) StreamKind= Stream_Other;
+        if (KindOfStreamS==__T("Image")) StreamKind= Stream_Image;
+        if (KindOfStreamS==__T("Menu")) StreamKind= Stream_Menu;
+        if (StreamKind==Stream_Max)
+            return List[j]+=__T(" is unknown");
+
+        //Loading codec table if not yet done
+        {
+        CriticalSectionLocker CSL(CS);
+        if (Info[StreamKind].empty())
+            switch (StreamKind)
+            {
+                case Stream_General :   MediaInfo_Config_General(Info[Stream_General]);   Language_Set(Stream_General); break;
+                case Stream_Video :     MediaInfo_Config_Video(Info[Stream_Video]);       Language_Set(Stream_Video); break;
+                case Stream_Audio :     MediaInfo_Config_Audio(Info[Stream_Audio]);       Language_Set(Stream_Audio); break;
+                case Stream_Text :      MediaInfo_Config_Text(Info[Stream_Text]);         Language_Set(Stream_Text); break;
+                case Stream_Other :     MediaInfo_Config_Other(Info[Stream_Other]);       Language_Set(Stream_Other); break;
+                case Stream_Image :     MediaInfo_Config_Image(Info[Stream_Image]);       Language_Set(Stream_Image); break;
+                case Stream_Menu :      MediaInfo_Config_Menu(Info[Stream_Menu]);         Language_Set(Stream_Menu); break;
+                default:;
+            }
+        }
+
+        String FieldName=List[j].substr(List[j].find(__T('_'))+1);
+        bool Found=false;
+        for (size_t i=0; i<Info[StreamKind].size(); i++)
+            if (Info[StreamKind][i](Info_Name)==FieldName)
+            {
+                if (Info_Options<Info[StreamKind][i].size())
+                {
+                    Info[StreamKind][i][Info_Options].resize(InfoOption_Max, __T(' '));
+                    Info[StreamKind][i][Info_Options][InfoOption_ShowInInform]=Show;
+                    Info[StreamKind][i][Info_Options][InfoOption_ShowInXml]=Show;
+                }
+                Found=true;
+                break;
+            }
+        if (!Found)
+            return List[j]+=__T(" is unknown");
+    }
+
+    return Ztring();
 }
 
 //---------------------------------------------------------------------------
@@ -2767,6 +3004,30 @@ size_t MediaInfo_Config::AcquisitionDataOutputMode_Get ()
 {
     CriticalSectionLocker CSL(CS);
     return AcquisitionDataOutputMode;
+}
+
+void MediaInfo_Config::ExternalMetadata_Set(Ztring Value)
+{
+    CriticalSectionLocker CSL(CS);
+    ExternalMetadata=Value;
+}
+
+Ztring MediaInfo_Config::ExternalMetadata_Get ()
+{
+    CriticalSectionLocker CSL(CS);
+    return ExternalMetadata;
+}
+
+void MediaInfo_Config::ExternalMetaDataConfig_Set(Ztring Value)
+{
+    CriticalSectionLocker CSL(CS);
+    ExternalMetaDataConfig=Value;
+}
+
+Ztring MediaInfo_Config::ExternalMetaDataConfig_Get ()
+{
+    CriticalSectionLocker CSL(CS);
+    return ExternalMetaDataConfig;
 }
 #endif // MEDIAINFO_EBUCORE_YES
 

@@ -5,6 +5,8 @@ AM_TESTS_FD_REDIRECT = 9>&2
 TESTS = \
     trace.sh \
     s3.sh \
+    xml.sh \
+    mixml.sh \
     ebucore.sh
 
 check_PROGRAMS = mil_analyze
