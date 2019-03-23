@@ -28,6 +28,7 @@
 #if defined(MEDIAINFO_EIA608_YES) || defined(MEDIAINFO_EIA708_YES)
     #include "MediaInfo/MediaInfo_Config_MediaInfo.h"
 #endif //defined(MEDIAINFO_EIA608_YES) || defined(MEDIAINFO_EIA708_YES)
+#include "MediaInfo/TimeCode.h"
 #include <cmath>
 using namespace std;
 using namespace ZenLib;
@@ -3207,7 +3208,7 @@ void File_Mpeg_Descriptors::Descriptor_B0()
 
     FILLING_BEGIN();
         Ztring Summary=Ztring::ToZtring(dv_version_major)+__T('.')+Ztring::ToZtring(dv_version_minor);
-        Complete_Stream->Streams[elementary_PID]->Infos["DolbyVision_Version"]=Summary;
+        Complete_Stream->Streams[elementary_PID]->Infos["HDR_Format_Version"]=Summary;
         if (dv_version_major==1)
         {
             string Profile, Level;
@@ -3218,8 +3219,9 @@ void File_Mpeg_Descriptors::Descriptor_B0()
             Profile+=__T('.');
             Profile+=Ztring().From_CC1(dv_profile).To_UTF8();
             Level+=Ztring().From_CC1(dv_level).To_UTF8();
-            Complete_Stream->Streams[elementary_PID]->Infos["DolbyVision_Profile"].From_UTF8(Profile);
-            Complete_Stream->Streams[elementary_PID]->Infos["DolbyVision_Level"].From_UTF8(Level);
+            Complete_Stream->Streams[elementary_PID]->Infos["HDR_Format"].From_UTF8("Dolby Vision");
+            Complete_Stream->Streams[elementary_PID]->Infos["HDR_Format_Profile"].From_UTF8(Profile);
+            Complete_Stream->Streams[elementary_PID]->Infos["HDR_Format_Level"].From_UTF8(Level);
             Summary+=__T(',');
             Summary+=__T(' ');
             Summary+=Ztring().From_UTF8(Profile);
@@ -3240,8 +3242,8 @@ void File_Mpeg_Descriptors::Descriptor_B0()
                 Layers.resize(Layers.size()-1);
                 Summary+=Ztring().From_UTF8(Layers);
             }
-            Complete_Stream->Streams[elementary_PID]->Infos["DolbyVision_Layers"].From_UTF8(Layers);
-            Complete_Stream->Streams[elementary_PID]->Infos["DolbyVision/String"]=Summary;
+            Complete_Stream->Streams[elementary_PID]->Infos["HDR_Format_Settings"].From_UTF8(Layers);
+            Complete_Stream->Streams[elementary_PID]->Infos["HDR_Format_Compatibility"]=Ztring();
         }
     FILLING_END();
 }
@@ -3587,36 +3589,6 @@ void File_Mpeg_Descriptors::Get_DVB_Text(int64u Size, Ztring &Value, const char*
     }
     else
         Get_Local(Size, Value,                                  Info);
-}
-
-//---------------------------------------------------------------------------
-//Modified Julian Date
-Ztring File_Mpeg_Descriptors::Date_MJD(int16u Date_)
-{
-    //Calculating
-    float64 Date=Date_;
-    int Y2=(int)((Date-15078.2)/365.25);
-    int M2=(int)(((Date-14956.1) - ((int)(Y2*365.25))) /30.6001);
-    int D =(int)(Date-14956 - ((int)(Y2*365.25)) - ((int)(M2*30.6001)));
-    int K=0;
-    if (M2==14 || M2==15)
-        K=1;
-    int Y =Y2+K;
-    int M =M2-1-K*12;
-
-    //Formating
-    return                       Ztring::ToZtring(1900+Y)+__T("-")
-         + (M<10?__T("0"):__T(""))+Ztring::ToZtring(     M)+__T("-")
-         + (D<10?__T("0"):__T(""))+Ztring::ToZtring(     D);
-}
-
-//---------------------------------------------------------------------------
-//Form: HHMMSS, BCD
-Ztring File_Mpeg_Descriptors::Time_BCD(int32u Time)
-{
-    return (((Time>>16)&0xFF)<10?__T("0"):__T("")) + Ztring::ToZtring((Time>>16)&0xFF, 16)+__T(":") //BCD
-         + (((Time>> 8)&0xFF)<10?__T("0"):__T("")) + Ztring::ToZtring((Time>> 8)&0xFF, 16)+__T(":") //BCD
-         + (((Time    )&0xFF)<10?__T("0"):__T("")) + Ztring::ToZtring((Time    )&0xFF, 16);        //BCD
 }
 
 //---------------------------------------------------------------------------

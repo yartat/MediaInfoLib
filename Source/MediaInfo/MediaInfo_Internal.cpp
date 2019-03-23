@@ -282,7 +282,7 @@ static const char* ChannelLayout_2018[ChannelLayout_2018_Size][2] =
 {
     { "BC", "Cb" },
     { "BL", "Lb" },
-    { "BR", "Lr" },
+    { "BR", "Rb" },
     { "CI", "Bfc" },
     { "CL", "Ls" },
     { "CR", "Rs" },
@@ -1792,6 +1792,11 @@ Ztring MediaInfo_Internal::Get(stream_t StreamKind, size_t StreamPos, const Stri
         Ztring Date=Get(StreamKind, StreamPos, __T("Encoded_Library_Date"));
         Ztring Encoded_Library=Get(StreamKind, StreamPos, __T("Encoded_Library"));
         return File__Analyze_Encoded_Library_String(CompanyName, Name, Version, Date, Encoded_Library);
+    }
+    if (!Parameter.compare(0, 11, __T("DolbyVision")))
+    {
+        Ztring Temp=Get(StreamKind, StreamPos, __T("HDR_Format")+Parameter.substr(11), KindOfInfo, KindOfSearch).substr(14);
+        return Temp.substr(0, Temp.find(__T(" / ")));
     }
 
     CS.Enter();

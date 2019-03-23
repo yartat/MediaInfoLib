@@ -669,7 +669,7 @@ public :
     };
     #define VLC_END \
         {(int32u)-1, (int8u)-1, 0, 0, 0}
-    void Get_VL_Prepare(vlc_fast &Vlc);
+    static void Get_VL_Prepare(vlc_fast &Vlc);
     void Get_VL_ (const vlc Vlc[], size_t &Info);
     void Get_VL_ (const vlc_fast &Vlc, size_t &Info);
     #define Get_VL(Vlc, Info, Name) Get_VL_(Vlc, Info);
@@ -770,6 +770,14 @@ public :
 
     #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES)
     void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance);
+    #endif
+    #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MATROSKA_YES)
+    struct mastering_metadata_2086
+    {
+        int16u Primaries[8];
+        int32u Luminance[2];
+    };
+    void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance, mastering_metadata_2086 &Meta);
     #endif
 
     //***************************************************************************
@@ -1251,6 +1259,7 @@ protected :
     int64u Buffer_TotalBytes_FirstSynched_Max;
     int64u Buffer_TotalBytes_Fill_Max;
     friend class File__Tags_Helper;
+    friend class File_Mpeg4;
 
     //***************************************************************************
     // Helpers

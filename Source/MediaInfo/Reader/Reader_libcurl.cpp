@@ -652,6 +652,31 @@ size_t Reader_libcurl::Format_Test(MediaInfo_Internal* MI, String File_Name)
 }
 
 //---------------------------------------------------------------------------
+void Reader_libcurl::Curl_Log(int Result, const Ztring &Message)
+{
+#if MEDIAINFO_EVENTS
+    if (Result == CURLE_UNKNOWN_TELNET_OPTION)
+        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0xF1010102, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name) + Message);
+    else
+    {
+        Curl_Log(Result);
+    }
+    Curl_Data->ErrorBuffer[0] = '\0';
+#endif //MEDIAINFO_EVENTS
+}
+
+//---------------------------------------------------------------------------
+void Reader_libcurl::Curl_Log(int Result)
+{
+#if MEDIAINFO_EVENTS
+    Ztring MessageString;
+    MessageString.From_Local(Curl_Data->ErrorBuffer);
+    if (MessageString.empty())
+        MessageString.From_Local(curl_easy_strerror(CURLcode(Result)));
+    MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name) + __T(", ") + MessageString);
+#endif
+}
+//---------------------------------------------------------------------------
 size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const String &File_Name)
 {
     #if defined MEDIAINFO_LIBCURL_DLL_RUNTIME
@@ -778,19 +803,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_SSH_PUBLIC_KEYFILE, Curl_Data->Ssh_PublicKeyFileName.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        if (Result==CURLE_UNKNOWN_TELNET_OPTION)
-                            MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0xF1010101, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", The Curl library you use has no support for secure connections."));
-                        else
-                        {
-                            Ztring MessageString;
-                            MessageString.From_Local(Curl_Data->ErrorBuffer);
-                            if (MessageString.empty())
-                                MessageString.From_Local(curl_easy_strerror(Result));
-                            MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                        }
-                        Curl_Data->ErrorBuffer[0]='\0';
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result, __T(", The Curl library you use has no support for secure connections."));
                     return 0;
                 }
             }
@@ -800,19 +813,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_SSH_PRIVATE_KEYFILE, Curl_Data->Ssh_PrivateKeyFileName.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        if (Result==CURLE_UNKNOWN_TELNET_OPTION)
-                            MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0xF1010101, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", The Curl library you use has no support for secure connections."));
-                        else
-                        {
-                            Ztring MessageString;
-                            MessageString.From_Local(Curl_Data->ErrorBuffer);
-                            if (MessageString.empty())
-                                MessageString.From_Local(curl_easy_strerror(Result));
-                            MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                        }
-                        Curl_Data->ErrorBuffer[0]='\0';
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result, __T(", The Curl library you use has no support for secure connections."));
                     return 0;
                 }
             }
@@ -833,19 +834,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 #endif //MEDIAINFO_LIBCURL_CURLOPT_SSH_KNOWNHOSTS
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        if (Result==CURLE_UNKNOWN_TELNET_OPTION)
-                            MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0xF1010102, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", The Curl library you use has no support for known_host security file, transfer would not be secure."));
-                        else
-                        {
-                            Ztring MessageString;
-                            MessageString.From_Local(Curl_Data->ErrorBuffer);
-                            if (MessageString.empty())
-                                MessageString.From_Local(curl_easy_strerror(Result));
-                            MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                        }
-                        Curl_Data->ErrorBuffer[0]='\0';
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result, __T(", The Curl library you use has no support for known_host security file, transfer would not be secure."));
                     return 0;
                 }
             }
@@ -858,14 +847,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_SSLCERT, Curl_Data->Ssl_CertificateFileName.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
             }
@@ -875,14 +857,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_SSLCERTTYPE, Curl_Data->Ssl_CertificateFormat.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
             }
@@ -892,14 +867,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_SSLKEY, Curl_Data->Ssl_PrivateKeyFileName.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
             }
@@ -909,14 +877,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_SSLKEYTYPE, Curl_Data->Ssl_PrivateKeyFormat.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
             }
@@ -926,14 +887,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_CAINFO, Curl_Data->Ssl_CertificateAuthorityFileName.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
             }
@@ -943,14 +897,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_CAPATH, Curl_Data->Ssl_CertificateAuthorityPath.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
             }
@@ -960,14 +907,7 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_CRLFILE, Curl_Data->Ssl_CertificateRevocationListFileName.c_str());
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
             }
@@ -977,28 +917,14 @@ size_t Reader_libcurl::Format_Test_PerParser(MediaInfo_Internal* MI, const Strin
                 CURLcode Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_SSL_VERIFYPEER, 0);
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
 
                 Result=curl_easy_setopt(Curl_Data->Curl, CURLOPT_SSL_VERIFYHOST, 0);
                 if (Result)
                 {
-                    #if MEDIAINFO_EVENTS
-                        Ztring MessageString;
-                        MessageString.From_Local(Curl_Data->ErrorBuffer);
-                        if (MessageString.empty())
-                            MessageString.From_Local(curl_easy_strerror(Result));
-                        Curl_Data->ErrorBuffer[0]='\0';
-                        MediaInfoLib::Config.Log_Send(0xC0, 0xFF, 0, Reader_libcurl_FileNameWithoutPassword(Curl_Data->File_Name)+__T(", ")+MessageString);
-                    #endif //MEDIAINFO_EVENTS
+                    Curl_Log(Result);
                     return 0;
                 }
             }

@@ -63,6 +63,16 @@ struct buffer_data
     }
 };
 
+static inline int8u ReverseBits(int8u c)
+{
+    // Input: bit order is 76543210
+    //Output: bit order is 01234567
+    c = (c & 0x0F) << 4 | (c & 0xF0) >> 4;
+    c = (c & 0x33) << 2 | (c & 0xCC) >> 2;
+    c = (c & 0x55) << 1 | (c & 0xAA) >> 1;
+    return c;
+}
+
 #if !MEDIAINFO_TRACE
     #include "MediaInfo/File__Analyze_MinimizeSize.h"
 #else
@@ -791,7 +801,7 @@ public :
     };
     #define VLC_END \
         {(int32u)-1, (int8u)-1, 0, 0, 0}
-    void Get_VL_Prepare(vlc_fast &Vlc);
+    static void Get_VL_Prepare(vlc_fast &Vlc);
     void Get_VL (const vlc Vlc[], size_t &Info, const char* Name);
     void Get_VL (vlc_fast &Vlc, size_t &Info, const char* Name);
     void Skip_VL(const vlc Vlc[], const char* Name);
@@ -870,6 +880,14 @@ public :
 
     #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES)
     void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance);
+    #endif
+    #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MATROSKA_YES)
+    struct mastering_metadata_2086
+    {
+        int16u Primaries[8];
+        int32u Luminance[2];
+    };
+    void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance, mastering_metadata_2086 &Meta);
     #endif
 
     //***************************************************************************
@@ -1316,6 +1334,7 @@ protected :
     int64u Buffer_TotalBytes_FirstSynched_Max;
     int64u Buffer_TotalBytes_Fill_Max;
     friend class File__Tags_Helper;
+    friend class File_Mpeg4;
 
     //***************************************************************************
     // Helpers

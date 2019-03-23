@@ -549,19 +549,6 @@ static const char* Mk_StereoMode(int64u StereoMode)
 }
 
 //---------------------------------------------------------------------------
-static const char* Mk_OldStereoMode(int64u StereoMode)
-{
-    switch (StereoMode)
-    {
-        case 0x00 : return ""; //Mono (default)
-        case 0x01 : return "Right Eye";
-        case 0x02 : return "Left Eye";
-        case 0x03 : return "Both Eye";
-        default   : return "";
-    }
-}
-
-//---------------------------------------------------------------------------
 static const char* Mk_OriginalSourceMedium_From_Source_ID (const Ztring &Value)
 {
     if (Value.size()==6 && Value[0] == __T('0') && Value[1] == __T('0'))
@@ -1144,6 +1131,17 @@ void File_Mk::Streams_Finish()
             }
 
             Fill(Stream_Video, StreamPos_Last, Video_FrameRate_Mode, IsVfr?"VFR":"CFR");
+
+            //MasteringDisplay
+            Ztring MasteringDisplay_ColorPrimaries, MasteringDisplay_Luminance;
+            Get_MasteringDisplayColorVolume(MasteringDisplay_ColorPrimaries, MasteringDisplay_Luminance, Temp->second.MasteringMetadata);
+            if (!MasteringDisplay_ColorPrimaries.empty() || !MasteringDisplay_Luminance.empty())
+            {
+                Fill(StreamKind_Last, StreamPos_Last, "HDR_Format", "SMPTE ST 2086");
+                Fill(StreamKind_Last, StreamPos_Last, "HDR_Format_Compatibility", "HDR10");
+                Fill(StreamKind_Last, StreamPos_Last, "MasteringDisplay_ColorPrimaries", MasteringDisplay_ColorPrimaries);
+                Fill(StreamKind_Last, StreamPos_Last, "MasteringDisplay_Luminance", MasteringDisplay_Luminance);
+            }
         }
 
         if (Temp->second.Parser)
@@ -1268,9 +1266,12 @@ void File_Mk::Streams_Finish()
                         PerLanguage+=EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterDisplays[ChapterDisplays_Pos].ChapString;
                         Text+=PerLanguage+__T(" - ");
                     }
+                    Ztring Time=Ztring().Duration_From_Milliseconds(EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterTimeStart/1000000).To_UTF8().c_str();
                     if (Text.size())
                         Text.resize(Text.size()-3);
-                    Fill(Stream_Menu, StreamPos_Last, Ztring().Duration_From_Milliseconds(EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterTimeStart/1000000).To_UTF8().c_str(), Text);
+                    else
+                        Text = Time;
+                    Fill(Stream_Menu, StreamPos_Last, Time.To_UTF8().c_str(), Text);
                 }
             }
             Fill(Stream_Menu, StreamPos_Last, Menu_Chapters_Pos_End, Count_Get(Stream_Menu, StreamPos_Last), 10, true);
@@ -3868,6 +3869,34 @@ void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_Primaries()
 }
 
 //---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_MaxCLL()
+{
+    //Parsing
+    int64u UInteger=UInteger_Get();
+
+    //Filling
+    FILLING_BEGIN();
+        if (Segment_Info_Count>1)
+            return; //First element has the priority
+        Stream[TrackNumber].Infos["MaxCLL"].From_Number(UInteger);
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_MaxFALL()
+{
+    //Parsing
+    int64u UInteger=UInteger_Get();
+
+    //Filling
+    FILLING_BEGIN();
+        if (Segment_Info_Count>1)
+            return; //First element has the priority
+        Stream[TrackNumber].Infos["MaxFALL"].From_Number(UInteger);
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
 void File_Mk::Segment_Tracks_TrackEntry_Video_PixelCropBottom()
 {
     //Parsing
@@ -4300,7 +4329,7 @@ void File_Mk::CodecID_Manage()
     stream& streamItem = Stream[TrackNumber];
 
     //Creating the parser
-    #if defined(MEDIAINFO_MPEG4V_YES) || defined(MEDIAINFO_AV1_YES) || defined(MEDIAINFO_AVC_YES) || defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_VC1_YES) || defined(MEDIAINFO_DIRAC_YES) || defined(MEDIAINFO_MPEGV_YES) || defined(MEDIAINFO_VP8_YES) || defined(MEDIAINFO_OGG_YES) || defined(MEDIAINFO_DTS_YES)
+    #if defined(MEDIAINFO_MPEG4V_YES) || defined(MEDIAINFO_AV1_YES) || defined(MEDIAINFO_AVC_YES) || defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_VC1_YES) || defined(MEDIAINFO_DIRAC_YES) || defined(MEDIAINFO_MPEGV_YES) || defined(MEDIAINFO_VP8_YES) || defined(MEDIAINFO_VP9_YES) || defined(MEDIAINFO_OGG_YES) || defined(MEDIAINFO_DTS_YES)
         const Ztring &Format=MediaInfoLib::Config.CodecID_Get(StreamKind_Last, InfoCodecID_Format_Type, CodecID, InfoCodecID_Format);
     #endif
         if (0);
@@ -4569,6 +4598,41 @@ void File_Mk::CodecPrivate_Manage()
     Element_Offset=Element_Size_Save;
     delete[] CodecPrivate; CodecPrivate=NULL;
     CodecPrivate_Size=0;
+}
+
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_Primary(int8u i)
+{
+    //Parsing
+    float Float=Float_Get();
+
+    //Filling
+    FILLING_BEGIN();
+        if (Segment_Info_Count>1)
+            return; //First element has the priority
+        mastering_metadata_2086& MasteringMetadata=Stream[TrackNumber].MasteringMetadata;
+        int16u& Value=Stream[TrackNumber].MasteringMetadata.Primaries[i];
+        if (Value==(int16u)-1 && Float>=0 && Float<=1)
+            Value=((int16u)float32_int32s(Float*50000));
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_Luminance(int8u i)
+{
+    //Parsing
+    float Float=Float_Get();
+
+    //Filling
+    FILLING_BEGIN();
+        if (Segment_Info_Count>1)
+            return; //First element has the priority
+        mastering_metadata_2086& MasteringMetadata=Stream[TrackNumber].MasteringMetadata;
+        int32u& Value=Stream[TrackNumber].MasteringMetadata.Luminance[i];
+        if (Value==(int32u)-1 && Float<0x8FFFFFFF/10000)
+            Value=float32_int32s(Float*10000);
+    FILLING_END();
 }
 
 //***************************************************************************
