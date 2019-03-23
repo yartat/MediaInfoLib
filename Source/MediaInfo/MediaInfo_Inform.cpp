@@ -40,6 +40,10 @@
     #include "MediaInfo/Export/Export_PBCore.h"
     #include "MediaInfo/Export/Export_PBCore2.h"
 #endif //defined(MEDIAINFO_PBCORE_YES)
+#if defined(MEDIAINFO_NISO_YES)
+#include "MediaInfo/Export/Export_Niso.h"
+#endif //defined(MEDIAINFO_NISO_YES)
+
 #include "MediaInfo/MediaInfo_Internal.h"
 #include "MediaInfo/File__Analyze.h"
 #include "ThirdParty/base64/base64.h"
@@ -187,6 +191,10 @@ Ztring MediaInfo_Internal::Inform()
         if (MediaInfoLib::Config.Inform_Get()==__T("PBCore")) //x.x
             return Export_PBCore2().Transform(*this);
     #endif //defined(MEDIAINFO_PBCORE_YES)
+    #if defined(MEDIAINFO_NISO_YES)
+        if (MediaInfoLib::Config.Inform_Get()==__T("NISO_Z39.87"))
+            return Export_Niso().Transform(*this, MediaInfoLib::Config.ExternalMetadata_Get(), MediaInfoLib::Config.ExternalMetaDataConfig_Get());
+    #endif //defined(MEDIAINFO_NISO_YES)
     #if defined(MEDIAINFO_REVTMD_YES)
         if (MediaInfoLib::Config.Inform_Get()==__T("reVTMD"))
             return __T("reVTMD is disabled due to its non-free licensing."); //return Export_reVTMD().Transform(*this);
@@ -402,11 +410,19 @@ Ztring MediaInfo_Internal::Inform()
 
     #if defined(MEDIAINFO_XML_YES)
         if (XML || XML_0_7_78_MA || XML_0_7_78_MI)
+        {
             Retour=Ztring().From_UTF8(To_XML(*Node_Main, 0, false, false));
+            delete Node_Main;
+            delete Node_MI;
+        }
     #endif //MEDIAINFO_XML_YES
     #if defined(MEDIAINFO_JSON_YES)
         if (JSON)
+        {
             Retour=__T("{\n")+Ztring().From_UTF8(To_JSON(*Node_Main, 0, false, false))+__T("\n}");
+            delete Node_Main;
+            delete Node_MI;
+        }
     #endif //MEDIAINFO_JSON_YES
 
     Retour.FindAndReplace(__T("\\"), __T("|SC1|"), 0, Ztring_Recursive);
@@ -710,19 +726,25 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                 Retour+=Ztring().From_UTF8(To_XML(*(Fields[Field]), 1, false, false));
             else if (JSON)
                 Retour+=Ztring().From_UTF8(To_JSON(*(Fields[Field]), 1, false, false)+(Field<Fields.size()-1?",\n":""));
+            delete Fields[Field];
         }
 
         #endif //defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
         ConvertRetour(Retour);
 
-        Retour.FindAndReplace(__T("|SC1|"), __T("\\"), 0, Ztring_Recursive);
+        #if defined(MEDIAINFO_JSON_YES)
+            if (JSON)
+                Retour.FindAndReplace(__T("|SC1|"), __T("\\\\"), 0, Ztring_Recursive);
+            else
+                Retour.FindAndReplace(__T("|SC1|"), __T("\\"), 0, Ztring_Recursive);
+        #else
+            Retour.FindAndReplace(__T("|SC1|"), __T("\\"), 0, Ztring_Recursive);
+        #endif
+
         return Retour;
     }
 
     Ztring Retour=MediaInfoLib::Config.Inform_Get(Get(StreamKind, 0, __T("StreamKind"), Info_Text));
-    ZtringList Info;
-
-    Info=Stream[StreamKind][StreamPos];
 
     //Special characters
     Retour.FindAndReplace(__T("\\\\"), __T("|SC1|"), 0, Ztring_Recursive);
@@ -764,7 +786,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
         size_t Pos=MediaInfoLib::Config.Info_Get(StreamKind).Find(Elements(0));
         if (Pos!=std::string::npos)
         {
-            if (Info(Pos).size()>0)
+            if (Get(StreamKind, StreamPos, Pos).size()>0)
                 Elements_Index=1;
             else
                 Elements_Index=2;
@@ -776,7 +798,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
         while (Elements(Elements_Index).SubString(__T("%"), __T("%")).size()>0)
         {
             Ztring ToReplace=Elements(Elements_Index).SubString(__T("%"), __T("%"));
-            Ztring ReplacedBy=Info(MediaInfoLib::Config.Info_Get(StreamKind).Find(ToReplace));
+            Ztring ReplacedBy=Get(StreamKind, StreamPos, ToReplace);
             ToReplace=Ztring(__T("%"))+ToReplace+Ztring(__T("%"));
             Elements(Elements_Index).FindAndReplace(ToReplace, ReplacedBy);
         }
@@ -795,7 +817,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
         Ztring ARemplacer=Ztring(__T("[")+Crochets+__T("]"));
         if (ValueToFind_Pos!=Error)
         {
-            Ztring RemplacerPar=Info(ValueToFind_Pos);
+            Ztring RemplacerPar= Get(StreamKind, StreamPos, ValueToFind_Pos);
             if (RemplacerPar.empty())
                 Retour.FindAndReplace(ARemplacer, Ztring());
             else
@@ -803,7 +825,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                 //Formate l'interieur
                 Ztring ATraiter=Crochets;
                 Ztring Crochets_ARemplacer=Ztring(__T("%")+ATraiter.SubString(__T("%"), __T("%")))+__T("%");
-                Ztring Crochets_RemplacerPar=Info(MediaInfoLib::Config.Info_Get(StreamKind).Find(ATraiter.SubString(__T("%"), __T("%"))));
+                Ztring Crochets_RemplacerPar=Get(StreamKind, StreamPos, MediaInfoLib::Config.Info_Get(StreamKind).Find(ATraiter.SubString(__T("%"), __T("%"))));
                 ATraiter.FindAndReplace(Crochets_ARemplacer, Crochets_RemplacerPar);
                 Retour.FindAndReplace(ARemplacer, ATraiter);
             }
