@@ -4,8 +4,8 @@ cmake_minimum_required(VERSION 2.8.11)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-set(MediaInfoLib_MAJOR_VERSION 18)
-set(MediaInfoLib_MINOR_VERSION 12)
+set(MediaInfoLib_MAJOR_VERSION 19)
+set(MediaInfoLib_MINOR_VERSION 04)
 set(MediaInfoLib_PATCH_VERSION 0)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION})
 
@@ -197,6 +197,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Tak.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Tta.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_TwinVQ.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Usac.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Vorbis.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Wvpk.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Duplicate/File__Duplicate__Base.cpp
