@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 2.8.11)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 set(MediaInfoLib_MAJOR_VERSION 19)
-set(MediaInfoLib_MINOR_VERSION 04)
+set(MediaInfoLib_MINOR_VERSION 07)
 set(MediaInfoLib_PATCH_VERSION 0)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION})
 
@@ -21,9 +21,6 @@ if (NOT WIN32)
 else()
   option(BUILD_ZLIB "Build bundled zlib" ON)
   option(BUILD_ZENLIB "Build bundled ZenLib" ON)
-
-  # FIXME: On Windows shared library is not compiling now.
-  set(BUILD_SHARED_LIBS OFF)
 endif()
 
 set(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)" )
@@ -70,10 +67,12 @@ else()
   set(ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../../../zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib)
 endif()
 
-if(NOT MSVC)
-  set(MediaInfoLib_CONFIG_INSTALL_DIR "${LIB_INSTALL_DIR}/cmake/mediainfolib")
+if(VCPKG_TARGET_TRIPLET)
+  set(MediaInfoLib_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/share/mediainfolib")
+elseif(MSVC)
+  set(MediaInfoLib_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/cmake")
 else()
-  set(MediaInfoLib_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/cmake/")
+  set(MediaInfoLib_CONFIG_INSTALL_DIR "${LIB_INSTALL_DIR}/cmake/mediainfolib")
 endif()
 
 set(MediaInfoLib_SOURCES_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../Source)
@@ -322,6 +321,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_AvsV.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Canopus.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Dirac.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_DolbyVisionMetadata.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Ffv1.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Flic.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Fraps.cpp
@@ -342,6 +342,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfoDLL/MediaInfoJNI.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfoDLL/MediaInfoDLL.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfoDLL/MediaInfoDLL.def
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfoDLL/MediaInfoDLL.rc
 )
 
 if(NOT TinyXML_FOUND)
@@ -362,7 +363,7 @@ if(NOT CURL_FOUND)
   target_compile_definitions(mediainfo PRIVATE MEDIAINFO_LIBCURL_NO)
 else()
   include_directories(${CURL_INCLUDE_DIRS})
-  target_link_libraries(mediainfo "${CURL_LIBRARIES}")
+  target_link_libraries(mediainfo ${CURL_LIBRARIES})
   set(CURL_PC " libcurl")
   set(CURL_LIB " -lcurl")
 endif()
@@ -387,10 +388,9 @@ if(BUILD_ZENLIB)
   target_include_directories(mediainfo PRIVATE ${ZLIB_INCLUDE_DIRS})
 endif()
 
-target_link_libraries(mediainfo
-  ${ZenLib_LIBRARY} ${ZLIB_LIBRARIES})
+target_link_libraries(mediainfo ${ZenLib_LIBRARY} ${ZLIB_LIBRARIES})
 
-if(MSVC)
+if(MSVC AND BUILD_SHARED_LIBS)
   get_target_property(LOCATION mediainfo LOCATION_DEBUG)
   string(REGEX REPLACE "\\.[^.]*$" ".pdb" LOCATION "${LOCATION}")
   install(FILES ${LOCATION} DESTINATION ${BIN_INSTALL_DIR} CONFIGURATIONS Debug)
