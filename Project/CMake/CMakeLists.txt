@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 2.8.11)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 set(MediaInfoLib_MAJOR_VERSION 19)
-set(MediaInfoLib_MINOR_VERSION 07)
+set(MediaInfoLib_MINOR_VERSION 09)
 set(MediaInfoLib_PATCH_VERSION 0)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION})
 
@@ -159,6 +159,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Aac_Main.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Aac_Others.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Ac3.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Ac4.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Adpcm.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Als.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Amr.cpp
@@ -344,6 +345,11 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfoDLL/MediaInfoDLL.def
   ${MediaInfoLib_SOURCES_PATH}/MediaInfoDLL/MediaInfoDLL.rc
 )
+
+if(WIN32)
+  # aes_ni.h has windows-only include
+  set(MediaInfoLib_SRCS ${MediaInfoLib_SRCS} ${MediaInfoLib_SOURCES_PATH}/ThirdParty/aes-gladman/aes_ni.c)
+endif()
 
 if(NOT TinyXML_FOUND)
   include_directories(${MediaInfoLib_SOURCES_PATH}/ThirdParty/tinyxml2/)
