@@ -225,6 +225,13 @@ File_DvDif::File_DvDif()
 {
     //Configuration
     ParserName="DV";
+    #if MEDIAINFO_EVENTS
+        ParserIDs[0]=MediaInfo_Parser_DvDif;
+        StreamIDs_Width[0]=4;
+    #endif //MEDIAINFO_EVENTS
+    #if MEDIAINFO_DEMUX
+        Demux_Level=2; //Container
+    #endif //MEDIAINFO_DEMUX
     MustSynchronize=true;
     Buffer_TotalBytes_FirstSynched_Max=64*1024;
 
@@ -235,12 +242,12 @@ File_DvDif::File_DvDif()
 
     //Temp
     FrameSize_Theory=0;
-    Duration=0;
     Synched_Test_Reset();
     DSF_IsValid=false;
     APT=0xFF; //Impossible
     video_source_stype=0xFF;
     audio_source_stype=0xFF;
+    aspect=0xFF;
     ssyb_AP3=0xFF;
     TF1=false; //Valid by default, for direct analyze
     TF2=false; //Valid by default, for direct analyze
@@ -257,7 +264,7 @@ File_DvDif::File_DvDif()
 
     #ifdef MEDIAINFO_DVDIF_ANALYZE_YES
     Analyze_Activated=false;
-    video_source_Detected=false;
+    Speed_FrameCount_StartOffset=(int64u)-1;
     Speed_FrameCount=0;
     Speed_FrameCount_Video_STA_Errors=0;
     Speed_FrameCount_Audio_Errors.resize(8);
@@ -266,10 +273,8 @@ File_DvDif::File_DvDif()
     Speed_Contains_NULL=0;
     Speed_FrameCount_Arb_Incoherency=0;
     Speed_FrameCount_Stts_Fluctuation=0;
-    System_IsValid=false;
-    Frame_AtLeast1DIF=false;
+    SMP=(int8u)-1;
     QU=(int8u)-1;
-    CH_IsPresent.resize(8);
     Speed_TimeCode_IsValid=false;
     Speed_Arb_IsValid=false;
     Mpeg4_stts=NULL;
@@ -548,15 +553,24 @@ void File_DvDif::Streams_Finish()
             Stream_Prepare(Stream_General);
         Fill(Stream_General, 0, General_Recorded_Date, Recorded_Date, true);
     }
-    if (!IsSub && Duration)
-        Fill(Stream_General, 0, General_Duration, Duration);
+
+    float64 OverallBitRate=Retrieve_Const(Stream_General, 0, General_OverallBitRate).To_float64();
+    if (OverallBitRate && File_Size && File_Size!=(int64u)-1)
+    {
+        float64 Duration=File_Size/OverallBitRate*8*1000;
+        if (Duration)
+        {
+            for (size_t StreamKind=0; StreamKind<Stream_Max; StreamKind++)
+                for (size_t StreamPos=0; StreamPos<Count_Get((stream_t)StreamKind); StreamPos++)
+                    Fill((stream_t)StreamKind, StreamPos, Fill_Parameter((stream_t)StreamKind, Generic_Duration), Duration, 0);
+        }
+    }
 
     #ifdef MEDIAINFO_DVDIF_ANALYZE_YES
         if (Config->File_DvDif_Analysis_Get())
         {
             //Errors stats
             Status[IsFinished]=true; //We need to fill it before the call to Errors_Stats_Update
-            Errors_Stats_Update();
             Errors_Stats_Update_Finnish();
         }
     #endif //MEDIAINFO_DVDIF_ANALYZE_YES
@@ -641,6 +655,7 @@ bool File_DvDif::Synched_Test()
         return true;
 
     SCT =(Buffer[Buffer_Offset  ]&0xE0)>>5;
+    Dseq= Buffer[Buffer_Offset+1]>>4;
     DBN = Buffer[Buffer_Offset+2];
 
     //DIF Sequence Numbers
@@ -1750,6 +1765,15 @@ void File_DvDif::consumer_camera_2()
 //---------------------------------------------------------------------------
 void File_DvDif::recdate(bool FromVideo)
 {
+    // Coherency test
+    int32u Test;
+    Peek_B4(Test);
+    if (Test==(int32u)-1)
+    {
+        Skip_B4(                                                "Junk");
+        return;
+    }
+
     BS_Begin();
 
     int8u Temp;
@@ -1778,7 +1802,7 @@ void File_DvDif::recdate(bool FromVideo)
 
     BS_End();
 
-    if (FromVideo && Frame_Count==1 && Month<=12 && Day<=31 && Recorded_Date_Date.empty())
+    if (FromVideo && Frame_Count==1 && Year!=2065 && Month && Month<=12 && Day && Day<=31 && Recorded_Date_Date.empty())
     {
         Ztring MonthString;
         if (Month<10)
@@ -1795,6 +1819,15 @@ void File_DvDif::recdate(bool FromVideo)
 //---------------------------------------------------------------------------
 void File_DvDif::rectime(bool FromVideo)
 {
+    // Coherency test
+    int32u Test;
+    Peek_B4(Test);
+    if (Test==(int32u)-1)
+    {
+        Skip_B4(                                            "Junk");
+        return;
+    }
+
     if (!DSF_IsValid)
     {
         Trusted_IsNot("Not in right order");

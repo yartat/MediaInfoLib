@@ -85,6 +85,9 @@
 #if defined(MEDIAINFO_MPEGA_YES)
     #include "MediaInfo/Audio/File_Mpega.h"
 #endif
+#if defined(MEDIAINFO_MPEGH3DA_YES)
+    #include "MediaInfo/Audio/File_Mpegh3da.h"
+#endif
 #if defined(MEDIAINFO_PCM_YES)
     #include "MediaInfo/Audio/File_Pcm.h"
 #endif
@@ -401,10 +404,11 @@ static std::string Mpeg4_chan_ChannelDescription (int64u ChannelLabels)
 }
 
 //---------------------------------------------------------------------------
-static const char* Mpeg4_chan_ChannelDescription_Layout (int32u ChannelLabel)
+static string Mpeg4_chan_ChannelDescription_Layout (int32u ChannelLabel)
 {
     switch(ChannelLabel)
     {
+        case   0 : return "";
         case   1 : return "L";
         case   2 : return "R";
         case   3 : return "C";
@@ -430,6 +434,12 @@ static const char* Mpeg4_chan_ChannelDescription_Layout (int32u ChannelLabel)
         case  37 : return "LFE2";
         case  38 : return "Lt";
         case  39 : return "Rt";
+        case  40 : return "HearingImpaired";
+        case  41 : return "Narration";
+        case  42 : return "M";
+        case  43 : return "DialogCentricMix";
+        case  44 : return "CenterSurroundDirect";
+        case  45 : return "Haptic";
         case 200 : return "W";
         case 201 : return "X";
         case 202 : return "Y";
@@ -438,23 +448,15 @@ static const char* Mpeg4_chan_ChannelDescription_Layout (int32u ChannelLabel)
         case 205 : return "S";
         case 206 : return "X";
         case 207 : return "Y";
-        case 0x10000 : return "Discrete-0";
-        case 0x10001 : return "Discrete-1";
-        case 0x10002 : return "Discrete-2";
-        case 0x10003 : return "Discrete-3";
-        case 0x10004 : return "Discrete-4";
-        case 0x10005 : return "Discrete-5";
-        case 0x10006 : return "Discrete-6";
-        case 0x10007 : return "Discrete-7";
-        case 0x10008 : return "Discrete-8";
-        case 0x10009 : return "Discrete-9";
-        case 0x1000A : return "Discrete-10";
-        case 0x1000B : return "Discrete-11";
-        case 0x1000C : return "Discrete-12";
-        case 0x1000D : return "Discrete-13";
-        case 0x1000E : return "Discrete-14";
-        case 0x1000F : return "Discrete-15";
-        default  : return "?";
+        case 301 : return "HeadphonesLeft";
+        case 302 : return "HeadphonesRight";
+        case 304 : return "ClickTrack";
+        case 305 : return "ForeignLanguage";
+        case 400 : return "Discrete";
+        default  : 
+                    if ((ChannelLabel>>16)==1) //0x10000 to 0x1FFFF, numbered Discrete
+                        return "Discrete-"+Ztring::ToZtring(ChannelLabel&0xFFFF).To_UTF8();
+                    return Ztring::ToZtring(ChannelLabel).To_UTF8();
     }
 }
 
@@ -764,6 +766,7 @@ namespace Elements
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_colr=0x636F6C72;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_colr_clcn=0x636C636E;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc=0x6E636C63;
+    const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclx=0x6E636C78;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_colr_prof=0x70726F66;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_d263=0x64323633;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_dac3=0x64616333;
@@ -771,6 +774,7 @@ namespace Elements
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_damr=0x64616D72;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_dec3=0x64656333;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_ddts=0x64647473;
+    const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_dmlp=0x646D6C70;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_dvc1=0x64766331;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_dvcC=0x64766343;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_dvvC=0x64767643;
@@ -790,6 +794,7 @@ namespace Elements
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_jp2h_colr=0x636F6C72;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_jp2h_ihdr=0x69686472;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_mdcv=0x6D646376;
+    const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_mhaC=0x6D686143;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_pasp=0x70617370;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_SA3D=0x53413344;
     const int64u moov_trak_mdia_minf_stbl_stsd_xxxx_sinf=0x73696E66;
@@ -858,6 +863,7 @@ namespace Elements
     const int64u moov_udta_AllF=0x416C6C46;
     const int64u moov_udta_chpl=0x6368706C;
     const int64u moov_udta_clsf=0x636C7366;
+    const int64u moov_udta_date=0x64617465;
     const int64u moov_udta_DcMD=0x44634D44;
     const int64u moov_udta_DcMD_Cmbo=0x436D626F;
     const int64u moov_udta_DcMD_DcME=0x44634D45;
@@ -877,6 +883,8 @@ namespace Elements
     const int64u moov_udta_MCPS=0x4D435053;
     const int64u moov_udta_meta=0x6D657461;
     const int64u moov_udta_meta_hdlr=0x68646C72;
+    const int64u moov_udta_meta_keys=0x6B657973;
+    const int64u moov_udta_meta_keys_mdta=0x6D647461;
     const int64u moov_udta_meta_ilst=0x696C7374;
     const int64u moov_udta_meta_ilst_xxxx_data=0x64617461;
     const int64u moov_udta_meta_ilst_xxxx_mean=0x6D65616E;
@@ -1146,6 +1154,7 @@ void File_Mpeg4::Data_Parse()
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_clap)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_clli)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_mdcv)
+                                ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_mhaC)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_colr)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_d263)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_dac3)
@@ -1153,6 +1162,7 @@ void File_Mpeg4::Data_Parse()
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_damr)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_dec3)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_ddts)
+                                ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_dmlp)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_dvc1)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_dvcC)
                                 ATOM(moov_trak_mdia_minf_stbl_stsd_xxxx_dvvC)
@@ -1253,6 +1263,7 @@ void File_Mpeg4::Data_Parse()
             ATOM(moov_udta_AllF)
             ATOM(moov_udta_chpl)
             ATOM(moov_udta_clsf)
+            ATOM(moov_udta_date)
             LIST(moov_udta_DcMD)
                 ATOM_BEGIN
                 ATOM(moov_udta_DcMD_Cmbo)
@@ -1278,6 +1289,10 @@ void File_Mpeg4::Data_Parse()
             ATOM(moov_udta_MCPS)
             LIST(moov_udta_meta)
                 ATOM_BEGIN
+                LIST(moov_udta_meta_keys)
+                    ATOM_BEGIN
+                    ATOM(moov_udta_meta_keys_mdta)
+                    ATOM_END
                 ATOM(moov_udta_meta_hdlr)
                 LIST(moov_udta_meta_ilst)
                     LIST_DEFAULT_ALONE_BEGIN (moov_udta_meta_ilst_xxxx)
@@ -5393,6 +5408,14 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxxSound()
             Streams[moov_trak_tkhd_TrackID].Parsers.push_back(Parser);
         }
         #endif
+        #if defined(MEDIAINFO_MPEGH3DA_YES)
+        if (MediaInfoLib::Config.CodecID_Get(Stream_Audio, InfoCodecID_Format_Mpeg4, Codec, InfoCodecID_Format)==__T("MPEG-H 3D Audio"))
+        {
+            //Creating the parser
+            File_Mpegh3da* Parser=new File_Mpegh3da;
+            Streams[moov_trak_tkhd_TrackID].Parsers.push_back(Parser);
+        }
+        #endif
         if (Element_Code==0x6F776D61) //"owma"
         {
             //Parsing
@@ -6339,16 +6362,18 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_colr()
     {
         case Elements::moov_trak_mdia_minf_stbl_stsd_xxxx_colr_clcn: moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc(true); break;
         case Elements::moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc: moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc(); break;
+        case Elements::moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclx: moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc(false, true); break;
         case Elements::moov_trak_mdia_minf_stbl_stsd_xxxx_colr_prof: moov_trak_mdia_minf_stbl_stsd_xxxx_colr_prof(); break;
         default                                                    : Skip_XX(Element_Size-Element_Offset, "Unknown");
     }
 }
 
 //---------------------------------------------------------------------------
-void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc(bool LittleEndian)
+void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc(bool LittleEndian, bool HasFlags)
 {
     //Parsing
     int16u  colour_primaries, transfer_characteristics, matrix_coefficients;
+    bool full_range_flag;
     if (LittleEndian)
         Get_L2 (colour_primaries,                               "Primaries index");
     else
@@ -6364,6 +6389,12 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc(bool LittleEndian)
     else
         Get_B2 (matrix_coefficients,                            "Matrix index");
     Param_Info1(Mpegv_matrix_coefficients((int8u)matrix_coefficients));
+    if (HasFlags)
+    {
+        BS_Begin();
+        Get_SB (full_range_flag,                                "full_range_flag");
+        BS_End();
+    }
 
     FILLING_BEGIN();
         if (Retrieve(Stream_Video, StreamPos_Last, Video_colour_description_present).empty()) //Using only the first one met
@@ -6374,6 +6405,8 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_colr_nclc(bool LittleEndian)
             Fill(Stream_Video, StreamPos_Last, Video_matrix_coefficients, Mpegv_matrix_coefficients((int8u)matrix_coefficients));
             if (matrix_coefficients!=2)
                 Fill(Stream_Video, StreamPos_Last, Video_ColorSpace, Mpegv_matrix_coefficients_ColorSpace((int8u)matrix_coefficients), Unlimited, true, true);
+            if (HasFlags)
+                Fill(Stream_Video, StreamPos_Last, Video_colour_range, full_range_flag?"Full":"Limited");
         }
     FILLING_END();
 }
@@ -6630,6 +6663,35 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_ddts()
 }
 
 //---------------------------------------------------------------------------
+void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_dmlp()
+{
+    Element_Name("MLPSpecificBox");
+    Clear(Stream_Audio, StreamPos_Last, Audio_Channel_s_); //Remove the value (is always wrong in the stsd atom)
+
+    //Parsing
+    if (moov_trak_mdia_minf_stbl_stsd_Pos>1)
+        return; //Handling only the first description
+
+    #ifdef MEDIAINFO_AC3_YES
+        if (Streams[moov_trak_tkhd_TrackID].Parsers.empty())
+        {
+            File_Ac3* Parser=new File_Ac3;
+            Open_Buffer_Init(Parser);
+            Parser->MustParse_dmlp=true;
+            Streams[moov_trak_tkhd_TrackID].Parsers.push_back(Parser);
+            mdat_MustParse=true; //Data is in MDAT
+
+            //Parsing
+            Open_Buffer_OutOfBand(Parser);
+        }
+    #else
+        Skip_XX(Element_Size,                                   "TrueHD Data");
+
+        Fill(Stream_Audio, StreamKind_Last, Audio_Format, "TrueHD");
+    #endif
+}
+
+//---------------------------------------------------------------------------
 void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_dvc1()
 {
     Element_Name("VC1SpecificBox");
@@ -6776,6 +6838,18 @@ extern const char* DolbyVision_Profiles [DolbyVision_Profiles_Size] = // dv[BL_c
     "dvav",
 };
 
+extern const size_t DolbyVision_Compatibility_Size=7;
+extern const char* DolbyVision_Compatibility[DolbyVision_Compatibility_Size]=
+{
+    "",
+    "HDR10",
+    "SDR",
+    NULL,
+    "HLG",
+    NULL,
+    "Blu-ray",
+};
+
 //---------------------------------------------------------------------------
 void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_dvcC()
 {
@@ -6783,28 +6857,41 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_dvcC()
     AddCodecConfigurationBoxInfo();
 
     //Parsing
-    int8u  dv_version_major, dv_version_minor, dv_profile, dv_level;
+    int8u  dv_version_major, dv_version_minor, dv_profile, dv_level, dv_bl_signal_compatibility_id;
     bool rpu_present_flag, el_present_flag, bl_present_flag;
     Get_B1 (dv_version_major,                                   "dv_version_major");
-    Get_B1 (dv_version_minor,                                   "dv_version_minor");
-    if (dv_version_major==1) //Spec says nothing, we hope that a minor version change means that the stream is backward compatible
+    if (dv_version_major && dv_version_major<=2) //Spec says nothing, we hope that a minor version change means that the stream is backward compatible
     {
+        Get_B1 (dv_version_minor,                               "dv_version_minor");
         BS_Begin();
+        size_t End=Data_BS_Remain();
+        if (End>=176)
+            End-=176;
+        else
+            End=0; // Not enough place for reserved bits, but we currently ignore such case, just considered as unknown
         Get_S1 (7, dv_profile,                                  "dv_profile");
         Get_S1 (6, dv_level,                                    "dv_level");
         Get_SB (   rpu_present_flag,                            "rpu_present_flag");
         Get_SB (   el_present_flag,                             "el_present_flag");
         Get_SB (   bl_present_flag,                             "bl_present_flag");
+        if (Data_BS_Remain())
+        {
+            Get_S1 (4, dv_bl_signal_compatibility_id,           "dv_bl_signal_compatibility_id"); // in dv_version_major 2 only if based on specs but it was confirmed to be seen in dv_version_major 1 too and it does not hurt (value 0 means no new display)
+            if (End<Data_BS_Remain())
+                Skip_BS(Data_BS_Remain()-End,                   "reserved");
+        }
+        else
+            dv_bl_signal_compatibility_id=0;
         BS_End();
     }
-    else
-        Skip_XX(Element_Size-Element_Offset,                    "Unknown");
+    Skip_XX(Element_Size-Element_Offset,                        "Unknown");
 
     FILLING_BEGIN();
-        Ztring Summary=Ztring::ToZtring(dv_version_major)+__T('.')+Ztring::ToZtring(dv_version_minor);
-        Fill(Stream_Video, StreamPos_Last, "HDR_Format_Version", Summary);
-        if (dv_version_major==1)
+        Fill(Stream_Video, StreamPos_Last, "HDR_Format", "Dolby Vision");
+        if (dv_version_major && dv_version_major<=2)
         {
+            Ztring Summary=Ztring::ToZtring(dv_version_major)+__T('.')+Ztring::ToZtring(dv_version_minor);
+            Fill(Stream_Video, StreamPos_Last, "HDR_Format_Version", Summary);
             string Profile, Level;
             if (dv_profile<DolbyVision_Profiles_Size)
                 Profile+=DolbyVision_Profiles[dv_profile];
@@ -6813,7 +6900,6 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_dvcC()
             Profile+=__T('.');
             Profile+=Ztring().From_CC1(dv_profile).To_UTF8();
             Level+=Ztring().From_CC1(dv_level).To_UTF8();
-            Fill(Stream_Video, StreamPos_Last, "HDR_Format", "Dolby Vision");
             Fill(Stream_Video, StreamPos_Last, "HDR_Format_Profile", Profile);
             Fill(Stream_Video, StreamPos_Last, "HDR_Format_Level", Level);
             Summary+=__T(',');
@@ -6837,7 +6923,18 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_dvcC()
                 Summary+=Ztring().From_UTF8(Layers);
             }
             Fill(Stream_Video, StreamPos_Last, "HDR_Format_Settings", Layers);
+            if (dv_bl_signal_compatibility_id)
+            {
+                string Compatibility;
+                if (dv_bl_signal_compatibility_id<DolbyVision_Compatibility_Size && DolbyVision_Compatibility[dv_bl_signal_compatibility_id])
+                    Compatibility=DolbyVision_Compatibility[dv_bl_signal_compatibility_id];
+                else
+                    Compatibility=Ztring().From_Number(dv_bl_signal_compatibility_id).To_UTF8();
+                Fill(Stream_Video, StreamPos_Last, Video_HDR_Format_Compatibility, Compatibility);
+            }
         }
+        else
+            Fill(Stream_Video, StreamPos_Last, "HDR_Format_Version", dv_version_major);
     FILLING_END();
 }
 
@@ -7060,6 +7157,41 @@ void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_mdcv()
         Fill(StreamKind_Last, StreamPos_Last, "MasteringDisplay_ColorPrimaries", MasteringDisplay_ColorPrimaries);
         Fill(StreamKind_Last, StreamPos_Last, "MasteringDisplay_Luminance", MasteringDisplay_Luminance);
     FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+void File_Mpeg4::moov_trak_mdia_minf_stbl_stsd_xxxx_mhaC()
+{
+    Element_Name("MHAConfigurationBox");
+
+    if (moov_trak_mdia_minf_stbl_stsd_Pos>1)
+    {
+        Skip_XX(Element_Size,                                   "Data not analyzed");
+        return; //Handling only the first description
+    }
+
+    AddCodecConfigurationBoxInfo();
+    #ifdef MEDIAINFO_MPEGH3DA_YES
+        if (!Streams[moov_trak_tkhd_TrackID].Parsers.empty())
+        {
+            for (size_t i=0; i<Streams[moov_trak_tkhd_TrackID].Parsers.size(); i++)
+                delete Streams[moov_trak_tkhd_TrackID].Parsers[i];
+            Streams[moov_trak_tkhd_TrackID].Parsers.clear();
+        }
+
+        File_Mpegh3da* Parser=new File_Mpegh3da;
+        Open_Buffer_Init(Parser);
+        Parser->MustParse_mhaC=true;
+        Streams[moov_trak_tkhd_TrackID].Parsers.push_back(Parser);
+        mdat_MustParse=true; //Data is in MDAT
+
+        //Parsing
+        Open_Buffer_Continue(Parser);
+    #else
+        Skip_XX(Element_Size,                                   "MPEG-H 3D Audio Data");
+
+        Fill(Stream_Audio, StreamKind_Last, Audio_Format, "MPEG-H 3D Audio");
+    #endif
 }
 
 //---------------------------------------------------------------------------
@@ -8048,6 +8180,20 @@ void File_Mpeg4::moov_udta_clsf()
 }
 
 //---------------------------------------------------------------------------
+void File_Mpeg4::moov_udta_date()
+{
+    Element_Name("First recording date");
+
+    //Parsing
+    string Date;
+    Get_String (Element_Size-Element_Offset, Date,              "Date");
+
+    FILLING_BEGIN();
+        Fill(Stream_General, 0, General_Recorded_Date, Date);
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
 void File_Mpeg4::moov_udta_DcMD()
 {
     Element_Name("Kodak MetaData");
@@ -8230,6 +8376,18 @@ void File_Mpeg4::moov_udta_meta()
 
     //Filling
     moov_meta_hdlr_Type=Elements::moov_udta_meta;
+}
+
+//---------------------------------------------------------------------------
+void File_Mpeg4::moov_udta_meta_keys()
+{
+    moov_meta_keys();
+}
+
+//---------------------------------------------------------------------------
+void File_Mpeg4::moov_udta_meta_keys_mdta()
+{
+    moov_meta_keys_mdta();
 }
 
 //---------------------------------------------------------------------------

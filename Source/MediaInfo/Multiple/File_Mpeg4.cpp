@@ -720,7 +720,8 @@ void File_Mpeg4::Streams_Finish()
         //Fragments
         if (IsFragmented)
         {
-            Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Duration), Temp->second.stts_Duration/((float)Temp->second.mdhd_TimeScale)*1000, 0, true);
+            if (Temp->second.mdhd_TimeScale)
+                Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Duration), Temp->second.stts_Duration/((float)Temp->second.mdhd_TimeScale)*1000, 0, true);
             Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_FrameCount), Temp->second.stts_FrameCount, 10, true);
         }
 
@@ -1310,7 +1311,7 @@ void File_Mpeg4::Streams_Finish()
                 CodecConfigurationBoxInfo+=__T('+');
             CodecConfigurationBoxInfo+=Ztring().From_CC4(Temp->second.CodecConfigurationBoxInfo[i]);
         }
-        Fill(StreamKind_Last, StreamPos_Last, "Codec configuration box", CodecConfigurationBoxInfo);
+        Fill(StreamKind_Last, StreamPos_Last, "CodecConfigurationBox", CodecConfigurationBoxInfo);
 
         //ES_ID
         for (File_Mpeg4_Descriptors::es_id_infos::iterator ES_ID_Info=ES_ID_Infos.begin(); ES_ID_Info!=ES_ID_Infos.end(); ES_ID_Info++)
@@ -2359,7 +2360,7 @@ bool File_Mpeg4::BookMark_Needed()
             //Limit the detection
             #if defined(MEDIAINFO_SMPTEST0337_YES) && defined(MEDIAINFO_PCM_YES)
                 if (Temp->second.IsPcm && Temp->second.Parsers.size()>=2 && !Temp->second.stsc.empty() && Temp->second.stsc[0].SamplesPerChunk>=48000/4) // 1/4 of second is enough for detection
-                    ((File_Pcm*)Temp->second.Parsers[Temp->second.Parsers.size()-1])->Frame_Count_Valid=2; //2 for checking the PCM block after this one (next track)
+                    ((File_Pcm*)Temp->second.Parsers[Temp->second.Parsers.size()-1])->Frame_Count_Valid=3; //3 for checking the PCM block after this one (next track) + Some files have 2 consecutive packets before the next stream, and we want to catch the channel grouping
             #endif //defined(MEDIAINFO_PCM_YES)
 
             //PCM split

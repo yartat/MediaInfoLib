@@ -489,6 +489,9 @@ void File_Dpx::Header_Parse()
     }
     else
         Header_Fill_Size(Sizes[Sizes_Pos]);
+
+    if (Sizes_Pos==Pos_ImageData)
+        DataMustAlwaysBeComplete=false; //We actually don't need to load the whole ImageData, as we don't parse it
 }
 
 //---------------------------------------------------------------------------
@@ -811,8 +814,8 @@ void File_Dpx::GenericSectionHeader_Dpx_ImageElement()
             Fill(StreamKind_Last, StreamPos_Last, "ChromaSubsampling", DPX_Descriptors_ChromaSubsampling(Descriptor));
             Fill(StreamKind_Last, StreamPos_Last, "BitDepth", BitDephs);
             Fill(StreamKind_Last, StreamPos_Last, "colour_description_present", "Yes");
-            Fill(StreamKind_Last, StreamPos_Last, "colour_primaries", DPX_TransferCharacteristic(TransferCharacteristic));
-            Fill(StreamKind_Last, StreamPos_Last, "transfer_characteristics", DPX_ColorimetricSpecification(ColorimetricSpecification));
+            Fill(StreamKind_Last, StreamPos_Last, "colour_primaries", DPX_ColorimetricSpecification(ColorimetricSpecification));
+            Fill(StreamKind_Last, StreamPos_Last, "transfer_characteristics", DPX_TransferCharacteristic(TransferCharacteristic));
             if (ComponentDataPackingMethod<8)
             {
                 Fill(StreamKind_Last, StreamPos_Last, "Format_Settings", DPX_ComponentDataPackingMethod[ComponentDataPackingMethod]);

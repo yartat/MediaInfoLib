@@ -1,11 +1,11 @@
-project(MediaInfoLib)
-
 cmake_minimum_required(VERSION 2.8.11)
+
+project(MediaInfoLib)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
-set(MediaInfoLib_MAJOR_VERSION 19)
-set(MediaInfoLib_MINOR_VERSION 09)
+set(MediaInfoLib_MAJOR_VERSION 20)
+set(MediaInfoLib_MINOR_VERSION 08)
 set(MediaInfoLib_PATCH_VERSION 0)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION})
 
@@ -182,6 +182,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Mpc.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_MpcSv8.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Mpega.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Mpegh3da.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_OpenMG.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Opus.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Pcm.cpp

@@ -415,6 +415,10 @@ namespace Elements
     const int32u SMV0_xxxx=0x534D563A;
     const int32u WAVE=0x57415645;
     const int32u WAVE__pmx=0x20786D70;
+    const int32u WAVE_adtl=0x6164746C;
+    const int32u WAVE_adtl_labl=0x6C61626C;
+    const int32u WAVE_adtl_ltxt=0x6C747874;
+    const int32u WAVE_adtl_note=0x6E6F7465;
     const int32u WAVE_aXML=0x61584D4C;
     const int32u WAVE_bext=0x62657874;
     const int32u WAVE_cue_=0x63756520;
@@ -604,6 +608,12 @@ void File_Riff::Data_Parse()
         ATOM_BEGIN
         ATOM(WAVE__pmx)
         ATOM(WAVE_aXML)
+        LIST(WAVE_adtl)
+            ATOM_BEGIN
+            ATOM(WAVE_adtl_labl)
+            ATOM(WAVE_adtl_ltxt)
+            ATOM(WAVE_adtl_note)
+            ATOM_END
         ATOM(WAVE_bext)
         LIST(WAVE_data)
             break;
@@ -2455,7 +2465,7 @@ void File_Riff::AVI__MD5_()
         int128u MD5Stored;
         Get_L16   (MD5Stored,                                   "MD5");
         Ztring MD5_PerItem;
-        MD5_PerItem.From_Number(MD5Stored, 16);
+        MD5_PerItem.From_UTF8(uint128toString(MD5Stored, 16));
         while (MD5_PerItem.size()<32)
             MD5_PerItem.insert(MD5_PerItem.begin(), '0'); //Padding with 0, this must be a 32-byte string
         MD5_PerItem.MakeLowerCase();
@@ -3601,6 +3611,48 @@ void File_Riff::WAVE_aXML()
 }
 
 //---------------------------------------------------------------------------
+void File_Riff::WAVE_adtl()
+{
+    Element_Name("Associated Data List");
+}
+
+//---------------------------------------------------------------------------
+void File_Riff::WAVE_adtl_labl()
+{
+    Element_Name("Label");
+
+    //Parsing
+    Skip_L4(                                                    "Cue Point ID");
+    Skip_UTF8(Element_Size-Element_Offset,                      "Text");
+}
+
+//---------------------------------------------------------------------------
+void File_Riff::WAVE_adtl_ltxt()
+{
+    Element_Name("Labeled Text");
+
+    //Parsing
+    Skip_L4(                                                    "Cue Point ID");
+    Skip_L4(                                                    "Sample Length");
+    Skip_C4(                                                    "Purpose ID");
+    Skip_L2(                                                    "Country");
+    Skip_L2(                                                    "Language");
+    Skip_L2(                                                    "Dialect");
+    Skip_L2(                                                    "Code Page");
+    Skip_UTF8(Element_Size-Element_Offset,                      "Text");
+}
+
+//---------------------------------------------------------------------------
+void File_Riff::WAVE_adtl_note()
+{
+    Element_Name("Note");
+
+    //Parsing
+    Skip_L4(                                                    "Cue Point ID");
+    Skip_UTF8(Element_Size-Element_Offset,                      "Text");
+}
+
+//---------------------------------------------------------------------------
 void File_Riff::WAVE_bext()
 {
     Element_Name("Broadcast extension");
@@ -3696,9 +3748,9 @@ void File_Riff::WAVE_bext()
         }
         if (Version>=1 && UMID1 != 0 && UMID2 != 0)
         {
-            Ztring UMID=__T("0x")+Ztring().From_Number(UMID1, 16)+Ztring().From_Number(UMID2, 16);
+            Ztring UMID=__T("0x")+Ztring().From_UTF8(uint128toString(UMID1, 16))+Ztring().From_UTF8(uint128toString(UMID2, 16));
             if ((UMID1.lo&0xFF000000)==0x33000000)
-                UMID+=Ztring().From_Number(UMID3, 16)+Ztring().From_Number(UMID4, 16);
+                UMID+=Ztring().From_UTF8(uint128toString(UMID3, 16))+Ztring().From_UTF8(uint128toString(UMID4, 16));
             Fill(Stream_General, 0, "UMID", UMID);
         }
         if (Version>=2)

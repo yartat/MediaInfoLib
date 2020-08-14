@@ -114,7 +114,6 @@ protected :
     Ztring Recorded_Date_Time;
     Ztring Encoded_Library_Settings;
     TimeCode TimeCode_FirstFrame;
-    int64u Duration;
     int64u FrameSize_Theory; //The size of a frame
     int8u  SCT;
     int8u  SCT_Old;
@@ -150,7 +149,6 @@ protected :
 
     #ifdef MEDIAINFO_DVDIF_ANALYZE_YES
     bool Analyze_Activated;
-    bool video_source_Detected;
 
     void Errors_Stats_Update();
     void Errors_Stats_Update_Finnish();
@@ -160,6 +158,7 @@ protected :
     Ztring Errors_Stats_10;
     Ztring Date;
     Ztring Time;
+    int64u Speed_FrameCount_StartOffset;
     int64u Speed_FrameCount;                            //Global    - Total
     int64u Speed_FrameCount_Video_STA_Errors;           //Global    - Error 1
     std::vector<int64u> Speed_FrameCount_Audio_Errors;  //Global    - Error 2
@@ -168,15 +167,13 @@ protected :
     int64u Speed_Contains_NULL;                         //Per Frame - Error 4
     int64u Speed_FrameCount_Arb_Incoherency;            //Global    - Error 5
     int64u Speed_FrameCount_Stts_Fluctuation;           //Global    - Error 6
+    int8u  SMP;
     int8u  QU;
     bool   QU_FSC; //Validity is with QU
     bool   QU_System; //Validity is with QU
     bool   REC_ST;
     bool   REC_END;
     bool   REC_IsValid;
-    bool   System;
-    bool   System_IsValid;
-    bool   Frame_AtLeast1DIF;
     struct dvdate
     {
         int8u  Days;
@@ -242,13 +239,15 @@ protected :
     Ztring Speed_RecDateZ_Last;
     Ztring Speed_RecDateZ_Current;
     std::vector<size_t> Video_STA_Errors; //Per STA type
+    std::vector<size_t> Video_STA_Errors_ByDseq; //Per Dseq & STA type
     std::vector<size_t> Video_STA_Errors_Total; //Per STA type
-    std::vector<size_t> Audio_Errors; //Per Dseq
-    std::vector<bool> audio_source_IsPresent;
-    std::vector<bool>   CH_IsPresent;
-    std::vector<std::vector<size_t> > Audio_Errors_Total; //Per Channel and Dseq
-    std::vector<std::vector<size_t> > Audio_Invalids; //Per Channel and Dseq
-    std::vector<std::vector<size_t> > Audio_Invalids_Total; //Per Channel and Dseq
+    static const size_t ChannelGroup_Count=2;
+    static const size_t Dseq_Count=16;
+    bitset<64> Captions_Flags;
+    std::vector<std::vector<int8u> > audio_source_mode; //Per ChannelGroup and Dseq, -1 means not present
+    bitset<ChannelGroup_Count*2> ChannelInfo;
+    std::vector<std::vector<size_t> > Audio_Errors; //Per ChannelGroup and Dseq
+    std::vector<std::vector<size_t> > Audio_Errors_TotalPerChannel; //Per Channel and Dseq
     struct recZ_Single
     {
         int64u FramePos;
