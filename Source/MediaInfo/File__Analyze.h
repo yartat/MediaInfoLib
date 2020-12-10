@@ -893,6 +893,9 @@ public :
     };
     void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance, mastering_metadata_2086 &Meta);
     #endif
+    #if defined(MEDIAINFO_MPEGPS_YES) || defined(MEDIAINFO_MPEGTS_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MK_YES)
+    void dvcC(bool has_dependency_pid=false, std::map<std::string, Ztring>* Infos=NULL);
+    #endif
 
     //***************************************************************************
     // Unknown
@@ -1666,12 +1669,44 @@ public :
                 _ATOM(); \
             } \
 
+#define LIST_COMPLETE(_ATOM) \
+    case Elements::_ATOM : \
+            if (Level==Element_Level) \
+            { \
+                if (Element_IsComplete_Get()) \
+                { \
+                    Element_ThisIsAList(); \
+                    _ATOM(); \
+                } \
+                else \
+                { \
+                    Element_WaitForMoreData(); \
+                    return; \
+                } \
+            } \
+
 #define LIST_DEFAULT(_ATOM) \
             default : \
             if (Level==Element_Level) \
             { \
                 Element_ThisIsAList(); \
                 _ATOM(); \
+            } \
+
+#define LIST_DEFAULT_COMPLETE(_ATOM) \
+            default : \
+            if (Level==Element_Level) \
+            { \
+                if (Element_IsComplete_Get()) \
+                { \
+                    Element_ThisIsAList(); \
+                    _ATOM(); \
+                } \
+                else \
+                { \
+                    Element_WaitForMoreData(); \
+                    return; \
+                } \
             } \
 
 #define ATOM_END_DEFAULT \
