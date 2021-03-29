@@ -230,7 +230,7 @@ File_DvDif::File_DvDif()
         StreamIDs_Width[0]=4;
     #endif //MEDIAINFO_EVENTS
     #if MEDIAINFO_DEMUX
-        Demux_Level=2; //Container
+        Demux_Level=3; //Container and Stream
     #endif //MEDIAINFO_DEMUX
     MustSynchronize=true;
     Buffer_TotalBytes_FirstSynched_Max=64*1024;
@@ -273,6 +273,9 @@ File_DvDif::File_DvDif()
     Speed_Contains_NULL=0;
     Speed_FrameCount_Arb_Incoherency=0;
     Speed_FrameCount_Stts_Fluctuation=0;
+    AbstBf_Current=(0x7FFFFF)<<1;
+    AbstBf_Previous=(0x7FFFFF)<<1;
+    AbstBf_Previous_MaxAbst=0xFFFFFF;
     SMP=(int8u)-1;
     QU=(int8u)-1;
     Speed_TimeCode_IsValid=false;
@@ -634,7 +637,14 @@ bool File_DvDif::Synchronize()
         return false;
 
     if (!Status[IsAccepted])
+    {
         Accept();
+
+        #if MEDIAINFO_DEMUX
+            if (Config->Demux_Unpacketize_Get())
+                Demux_UnpacketizeContainer=true;
+        #endif //MEDIAINFO_DEMUX
+    }
 
     return true;
 }
@@ -822,6 +832,7 @@ bool File_DvDif::Demux_UnpacketizeContainer_Test()
         if (Demux_Offset+8*80>Buffer_Size && File_Offset+Buffer_Size==File_Size)
             Demux_Offset=(size_t)(File_Size-File_Offset); //Using the complete buffer (no next sync)
 
+        Element_Code=-1;
         Demux_UnpacketizeContainer_Demux();
     }
 
@@ -1191,7 +1202,7 @@ void File_DvDif::Subcode_Ssyb(int8u syb_num)
         Skip_S1(3,                                              "APT - track application ID");
     else
         Skip_S1(3,                                              "Res - Reserved");
-    Skip_S1(8,                                                  "Arb - Arbitrary bits");
+    Skip_S1(8,                                                  "ABST/BF - Absolute track number / Blank flag");
     Skip_S1(4,                                                  "Syb - SSYSB number");
     BS_End();
     //FFh
@@ -1346,16 +1357,6 @@ void File_DvDif::binary_group()
 void File_DvDif::timecode()
 {
     Element_Name("timecode");
-
-    if (Buffer[Buffer_Offset+(size_t)Element_Offset  ]==0x00
-     && Buffer[Buffer_Offset+(size_t)Element_Offset+1]==0x00
-     && Buffer[Buffer_Offset+(size_t)Element_Offset+2]==0x00
-     && Buffer[Buffer_Offset+(size_t)Element_Offset+3]==0x00
-    )
-    {
-        Skip_XX(4,                                              "All zero");
-        return;
-    }
 
     //Parsing
     int8u Frames_Units, Frames_Tens, Seconds_Units, Seconds_Tens, Minutes_Units, Minutes_Tens, Hours_Units, Hours_Tens;

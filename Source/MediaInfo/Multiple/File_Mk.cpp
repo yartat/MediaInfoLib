@@ -37,6 +37,9 @@
 #if defined(MEDIAINFO_AVC_YES)
     #include "MediaInfo/Video/File_Avc.h"
 #endif
+#if defined(MEDIAINFO_DVDIF_YES)
+    #include "MediaInfo/Multiple/File_DvDif.h"
+#endif
 #if defined(MEDIAINFO_HEVC_YES)
     #include "MediaInfo/Video/File_Hevc.h"
 #endif
@@ -1213,6 +1216,35 @@ void File_Mk::Streams_Finish()
             //if (!Duration_Temp.empty()) Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Duration), Duration_Temp, true);
             if (Temp->second.StreamKind==Stream_Video && !Codec_Temp.empty())
                 Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Codec), Codec_Temp, true);
+
+
+            //Format specific
+            #if defined(MEDIAINFO_DVDIF_YES)
+                if (StreamKind_Last==Stream_Video && Retrieve(Stream_Video, StreamPos_Last, Video_Format)==__T("DV"))
+                {
+                    if (Retrieve(Stream_General, 0, General_Recorded_Date).empty())
+                        Fill(Stream_General, 0, General_Recorded_Date, Temp->second.Parser->Retrieve(Stream_General, 0, General_Recorded_Date));
+
+                    //Video and Audio are together
+                    size_t Audio_Count=Temp->second.Parser->Count_Get(Stream_Audio);
+                    for (size_t Audio_Pos=0; Audio_Pos<Audio_Count; Audio_Pos++)
+                    {
+                        Fill_Flush();
+                        Stream_Prepare(Stream_Audio); // TODO: merge code with the one from RIFF/AVI parser and put this audio streams in the ID order instead of after pure Matroska audio streams
+                        size_t Pos=Count_Get(Stream_Audio)-1;
+                        Merge(*Temp->second.Parser, Stream_Audio, Audio_Pos, StreamPos_Last);
+                        Fill(Stream_Audio, Pos, Audio_MuxingMode, "DV");
+                        Fill(Stream_Audio, Pos, Audio_Duration, Retrieve(Stream_Video, Temp->second.StreamPos, Video_Duration));
+                        Fill(Stream_Audio, Pos, "MuxingMode_MoreInfo", __T("Muxed in Video #")+Ztring().From_Number(Temp->second.StreamPos+1));
+                        Fill(Stream_Audio, Pos, Audio_StreamSize_Encoded, 0); //Included in the DV stream size
+                        Ztring ID=Retrieve(Stream_Audio, Pos, Audio_ID);
+                        Fill(Stream_Audio, Pos, Audio_ID, Retrieve(Stream_Video, Temp->second.StreamPos, Video_ID)+__T("-")+ID, true);
+                    }
+
+                    StreamKind_Last=Stream_Video;
+                    StreamPos_Last=Temp->second.StreamPos;
+                }
+            #endif
 
             //Special case: AAC
             if (StreamKind_Last==Stream_Audio
@@ -4549,6 +4581,12 @@ void File_Mk::CodecID_Manage()
         }
     }
     #endif
+    #if defined(MEDIAINFO_HUFFYUV_YES)
+    else if (Format==__T("DV"))
+    {
+        streamItem.Parser=new File_DvDif;
+    }
+    #endif
     #if defined(MEDIAINFO_HEVC_YES)
     else if (Format==__T("HEVC"))
     {
@@ -4821,7 +4859,7 @@ void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_Primary(i
         if (Segment_Info_Count>1)
             return; //First element has the priority
         mastering_metadata_2086& MasteringMetadata=Stream[TrackNumber].MasteringMetadata;
-        int16u& Value=Stream[TrackNumber].MasteringMetadata.Primaries[i];
+        int16u& Value= MasteringMetadata.Primaries[i];
         if (Value==(int16u)-1 && Float>=0 && Float<=1)
             Value=((int16u)float32_int32s(Float*50000));
     FILLING_END();
@@ -4838,7 +4876,7 @@ void File_Mk::Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_Luminance
         if (Segment_Info_Count>1)
             return; //First element has the priority
         mastering_metadata_2086& MasteringMetadata=Stream[TrackNumber].MasteringMetadata;
-        int32u& Value=Stream[TrackNumber].MasteringMetadata.Luminance[i];
+        int32u& Value= MasteringMetadata.Luminance[i];
         if (Value==(int32u)-1 && Float<0x8FFFFFFF/10000)
             Value=float32_int32s(Float*10000);
     FILLING_END();

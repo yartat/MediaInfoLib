@@ -132,7 +132,7 @@ public :
         int64u  StreamIDs[16];
         int8u   StreamIDs_Width[16];
         int8u   ParserIDs[16];
-        void    Event_Prepare (struct MediaInfo_Event_Generic* Event);
+        void    Event_Prepare (struct MediaInfo_Event_Generic* Event, int32u Event_Code, size_t Event_Size);
     #endif //MEDIAINFO_EVENTS
     #if MEDIAINFO_DEMUX
         int8u   Demux_Level; //bit 0=frame, bit 1=container, bit 2=elementary (eg MPEG-TS), bit 3=ancillary (e.g. DTVCC), default with frame set
@@ -885,7 +885,7 @@ public :
     #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES)
     void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance);
     #endif
-    #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MATROSKA_YES)
+    #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MATROSKA_YES) || defined(MEDIAINFO_MXF_YES)
     struct mastering_metadata_2086
     {
         int16u Primaries[8];
