@@ -46,4 +46,6 @@ MediaInfoLib.VC.db
 *.VC.db
 *.VC.db-shm
 *.VC.db-wal
+.vs/
+*.GhostDoc.xml
 
