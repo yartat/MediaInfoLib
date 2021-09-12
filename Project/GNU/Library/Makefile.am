@@ -45,6 +45,7 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/Audio/File_Aac_Others.cpp \
                        ../../../Source/MediaInfo/Audio/File_Ac3.cpp \
                        ../../../Source/MediaInfo/Audio/File_Ac4.cpp \
+                       ../../../Source/MediaInfo/Audio/File_Adm.cpp \
                        ../../../Source/MediaInfo/Audio/File_Adpcm.cpp \
                        ../../../Source/MediaInfo/Audio/File_Als.cpp \
                        ../../../Source/MediaInfo/Audio/File_Amr.cpp \
@@ -97,6 +98,7 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/Export/Export_PBCore2.cpp \
                        ../../../Source/MediaInfo/Export/Export_reVTMD.cpp \
                        ../../../Source/MediaInfo/Export/Export_Niso.cpp \
+                       ../../../Source/MediaInfo/Export/Export_Graph.cpp \
                        ../../../Source/MediaInfo/Image/File_ArriRaw.cpp \
                        ../../../Source/MediaInfo/Image/File_Bmp.cpp \
                        ../../../Source/MediaInfo/Image/File_Bpg.cpp \
@@ -276,6 +278,7 @@ endif
 
 if COMPILE_TINYXML2
 lib@MediaInfoLib_LibName@_la_SOURCES += \
+                       ../../../Source/ThirdParty/tfsxml/tfsxml.c \
                        ../../../Source/ThirdParty/tinyxml2/tinyxml2.cpp
 endif
 
