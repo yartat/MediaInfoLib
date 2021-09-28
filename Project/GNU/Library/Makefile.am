@@ -59,9 +59,11 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/Audio/File_Dsdiff.cpp \
                        ../../../Source/MediaInfo/Audio/File_Dsf.cpp \
                        ../../../Source/MediaInfo/Audio/File_Dts.cpp \
+                       ../../../Source/MediaInfo/Audio/File_DolbyAudioMetadata.cpp \
                        ../../../Source/MediaInfo/Audio/File_DolbyE.cpp \
                        ../../../Source/MediaInfo/Audio/File_ExtendedModule.cpp \
                        ../../../Source/MediaInfo/Audio/File_Flac.cpp \
+                       ../../../Source/MediaInfo/Audio/File_Iab.cpp \
                        ../../../Source/MediaInfo/Audio/File_ImpulseTracker.cpp \
                        ../../../Source/MediaInfo/Audio/File_La.cpp \
                        ../../../Source/MediaInfo/Audio/File_Midi.cpp \

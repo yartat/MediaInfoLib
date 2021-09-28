@@ -5,7 +5,7 @@ project(MediaInfoLib)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
 
 set(MediaInfoLib_MAJOR_VERSION 21)
-set(MediaInfoLib_MINOR_VERSION 03)
+set(MediaInfoLib_MINOR_VERSION 09)
 set(MediaInfoLib_PATCH_VERSION 0)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION})
 
@@ -175,9 +175,11 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Dsdiff.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Dsf.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Dts.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_DolbyAudioMetadata.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_DolbyE.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_ExtendedModule.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Flac.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Iab.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_ImpulseTracker.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_La.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Midi.cpp
