@@ -24,6 +24,7 @@
 #if defined(MEDIAINFO_ID3V2_YES) || defined(MEDIAINFO_FLAC_YES) || defined(MEDIAINFO_VORBISCOM_YES) || defined(MEDIAINFO_OGG_YES)
 //---------------------------------------------------------------------------
 
+#include "MediaInfo/MediaInfo_Internal.h"
 #include "ZenLib/Conf.h"
 using namespace ZenLib;
 
@@ -960,6 +961,16 @@ void File_Id3v2::APIC()
     Fill(Stream_General, 0, General_Cover_Description, Description);
     Fill(Stream_General, 0, General_Cover_Type, Id3v2_PictureType(PictureType));
     Fill(Stream_General, 0, General_Cover_Mime, Mime);
+    MediaInfo_Internal MI;
+    Ztring Demux_Save = MI.Option(__T("Demux_Get"), __T(""));
+    MI.Option(__T("Demux"), Ztring());
+    size_t MiOpenResult = MI.Open(Buffer + (size_t)(Buffer_Offset + Element_Offset), (size_t)(Element_Size - Element_Offset), nullptr, 0, (size_t)(Element_Size - Element_Offset));
+    MI.Option(__T("Demux"), Demux_Save); //This is a global value, need to reset it. TODO: local value
+    if (MI.Count_Get(Stream_Image))
+    {
+        Stream_Prepare(Stream_Image);
+        Merge(MI, Stream_Image, 0, StreamPos_Last);
+    }
     #if MEDIAINFO_ADVANCED
         if (MediaInfoLib::Config.Flags1_Get(Flags_Cover_Data_base64))
         {
@@ -1200,7 +1211,7 @@ void File_Id3v2::Fill_Name()
                               {
                                 if (Element_Value.find(__T('('))==0)
                                     Element_Value=Element_Value.SubString(__T("("), __T(")")); //Replace (nn) by nn
-                                if (Element_Value==__T("0") || Element_Value==__T("255"))
+                                if (Element_Value==__T("255"))
                                     Element_Value.clear();
                                 Fill(Stream_General, 0, General_Genre, Element_Value);
                               }
@@ -1415,7 +1426,7 @@ void File_Id3v2::Normalize_Date(Ztring& Date)
     if (Date.size()<=11 || Date[4]!=__T('-') || Date[7]!=__T('-'))
         return; //Format unknown or without time
     Date[10]=__T(' '); //could be "T"
-    Date=Ztring(__T("UTC "))+Date; //Id3v2 specify a UTC date
+    Date+=__T(" UTC"); //Id3v2 specify a UTC date
 }
 
 //***************************************************************************

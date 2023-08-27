@@ -22,6 +22,47 @@
 namespace MediaInfoLib
 {
 
+enum audio_profile : int8u
+{
+    NoProfile,
+    Main_Audio,
+    Scalable_Audio,
+    Speech_Audio,
+    Synthesis_Audio,
+    High_Quality_Audio,
+    Low_Delay_Audio,
+    Natural_Audio,
+    Mobile_Audio_Internetworking,
+    AAC,
+    High_Efficiency_AAC,
+    High_Efficiency_AAC_v2,
+    Low_Delay_AAC,
+    Low_Delay_AAC_v2,
+    Baseline_MPEG_Surround,
+    High_Definition_AAC,
+    ALS_Simple,
+    Baseline_USAC,
+    Extended_HE_AAC,
+    UnspecifiedAudio,
+    NoAudio,
+    AudioProfile_Max,
+    UnknownAudio = (int8u)-1,
+};
+struct profilelevel_struct
+{
+    audio_profile profile;
+    int8u level;
+};
+inline bool operator == (const profilelevel_struct& a, const profilelevel_struct& b)
+{
+    static_assert(sizeof(profilelevel_struct) == 2, "");
+    return *((int16u*)&a) == *((int16u*)&b);
+}
+
+struct stts_struct;
+struct sgpd_prol_struct;
+struct sbgp_struct;
+
 //***************************************************************************
 // Class File_Mpeg4_Descriptors
 //***************************************************************************
@@ -32,6 +73,7 @@ public :
     //In
     stream_t KindOfStream;
     size_t   PosOfStream;
+    int32u   TrackID;
     bool     Parser_DoNotFreeIt; //If you want to keep the Parser
     bool     SLConfig_DoNotFreeIt; //If you want to keep the SLConfig
 
@@ -41,7 +83,8 @@ public :
     struct es_id_info
     {
         stream_t    StreamKind;
-        Ztring      ProfileLevel;
+        Ztring      ProfileLevelString;
+        int8u       ProfileLevel[5];
 
         es_id_info() :
             StreamKind(Stream_Max)
@@ -49,6 +92,20 @@ public :
     };
     typedef map<int32u, es_id_info> es_id_infos;
     es_id_infos ES_ID_Infos;
+
+    // Conformance
+    #if MEDIAINFO_CONFORMANCE
+        int16u                  SamplingRate;
+        const std::vector<int64u>* stss;
+        const bool*             stss_IsPresent;
+        const bool*             IsCmaf;
+        const std::vector<stts_struct>* stts;
+        const size_t*           FirstOutputtedDecodedSample;
+        const std::vector<sgpd_prol_struct>* sgpd_prol;
+        const std::vector<sbgp_struct>* sbgp;
+        const bool*             sbgp_IsPresent;
+        const int16s*           sgpd_prol_roll_distance;
+    #endif
 
     struct slconfig
     {

@@ -527,6 +527,8 @@ struct MediaInfo_Event_DvDif_Analysis_Frame_1
     size_t                  BlockStatus_Count;
     const MediaInfo_int8u*  BlockStatus;
     MediaInfo_int32u        AbstBf;
+    MediaInfo_int32u        MoreFlags;
+    const MediaInfo_int8u*  MoreData;
 };
 
 /*-------------------------------------------------------------------------*/
@@ -688,6 +690,12 @@ struct MediaInfo_Event_DvDif_Change_0
 /***************************************************************************/
 
 #define MediaInfo_Parser_MiXml          0x6C
+
+/***************************************************************************/
+/* NSV                                                                     */
+/***************************************************************************/
+
+#define MediaInfo_Parser_Nsv            0x6D
 
 /***************************************************************************/
 /* MPEG Video                                                              */

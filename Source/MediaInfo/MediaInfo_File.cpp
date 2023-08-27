@@ -108,6 +108,9 @@
 #if defined(MEDIAINFO_MXF_YES)
     #include "MediaInfo/Multiple/File_Mxf.h"
 #endif
+#if defined(MEDIAINFO_NSV_YES)
+    #include "MediaInfo/Multiple/File_Nsv.h"
+#endif
 #if defined(MEDIAINFO_NUT_YES)
     #include "MediaInfo/Multiple/File_Nut.h"
 #endif
@@ -216,6 +219,9 @@
 #if defined(MEDIAINFO_APE_YES)
     #include "MediaInfo/Audio/File_Ape.h"
 #endif
+#if defined(MEDIAINFO_APTX100_YES)
+    #include "MediaInfo/Audio/File_Aptx100.h"
+#endif
 #if defined(MEDIAINFO_AU_YES)
     #include "MediaInfo/Audio/File_Au.h"
 #endif
@@ -290,6 +296,9 @@
 // Text
 #if defined(MEDIAINFO_EIA608_YES)
     #include "MediaInfo/Text/File_Eia608.h"
+#endif
+#if defined(MEDIAINFO_CDP_YES)
+    #include "MediaInfo/Text/File_Cdp.h"
 #endif
 #if defined(MEDIAINFO_N19_YES)
     #include "MediaInfo/Text/File_N19.h"
@@ -507,6 +516,9 @@ bool MediaInfo_Internal::SelectFromExtension (const String &Parser)
     #if defined(MEDIAINFO_MXF_YES)
         else if (Parser==__T("Mxf"))         Info=new File_Mxf();
     #endif
+    #if defined(MEDIAINFO_NSV_YES)
+        else if (Parser==__T("Nsv"))         Info=new File_Nsv();
+    #endif
     #if defined(MEDIAINFO_NUT_YES)
         else if (Parser==__T("Nut"))         Info=new File_Nut();
     #endif
@@ -610,6 +622,9 @@ bool MediaInfo_Internal::SelectFromExtension (const String &Parser)
     #if defined(MEDIAINFO_APE_YES)
         else if (Parser==__T("Ape"))         Info=new File_Ape();
     #endif
+    #if defined(MEDIAINFO_APTX100_YES)
+        else if (Parser==__T("Aptx100"))     Info=new File_Aptx100();
+    #endif
     #if defined(MEDIAINFO_AU_YES)
         else if (Parser==__T("Au"))          Info=new File_Au();
     #endif
@@ -681,6 +696,9 @@ bool MediaInfo_Internal::SelectFromExtension (const String &Parser)
     #if defined(MEDIAINFO_EIA608_YES)
         else if (Parser==__T("CEA-608"))     Info=new File_Eia608();
         else if (Parser==__T("EIA-608"))     Info=new File_Eia608();
+    #endif
+    #if defined(MEDIAINFO_CDP_YES)
+        else if (Parser==__T("CDP"))         Info=new File_Cdp();
     #endif
     #if defined(MEDIAINFO_N19_YES)
         else if (Parser==__T("N19"))         Info=new File_N19();
@@ -881,6 +899,9 @@ int MediaInfo_Internal::ListFormats(const String &File_Name)
     #if defined(MEDIAINFO_MXF_YES)
         delete Info; Info=new File_Mxf();                if (((Reader_File*)Reader)->Format_Test_PerParser(this, File_Name)>0) return 1;
     #endif
+    #if defined(MEDIAINFO_NSV_YES)
+        delete Info; Info=new File_Nsv();                if (((Reader_File*)Reader)->Format_Test_PerParser(this, File_Name)>0) return 1;
+    #endif
     #if defined(MEDIAINFO_NUT_YES)
         delete Info; Info=new File_Nut();                if (((Reader_File*)Reader)->Format_Test_PerParser(this, File_Name)>0) return 1;
     #endif
@@ -990,6 +1011,9 @@ int MediaInfo_Internal::ListFormats(const String &File_Name)
     #endif
     #if defined(MEDIAINFO_APE_YES)
         delete Info; Info=new File_Ape();                if (((Reader_File*)Reader)->Format_Test_PerParser(this, File_Name)>0) return 1;
+    #endif
+    #if defined(MEDIAINFO_APTX100_YES)
+        delete Info; Info=new File_Aptx100();            if (((Reader_File*)Reader)->Format_Test_PerParser(this, File_Name)>0) return 1;
     #endif
     #if defined(MEDIAINFO_AU_YES)
         delete Info; Info=new File_Au();                 if (((Reader_File*)Reader)->Format_Test_PerParser(this, File_Name)>0) return 1;
@@ -1186,7 +1210,7 @@ int MediaInfo_Internal::ListFormats(const String &File_Name)
 bool MediaInfo_Internal::LibraryIsModified ()
 {
     #if defined(MEDIAINFO_MULTI_NO) || defined(MEDIAINFO_VIDEO_NO) || defined(MEDIAINFO_AUDIO_NO) || defined(MEDIAINFO_TEXT_NO) || defined(MEDIAINFO_IMAGE_NO) || defined(MEDIAINFO_ARCHIVE_NO) \
-     || defined(MEDIAINFO_BDAV_NO) || defined(MEDIAINFO_MK_NO) || defined(MEDIAINFO_OGG_NO) || defined(MEDIAINFO_RIFF_NO) || defined(MEDIAINFO_MPEG4_NO) || defined(MEDIAINFO_MPEGPS_NO) || defined(MEDIAINFO_MPEGTS_NO) || defined(MEDIAINFO_DXW_NO) || defined(MEDIAINFO_FLV_NO) || defined(MEDIAINFO_GXF_NO) || defined(MEDIAINFO_HDSF4M_NO) || defined(MEDIAINFO_HLS_NO) || defined(MEDIAINFO_ISM_NO) || defined(MEDIAINFO_IVF_NO) || defined(MEDIAINFO_LXF_NO) || defined(MEDIAINFO_SWF_NO) || defined(MEDIAINFO_MXF_NO) || defined(MEDIAINFO_NUT_NO) || defined(MEDIAINFO_WM_NO) || defined(MEDIAINFO_WTV_NO) || defined(MEDIAINFO_QT_NO) || defined(MEDIAINFO_RM_NO) || defined(MEDIAINFO_DVDIF_NO) || defined(MEDIAINFO_DVDV_NO) || defined(MEDIAINFO_AAF_NO) || defined(MEDIAINFO_CDXA_NO) || defined(MEDIAINFO_DPG_NO) || defined(MEDIAINFO_TSP_NO) \
+     || defined(MEDIAINFO_BDAV_NO) || defined(MEDIAINFO_MK_NO) || defined(MEDIAINFO_OGG_NO) || defined(MEDIAINFO_RIFF_NO) || defined(MEDIAINFO_MPEG4_NO) || defined(MEDIAINFO_MPEGPS_NO) || defined(MEDIAINFO_MPEGTS_NO) || defined(MEDIAINFO_DXW_NO) || defined(MEDIAINFO_FLV_NO) || defined(MEDIAINFO_GXF_NO) || defined(MEDIAINFO_HDSF4M_NO) || defined(MEDIAINFO_HLS_NO) || defined(MEDIAINFO_ISM_NO) || defined(MEDIAINFO_IVF_NO) || defined(MEDIAINFO_LXF_NO) || defined(MEDIAINFO_SWF_NO) || defined(MEDIAINFO_MXF_NO) || defined(MEDIAINFO_NSV_NO) || defined(MEDIAINFO_NUT_NO) || defined(MEDIAINFO_WM_NO) || defined(MEDIAINFO_WTV_NO) || defined(MEDIAINFO_QT_NO) || defined(MEDIAINFO_RM_NO) || defined(MEDIAINFO_DVDIF_NO) || defined(MEDIAINFO_DVDV_NO) || defined(MEDIAINFO_AAF_NO) || defined(MEDIAINFO_CDXA_NO) || defined(MEDIAINFO_DPG_NO) || defined(MEDIAINFO_TSP_NO) \
      || defined(MEDIAINFO_AV1_NO) || defined(MEDIAINFO_AVC_NO) || defined(MEDIAINFO_AVSV_NO) || defined(MEDIAINFO_HEVC_NO) || defined(MEDIAINFO_MPEG4V_NO) || defined(MEDIAINFO_MPEGV_NO) || defined(MEDIAINFO_FLIC_NO) || defined(MEDIAINFO_THEORA_NO) || defined(MEDIAINFO_Y4M_NO) \
      || defined(MEDIAINFO_AC3_NO) || defined(MEDIAINFO_AC4_NO) || defined(MEDIAINFO_ADIF_NO) || defined(MEDIAINFO_ADTS_NO) || defined(MEDIAINFO_SMPTEST0337_NO) || defined(MEDIAINFO_AMR_NO) || defined(MEDIAINFO_DTS_NO) || defined(MEDIAINFO_DOLBYE_NO) || defined(MEDIAINFO_FLAC_NO) || defined(MEDIAINFO_APE_NO) || defined(MEDIAINFO_MPC_NO) || defined(MEDIAINFO_MPCSV8_NO) || defined(MEDIAINFO_MPEGA_NO) || defined(MEDIAINFO_OPENMG_NO) || defined(MEDIAINFO_TWINVQ_NO) || defined(MEDIAINFO_XM_NO) || defined(MEDIAINFO_MOD_NO) || defined(MEDIAINFO_S3M_NO) || defined(MEDIAINFO_IT_NO) || defined(MEDIAINFO_SPEEX_NO) || defined(MEDIAINFO_TAK_NO) || defined(MEDIAINFO_PS2A_NO) \
      || defined(MEDIAINFO_CMML_NO)  || defined(MEDIAINFO_KATE_NO)  || defined(MEDIAINFO_PGS_NO) || defined(MEDIAINFO_OTHERTEXT_NO) \

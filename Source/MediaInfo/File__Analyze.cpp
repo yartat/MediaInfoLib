@@ -449,6 +449,10 @@ void File__Analyze::Open_Buffer_Init (int64u File_Size_)
         if (Config_Ibi_Create && !IsSub && IbiStream==NULL)
             IbiStream=new ibi::stream;
     #endif //MEDIAINFO_IBIUSAGE
+    #if MEDIAINFO_ADVANCED
+        if (!IsSub && !Config->TimeCode_Dumps && MediaInfoLib::Config.Inform_Get().MakeLowerCase()==__T("timecodexml"))
+            Config->TimeCode_Dumps=new map<string, MediaInfo_Config_MediaInfo::timecode_dump>;
+    #endif //MEDIAINFO_ADVANCED
 }
 
 void File__Analyze::Open_Buffer_Init (File__Analyze* Sub)
@@ -524,7 +528,8 @@ void File__Analyze::Open_Buffer_OutOfBand (File__Analyze* Sub, size_t Size)
     #endif //MEDIAINFO_DEMUX
 
     #if MEDIAINFO_TRACE
-        Trace_Details_Handling(Sub);
+        if (Size)
+            Trace_Details_Handling(Sub);
     #endif // MEDIAINFO_TRACE
 }
 #if MEDIAINFO_TRACE
@@ -1069,7 +1074,8 @@ void File__Analyze::Open_Buffer_Continue (File__Analyze* Sub, const int8u* ToAdd
     }
 
     #if MEDIAINFO_TRACE
-        Trace_Details_Handling(Sub);
+        if (ToAdd_Size)
+            Trace_Details_Handling(Sub);
     #endif //MEDIAINFO_TRACE
 }
 
@@ -1579,6 +1585,8 @@ void File__Analyze::Buffer_Clear()
     Buffer_Offset=0;
     Buffer_Offset_Temp=0;
     Buffer_MinimumSize=0;
+    Element_Offset=0;
+    Element_Size=0;
 
     OriginalBuffer_Size=0;
     Offsets_Stream.clear();
@@ -2086,7 +2094,7 @@ bool File__Analyze::Synchro_Manage_Test()
         {
             if (Status[IsFinished])
                 Finish(); //Finish
-            if (!IsSub && File_Offset_FirstSynched==(int64u)-1 && Buffer_TotalBytes+Buffer_Offset>=Buffer_TotalBytes_FirstSynched_Max)
+            if (!IsSub && File_Offset_FirstSynched==(int64u)-1 && Buffer_TotalBytes+Buffer_Offset>=Buffer_TotalBytes_LastSynched+Buffer_TotalBytes_FirstSynched_Max)
                 Reject();
             return false; //Wait for more data
         }
@@ -2179,6 +2187,7 @@ bool File__Analyze::FileHeader_Manage()
         #if MEDIAINFO_TRACE
         Element[Element_Level].TraceNode.Init();
         #endif //MEDIAINFO_TRACE
+        Element_Offset=0;
         return false;
     }
 
@@ -2418,6 +2427,7 @@ bool File__Analyze::Data_Manage()
         {
             FrameInfo=FrameInfo_Next;
             FrameInfo_Next=frame_info();
+            Frame_Count_InThisBlock=0;
         }
 
         //Testing the parser result
@@ -2800,8 +2810,8 @@ void File__Analyze::Element_End_Common_Flush()
 {
     #if MEDIAINFO_TRACE
     //Size if not filled
-    if (File_Offset+Buffer_Offset+Element_Offset+BS->Offset_Get()<Element[Element_Level].Next)
-        Element[Element_Level].TraceNode.Size=File_Offset+Buffer_Offset+Element_Offset+BS->Offset_Get()-Element[Element_Level].TraceNode.Pos;
+    if (File_Offset+Buffer_Offset+Element_Offset+(BS_Size-BS->Remain())/8<Element[Element_Level].Next)
+        Element[Element_Level].TraceNode.Size=File_Offset+Buffer_Offset+Element_Offset+(BS_Size-BS->Remain())/8-Element[Element_Level].TraceNode.Pos;
     #endif //MEDIAINFO_TRACE
 
     //Level
@@ -2914,8 +2924,12 @@ void File__Analyze::Trusted_IsNot (const char* Reason)
 void File__Analyze::Trusted_IsNot ()
 #endif //MEDIAINFO_TRACE
 {
-    Element_Offset=Element_Size;
-    BS->Attach(NULL, 0);
+    if (BS && (BS->Offset_Get() || BS->Remain()))
+        BS->Skip(BS->Remain());
+    else if (BT && (BT->Offset_Get() || BT->Remain()))
+        BT->Skip(BT->Remain());
+    else
+        Element_Offset=Element_Size;
 
     if (!Element[Element_Level].UnTrusted)
     {
@@ -3262,7 +3276,7 @@ void File__Analyze::GoTo (int64u GoTo, const char* ParserName)
     {
         BookMark_Get();
         if (File_GoTo==(int64u)-1)
-            Finish();
+            ForceFinish();
         return;
     }
 
@@ -3698,9 +3712,6 @@ void File__Analyze::Event_Prepare(struct MediaInfo_Event_Generic* Event, int32u 
 void File__Analyze::Demux (const int8u* Buffer, size_t Buffer_Size, contenttype Content_Type, const int8u* xx, size_t xxx)
 {
     if (!(Config_Demux&Demux_Level))
-        return;
-
-    if (!Buffer_Size)
         return;
 
     #if MEDIAINFO_DEMUX && MEDIAINFO_SEEK

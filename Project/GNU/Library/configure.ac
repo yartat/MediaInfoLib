@@ -5,7 +5,7 @@ dnl #########################################################################
 dnl -------------------------------------------------------------------------
 dnl Name and version
 dnl
-AC_INIT([libmediainfo], [21.09])
+AC_INIT([libmediainfo], [23.07])
 
 dnl -------------------------------------------------------------------------
 dnl Test if we are at the good place
@@ -60,6 +60,7 @@ AC_ARG_ENABLE(minimize-size,    AC_HELP_STRING([--enable-minimize-size],    [Ena
 AC_ARG_ENABLE(minimal,    		AC_HELP_STRING([--enable-minimal],    		[Enable minimal management (except parsers)]),MediaInfoMinimal=$enableval, MediaInfoMinimal=depend)
 AC_ARG_ENABLE(trace,    		AC_HELP_STRING([--enable-trace],    		[Enable trace management]),                   MediaInfoTrace=$enableval,   MediaInfoTrace=depend)
 AC_ARG_ENABLE(events,    		AC_HELP_STRING([--enable-events],    		[Enable events management]),                  MediaInfoEvents=$enableval,  MediaInfoEvents=depend)
+AC_ARG_ENABLE(conformance,    	AC_HELP_STRING([--enable-conformance],      [Enable conformance tests]),                  MediaInfoConformance=$enableval, MediaInfoConformance=depend)
 AC_ARG_ENABLE(demux,    		AC_HELP_STRING([--enable-demux],    		[Enable demux management]),                   MediaInfoDemux=$enableval,   MediaInfoDemux=depend)
 AC_ARG_ENABLE(libmms-describe-support, AC_HELP_STRING([--enable-libmms-describe-support], [Enable customized libmms describe support]), MediaInfoLibmmsDescribeSupport=$enableval, MediaInfoLibmmsDescribeSupport=depend)
 AC_ARG_ENABLE(dll,     AC_HELP_STRING([--disable-dll],     [Disable dll iterface]),                                       MediaInfoDll=$enableval,     MediaInfoDll=depend)
@@ -99,6 +100,7 @@ AC_ARG_ENABLE(dts,     AC_HELP_STRING([--disable-dts],     [Disable Audio - DTS]
 AC_ARG_ENABLE(flac,    AC_HELP_STRING([--disable-flac],    [Disable Audio - FLAC format]),                                MediaInfoFlac=$enableval,    MediaInfoFlac=depend)
 AC_ARG_ENABLE(la,      AC_HELP_STRING([--disable-la],      [Disable Audio - LA (Lossless Audio)]),                        MediaInfoLa=$enableval,      MediaInfoLa=depend)
 AC_ARG_ENABLE(latm,    AC_HELP_STRING([--disable-latm],    [Disable Audio - LATM]),                                       MediaInfoLatm=$enableval,    MediaInfoLatm=depend)
+AC_ARG_ENABLE(mga,     AC_HELP_STRING([--disable-mga],     [Disable Audio - MGA]),                                        MediaInfoMga=$enableval,     MediaInfoMga=depend)
 AC_ARG_ENABLE(midi,    AC_HELP_STRING([--disable-midi],    [Disable Audio - MIDI]),                                       MediaInfoMidi=$enableval,    MediaInfoMidi=depend)
 AC_ARG_ENABLE(mpc,     AC_HELP_STRING([--disable-mpc],     [Disable Audio - Musepack format (.mpc)]),                     MediaInfoMpc=$enableval,     MediaInfoMpc=depend)
 AC_ARG_ENABLE(mpcsv8,  AC_HELP_STRING([--disable-mpc],     [Disable Audio - Musepack format SV8 (.mpc)]),                 MediaInfoMpcSv8=$enableval,  MediaInfoMpcSv8=depend)
@@ -224,6 +226,7 @@ if test "$MediaInfoMinimizeSize" = "yes";  then AC_DEFINE(MEDIAINFO_MINIMIZESIZE
 if test "$MediaInfoMinimal" = "no";  then AC_DEFINE(MEDIAINFO_MINIMAL_NO) fi; if test "$MediaInfoMinimal" = "yes"; then AC_DEFINE(MEDIAINFO_MINIMAL_YES) fi
 if test "$MediaInfoTrace"   = "no";  then AC_DEFINE(MEDIAINFO_TRACE_NO)   fi; if test "$MediaInfoTrace"   = "yes"; then AC_DEFINE(MEDIAINFO_TRACE_YES)   fi
 if test "$MediaInfoEvents"  = "no";  then AC_DEFINE(MEDIAINFO_EVENTS_NO)  fi; if test "$MediaInfoEvents"  = "yes"; then AC_DEFINE(MEDIAINFO_EVENTS_YES)  fi
+if test "$MediaInfoConformance" = "no";  then AC_DEFINE(MEDIAINFO_CONFORMANCE_NO)  fi; if test "$MediaInfoConformance"  = "yes"; then AC_DEFINE(MEDIAINFO_CONFORMANCE_YES) fi
 if test "$MediaInfoDemux"   = "no";  then AC_DEFINE(MEDIAINFO_DEMUX_NO)   fi; if test "$MediaInfoDemux"   = "yes"; then AC_DEFINE(MEDIAINFO_DEMUX_YES)   fi
 if test "$MediaInfoJni"     = "no";  then AC_DEFINE(MEDIAINFO_JNI_NO)     fi; if test "$MediaInfoJni"     = "yes"; then AC_DEFINE(MEDIAINFO_JNI_YES)   fi
 if test "$MediaInfoLibmmsDescribeSupport" = "yes"; then AC_DEFINE(MEDIAINFO_LIBMMS_DESCRIBE_SUPPORT)   fi
@@ -255,6 +258,7 @@ if test "$MediaInfoAls"     = "no";  then AC_DEFINE(MEDIAINFO_ALS_NO)     fi; if
 if test "$MediaInfoAmr"     = "no";  then AC_DEFINE(MEDIAINFO_AMR_NO)     fi; if test "$MediaInfoAmr"     = "yes"; then AC_DEFINE(MEDIAINFO_AMR_YES)     fi
 if test "$MediaInfoAmv"     = "no";  then AC_DEFINE(MEDIAINFO_AMV_NO)     fi; if test "$MediaInfoAmv"     = "yes"; then AC_DEFINE(MEDIAINFO_AMV_YES)     fi
 if test "$MediaInfoApe"     = "no";  then AC_DEFINE(MEDIAINFO_APE_NO)     fi; if test "$MediaInfoApe"     = "yes"; then AC_DEFINE(MEDIAINFO_APE_YES)     fi
+if test "$MediaInfoAptx100" = "no";  then AC_DEFINE(MEDIAINFO_APTX100_NO) fi; if test "$MediaInfoAptx100" = "yes"; then AC_DEFINE(MEDIAINFO_APTX100_YES) fi
 if test "$MediaInfoAu"      = "no";  then AC_DEFINE(MEDIAINFO_AU_NO)      fi; if test "$MediaInfoAu"      = "yes"; then AC_DEFINE(MEDIAINFO_AU_YES)      fi
 if test "$MediaInfoCaf"     = "no";  then AC_DEFINE(MEDIAINFO_CAF_NO)     fi; if test "$MediaInfoCaf"     = "yes"; then AC_DEFINE(MEDIAINFO_CAF_YES)     fi
 if test "$MediaInfoCelt"    = "no";  then AC_DEFINE(MEDIAINFO_CELT_NO)    fi; if test "$MediaInfoCelt"    = "yes"; then AC_DEFINE(MEDIAINFO_CELT_YES)    fi
@@ -358,6 +362,7 @@ if test "$MediaInfoTheora"  = "no";  then AC_DEFINE(MEDIAINFO_THEORA_NO)  fi; if
 if test "$MediaInfoVc1"     = "no";  then AC_DEFINE(MEDIAINFO_VC1_NO)     fi; if test "$MediaInfoVc1"     = "yes"; then AC_DEFINE(MEDIAINFO_VC1_YES)     fi
 if test "$MediaInfoVc3"     = "no";  then AC_DEFINE(MEDIAINFO_VC3_NO)     fi; if test "$MediaInfoVc3"     = "yes"; then AC_DEFINE(MEDIAINFO_VC3_YES)     fi
 if test "$MediaInfoVp8"     = "no";  then AC_DEFINE(MEDIAINFO_VP8_NO)     fi; if test "$MediaInfoVp8"     = "yes"; then AC_DEFINE(MEDIAINFO_VP8_YES)     fi
+if test "$MediaInfoVp9"     = "no";  then AC_DEFINE(MEDIAINFO_VP9_NO)     fi; if test "$MediaInfoVp9"     = "yes"; then AC_DEFINE(MEDIAINFO_VP9_YES)     fi
 if test "$MediaInfoY4m"     = "no";  then AC_DEFINE(MEDIAINFO_Y4M_NO)     fi; if test "$MediaInfoY4m"     = "yes"; then AC_DEFINE(MEDIAINFO_Y4M_YES)     fi
 
 AM_CONDITIONAL([COMPILE_DLL], [test "$MediaInfoDll" != "no"])
@@ -1020,6 +1025,7 @@ Mcho "Dts    " "$MediaInfoDts"
 Mcho "Flac   " "$MediaInfoFlac"
 Mcho "La     " "$MediaInfoLa"
 Mcho "Latm   " "$MediaInfoLatm"
+Mcho "Mga    " "$MediaInfoMga"
 Mcho "Midi   " "$MediaInfoMidi"
 Mcho "Mpc    " "$MediaInfoMpc"
 Mcho "MpcSv8 " "$MediaInfoMpcSv8"

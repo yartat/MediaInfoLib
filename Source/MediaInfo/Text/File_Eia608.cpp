@@ -85,6 +85,8 @@ File_Eia608::File_Eia608()
     cc_data_1_Old=0x00;
     cc_data_2_Old=0x00;
     HasContent=false;
+    HasContent_Displayed=false;
+    HasJumped=false;
 }
 
 //---------------------------------------------------------------------------
@@ -124,7 +126,7 @@ void File_Eia608::Streams_Fill()
                 ID+='1'+(cc_type*2)+(Pos%2);
                 Fill(Stream_Text, StreamPos_Last, Text_ID, ID);
                 Fill(Stream_Text, StreamPos_Last, "CaptionServiceName", ID);
-                Fill_SetOptions(StreamKind_Last, StreamKind_Last, "CaptionServiceName", "N NT");
+                Fill_SetOptions(Stream_Text, StreamPos_Last, "CaptionServiceName", "N NT");
             }
             if (Config->ParseSpeed>=1.0)
             {
@@ -151,8 +153,60 @@ void File_Eia608::Streams_Fill()
 }
 
 //---------------------------------------------------------------------------
+static const char* FirstDisplay_Type_Name[]=
+{
+    "PopOn",
+    "RollUp",
+    "PaintOn",
+};
 void File_Eia608::Streams_Finish()
 {
+    if (PTS_End>PTS_Begin)
+        Fill(Stream_General, 0, General_Duration, float64_int64s(((float64)(PTS_End-PTS_Begin))/1000000));
+
+    size_t i=0;
+    for (size_t StreamPos=0; StreamPos<Streams.size(); StreamPos++)
+        if (Streams[StreamPos] || (StreamPos<2 && Config->File_Eia608_DisplayEmptyStream_Get()))
+        {
+            Fill(Stream_Text, i, Text_Duration, Retrieve_Const(Stream_General, 0, General_Duration));
+            if (!Streams[StreamPos])
+            {
+                i++;
+                continue;
+            }
+            stream& Stream=*Streams[StreamPos];
+            if (Stream.Duration_Start!=FLT_MAX && Stream.Duration_End!=FLT_MAX)
+                Fill(Stream_Text, i, Text_Duration_Start2End, Stream.Duration_End-Stream.Duration_Start);
+            if (Stream.Duration_Start_Command!=FLT_MAX)
+                Fill(Stream_Text, i, Text_Duration_Start_Command, Stream.Duration_Start_Command);
+            if (Stream.Duration_Start!=FLT_MAX)
+                Fill(Stream_Text, i, Text_Duration_Start, Stream.Duration_Start);
+            if (Stream.Duration_End!=FLT_MAX)
+                Fill(Stream_Text, i, Text_Duration_End, Stream.Duration_End);
+            if (Stream.Duration_End_Command!=FLT_MAX)
+                Fill(Stream_Text, i, Text_Duration_End_Command, Stream.Duration_End_Command);
+            if (Stream.FirstDisplay_Delay_Frames!=(size_t)-1)
+                Fill(Stream_Text, i, Text_FirstDisplay_Delay_Frames, Stream.FirstDisplay_Delay_Frames);
+            if (Stream.FirstDisplay_Delay_Type!=(int8u)-1)
+                Fill(Stream_Text, i, Text_FirstDisplay_Type, FirstDisplay_Type_Name[Stream.FirstDisplay_Delay_Type]);
+            if (!HasJumped)
+            {
+                if (Stream.Count_PopOn)
+                    Fill(Stream_Text, i, Text_Events_PopOn, Stream.Count_PopOn);
+                if (Stream.Count_RollUp)
+                    Fill(Stream_Text, i, Text_Events_RollUp, Stream.Count_RollUp);
+                if (Stream.Count_CurrentHasContent)
+                    Stream.Count_PaintOn++;
+                if (Stream.Count_PaintOn)
+                    Fill(Stream_Text, i, Text_Events_PaintOn, Stream.Count_PaintOn);
+                if (size_t Events_Total=Stream.Count_PopOn+Stream.Count_RollUp+Stream.Count_PaintOn)
+                    Fill(Stream_Text, i, Text_Events_Total, Events_Total);
+                Fill(Stream_Text, i, Text_Lines_Count, Stream.LineCount);
+                if (Stream.LineCount)
+                    Fill(Stream_Text, i, Text_Lines_MaxCountPerEvent, Stream.LineMaxCountPerEvent);
+            }
+            i++;
+        }
 }
 
 //***************************************************************************
@@ -162,28 +216,36 @@ void File_Eia608::Streams_Finish()
 //---------------------------------------------------------------------------
 void File_Eia608::Read_Buffer_Unsynched()
 {
+    PTS_End=0;
     for (size_t StreamPos=0; StreamPos<Streams.size(); StreamPos++)
         if (Streams[StreamPos])
         {
-            for (size_t Pos_Y=0; Pos_Y<Streams[StreamPos]->CC_Displayed.size(); Pos_Y++)
+            stream& Stream=*Streams[StreamPos];
+            for (size_t Pos_Y=0; Pos_Y<Eia608_Rows; Pos_Y++)
             {
-                for (size_t Pos_X=0; Pos_X<Streams[StreamPos]->CC_Displayed[Pos_Y].size(); Pos_X++)
-                if (Streams[StreamPos])
+                for (size_t Pos_X=0; Pos_X<Eia608_Columns; Pos_X++)
+                {
+                    character& Character=Stream.CC_Displayed[Pos_Y][Pos_X];
+                    Character.Value=L'\0';
+                    Character.Attribute=0;
+                    if (StreamPos<2)
                     {
-                        Streams[StreamPos]->CC_Displayed[Pos_Y][Pos_X].Value=L' ';
-                        Streams[StreamPos]->CC_Displayed[Pos_Y][Pos_X].Attribute=0;
-                        if (StreamPos<2)
-                        {
-                            Streams[StreamPos]->CC_NonDisplayed[Pos_Y][Pos_X].Value=L' ';
-                            Streams[StreamPos]->CC_NonDisplayed[Pos_Y][Pos_X].Attribute=0;
-                        }
+                        character& Character_NonDisplayed=Stream.CC_NonDisplayed[Pos_Y][Pos_X];
+                        Character_NonDisplayed.Value=L'\0';
+                        Character_NonDisplayed.Attribute=0;
                     }
+                }
             }
-            Streams[StreamPos]->Synched=false;
+            Stream.Synched=false;
+            Stream.Duration_End=FLT_MAX;
+            Stream.Duration_End_Command=FLT_MAX;
+            Stream.Duration_End_Command_WasJustUpdated=false;
         }
 
     XDS_Data.clear();
     XDS_Level=(size_t)-1;
+
+    HasJumped=true;
 
     #if MEDIAINFO_EVENTS
         TextMode=true;  DataChannelMode=true;
@@ -255,10 +317,16 @@ void File_Eia608::Read_Buffer_AfterParsing()
         if (FrameInfo.DTS!=(int64u)-1)
             FrameInfo.DTS+=FrameInfo.DUR;
         if (FrameInfo.PTS!=(int64u)-1)
+        {
             FrameInfo.PTS+=FrameInfo.DUR;
+            PTS_End=FrameInfo.PTS;
+        }
+        else
+            PTS_End=0;
     }
     else
     {
+        PTS_End=FrameInfo.PTS!=(int64u)-1?FrameInfo.PTS:0; // Let's keep the last frame PTS if we don't have the duration of the last frame
         FrameInfo.DTS=(int64u)-1;
         FrameInfo.PTS=(int64u)-1;
     }
@@ -268,6 +336,8 @@ void File_Eia608::Read_Buffer_AfterParsing()
 void File_Eia608::Read_Buffer_Continue()
 {
     FrameInfo.PTS=FrameInfo.DTS;
+    if (Frame_Count==0)
+        PTS_Begin=FrameInfo.PTS;
 
     if (!Status[IsAccepted])
         Accept("EIA-608");
@@ -290,6 +360,12 @@ void File_Eia608::Read_Buffer_Continue()
             //This is duplicate
             cc_data_1_Old=0x00;
             cc_data_2_Old=0x00;
+            size_t StreamPos=TextMode*2+DataChannelMode; // From previous parsing
+            if (StreamPos<Streams.size() && Streams[StreamPos] && Streams[StreamPos]->Duration_End_Command_WasJustUpdated && FrameInfo.DTS!=(int64u)-1 && FrameInfo.DUR!=(int64u)-1 )
+            {
+                Streams[StreamPos]->Duration_End_Command=(FrameInfo.DTS)/1000000.0;
+                Streams[StreamPos]->Duration_End_Command_WasJustUpdated=false;
+            }
             return; //Nothing to do
         }
         else if (cc_type==0) // Field 1 only
@@ -299,6 +375,9 @@ void File_Eia608::Read_Buffer_Continue()
         cc_data_1_Old=0x00;
         cc_data_2_Old=0x00;
     }
+    for (size_t StreamPos=0; StreamPos<Streams.size(); StreamPos++)
+        if (Streams[StreamPos])
+            Streams[StreamPos]->Duration_End_Command_WasJustUpdated=false;
 
     if ((cc_data_1 && cc_data_1<0x10) || (XDS_Level!=(size_t)-1 && cc_data_1>=0x20)) //XDS
     {
@@ -619,6 +698,17 @@ void File_Eia608::PreambleAddressCode(int8u cc_data_1, int8u cc_data_2)
     //Horizontal position
     if (!TextMode)
     {
+        if (Streams[StreamPos]->Count_CurrentHasContent && !Streams[StreamPos]->InBack && !Streams[StreamPos]->RollUpLines && Streams[StreamPos]->y!=Eia608_PAC_Row[cc_data_1&0x07]+((cc_data_2&0x20)?1:0))
+        {
+            Streams[StreamPos]->Count_PaintOn++;
+            Streams[StreamPos]->Count_CurrentHasContent=false;
+            if (Streams[StreamPos]->FirstDisplay_Delay_Type==(int8u)-1)
+            {
+                if (!HasJumped)
+                    Streams[StreamPos]->FirstDisplay_Delay_Frames=Frame_Count_NotParsedIncluded;
+                Streams[StreamPos]->FirstDisplay_Delay_Type=2;
+            }
+        }
         Streams[StreamPos]->y=Eia608_PAC_Row[cc_data_1&0x07]+((cc_data_2&0x20)?1:0);
         if (Streams[StreamPos]->y>=Eia608_Rows)
         {
@@ -862,6 +952,8 @@ void File_Eia608::Special_14(int8u cc_data_2)
                         }
                     }
                     Streams[StreamPos]->Synched=true;
+                    if (!HasJumped && Streams[StreamPos]->Duration_Start_Command==FLT_MAX && FrameInfo.DTS!=(int64u)-1)
+                        Streams[StreamPos]->Duration_Start_Command=FrameInfo.DTS/1000000.0;
 
                     break;
         case 0x2F : //EOC - end of Caption
@@ -872,39 +964,43 @@ void File_Eia608::Special_14(int8u cc_data_2)
 
     if (StreamPos>=Streams.size() || Streams[StreamPos]==NULL || !Streams[StreamPos]->Synched)
         return; //Not synched
+    stream& Stream=*Streams[StreamPos];
 
     switch (cc_data_2)
     {
         case 0x20 : TextMode=false;
-                    Streams[StreamPos]->InBack=true;
+                    Stream.RollUpLines=0;
+                    Stream.InBack=true;
                     break; //RCL - Resume Caption Loading (Select pop-on style)
-        case 0x21 : if (Streams[StreamPos]->x)
-                        Streams[StreamPos]->x--;
-                    (Streams[StreamPos]->InBack?Streams[StreamPos]->CC_NonDisplayed:Streams[StreamPos]->CC_Displayed)[Streams[StreamPos]->y][Streams[StreamPos]->x].Value=L' '; //Clear the character
-                    if (!Streams[StreamPos]->InBack)
+        case 0x21 : if (Stream.x)
+                        Stream.x--;
+                    (Stream.InBack?Stream.CC_NonDisplayed:Stream.CC_Displayed)[Stream.y][Stream.x].Value=L'\0'; //Clear the character
+                    if (!Stream.InBack)
                         HasChanged();
                     break; //BS  - Backspace
         case 0x22 : Special_14(0x2D); //Found 1 file with AOF and non CR
                     break; //AOF - Alarm Off
         case 0x23 : break; //AON - Alarm On
-        case 0x24 : for (size_t Pos=Streams[StreamPos]->x; Pos<Eia608_Columns; Pos++)
-                        (Streams[StreamPos]->InBack?Streams[StreamPos]->CC_NonDisplayed:Streams[StreamPos]->CC_Displayed)[Streams[StreamPos]->y][Pos].Value=L' '; //Clear up to the end of line
-                    if (!Streams[StreamPos]->InBack)
+        case 0x24 : for (size_t Pos=Stream.x; Pos<Eia608_Columns; Pos++)
+                        (Stream.InBack?Stream.CC_NonDisplayed:Stream.CC_Displayed)[Stream.y][Pos].Value=L'\0'; //Clear up to the end of line
+                    if (!Stream.InBack)
                         HasChanged();
                     break; //DER - Delete to End of Row
         case 0x25 : //RU2 - Roll-Up Captions–2 Rows
         case 0x26 : //RU3 - Roll-Up Captions–3 Rows
         case 0x27 : //RU4 - Roll-Up Captions–4 Rows
-                    Streams[StreamPos]->RollUpLines=cc_data_2-0x25+2;
-                    Streams[StreamPos]->InBack=false;
+                    Stream.RollUpLines=cc_data_2-0x25+2;
+                    Stream.InBack=false;
                     break; //RUx - Roll-Up Captions–x Rows
         case 0x28 : break; //FON - Flash On
-        case 0x29 : Streams[StreamPos]->InBack=false;
+        case 0x29 : Stream.RollUpLines=0;
+                    Stream.InBack=false;
+                    Stream.Count_CurrentHasContent=false;
                     break; //RDC - Resume Direct Captioning (paint-on style)
         case 0x2A : TextMode=true;
-                    Streams[StreamPos]->RollUpLines=Eia608_Rows; //Roll up all the lines
-                    Streams[StreamPos]->y=Eia608_Rows-1; //Base is the bottom line
-                    Streams[StreamPos]->Attribute_Current=0; //Reset all attributes
+                    Stream.RollUpLines=Eia608_Rows; //Roll up all the lines
+                    Stream.y=Eia608_Rows-1; //Base is the bottom line
+                    Stream.Attribute_Current=0; //Reset all attributes
                     Special_14(0x2D); //Next line
                     break; //TR  - Text Restart (clear Text, but not boxes)
         case 0x2B : TextMode=true;
@@ -915,42 +1011,97 @@ void File_Eia608::Special_14(int8u cc_data_2)
                         bool HasChanged_=false;
                         for (size_t Pos_Y=0; Pos_Y<Eia608_Rows; Pos_Y++)
                             for (size_t Pos_X=0; Pos_X<Eia608_Columns; Pos_X++)
-                                if (Streams[StreamPos]->CC_Displayed[Pos_Y][Pos_X].Value!=L' ')
+                                if (Stream.CC_Displayed[Pos_Y][Pos_X].Value!=L'\0')
                                 {
-                                    Streams[StreamPos]->CC_Displayed[Pos_Y][Pos_X].Value=L' ';
-                                    Streams[StreamPos]->CC_Displayed[Pos_Y][Pos_X].Attribute=0;
+                                    Stream.CC_Displayed[Pos_Y][Pos_X].Value=L'\0';
+                                    Stream.CC_Displayed[Pos_Y][Pos_X].Attribute=0;
                                     HasChanged_=true;
                                 }
                         if (HasChanged_)
                             HasChanged();
                     }
-                    break; //EDM - Erase Displayed Memory
-        case 0x2D : for (size_t Pos=1; Pos<Streams[StreamPos]->RollUpLines; Pos++)
+                    if (Stream.Count_CurrentHasContent)
                     {
-                        if (Streams[StreamPos]->y>=Streams[StreamPos]->RollUpLines-Pos && Streams[StreamPos]->y-Streams[StreamPos]->RollUpLines+Pos+1<Eia608_Rows)
-                            Streams[StreamPos]->CC_Displayed[Streams[StreamPos]->y-Streams[StreamPos]->RollUpLines+Pos]=Streams[StreamPos]->CC_Displayed[Streams[StreamPos]->y-Streams[StreamPos]->RollUpLines+Pos+1];
+                        Stream.Count_PaintOn++;
+                        Stream.Count_CurrentHasContent=false;
+                        if (Stream.FirstDisplay_Delay_Type==(int8u)-1)
+                        {
+                            if (!HasJumped)
+                                Stream.FirstDisplay_Delay_Frames=Frame_Count_NotParsedIncluded;
+                            Stream.FirstDisplay_Delay_Type=2;
+                        }
+                    }
+                    break; //EDM - Erase Displayed Memory
+        case 0x2D : for (size_t Pos=1; Pos<Stream.RollUpLines; Pos++)
+                    {
+                        if (Stream.y>=Stream.RollUpLines-Pos && Stream.y-Stream.RollUpLines+Pos+1<Eia608_Rows)
+                            Stream.CC_Displayed[Stream.y-Stream.RollUpLines+Pos]=Stream.CC_Displayed[Stream.y-Stream.RollUpLines+Pos+1];
                     }
                     for (size_t Pos_X=0; Pos_X<Eia608_Columns; Pos_X++)
                     {
-                        Streams[StreamPos]->CC_Displayed[Streams[StreamPos]->y][Pos_X].Value=L' ';
-                        Streams[StreamPos]->CC_Displayed[Streams[StreamPos]->y][Pos_X].Attribute=0;
+                        Stream.CC_Displayed[Stream.y][Pos_X].Value=L'\0';
+                        Stream.CC_Displayed[Stream.y][Pos_X].Attribute=0;
                     }
-                    if (!Streams[StreamPos]->InBack)
+                    if (!Stream.InBack)
                         HasChanged();
-                    Streams[StreamPos]->x=0;
-                    break; //CR  - Carriage Return
-        case 0x2E : for (size_t Pos_Y=0; Pos_Y<Streams[StreamPos]->CC_NonDisplayed.size(); Pos_Y++)
-                        for (size_t Pos_X=0; Pos_X<Streams[StreamPos]->CC_NonDisplayed[Pos_Y].size(); Pos_X++)
+                    Stream.x=0;
+                    if (Stream.RollUpLines && Stream.Count_CurrentHasContent)
+                    {
+                        Stream.Count_RollUp++;
+                        if (Stream.FirstDisplay_Delay_Type==(int8u)-1)
                         {
-                            Streams[StreamPos]->CC_NonDisplayed[Pos_Y][Pos_X].Value=L' ';
-                            Streams[StreamPos]->CC_NonDisplayed[Pos_Y][Pos_X].Attribute=0;
+                            if (HasJumped)
+                                Stream.FirstDisplay_Delay_Frames=Frame_Count_NotParsedIncluded;
+                            Stream.FirstDisplay_Delay_Type=1;
+                        }
+                    }
+                    break; //CR  - Carriage Return
+        case 0x2E : for (size_t Pos_Y=0; Pos_Y<Stream.CC_NonDisplayed.size(); Pos_Y++)
+                        for (size_t Pos_X=0; Pos_X<Stream.CC_NonDisplayed[Pos_Y].size(); Pos_X++)
+                        {
+                            Stream.CC_NonDisplayed[Pos_Y][Pos_X].Value=L'\0';
+                            Stream.CC_NonDisplayed[Pos_Y][Pos_X].Attribute=0;
                         }
                     break; //ENM - Erase Non-Displayed Memory
-        case 0x2F : Streams[StreamPos]->CC_Displayed.swap(Streams[StreamPos]->CC_NonDisplayed);
+        case 0x2F : Stream.CC_Displayed.swap(Stream.CC_NonDisplayed);
+                    {
+                    vector<vector<character> >& CC_Displayed=Stream.CC_Displayed;
+                    int64u LineMaxCountPerEvent_Temp=0;
+                    for (int8u Pos_Y=0; Pos_Y<Eia608_Rows; Pos_Y++)
+                    {
+                        bool HasContent=false;
+                        vector<character>& Line=CC_Displayed[Pos_Y];
+                        for (int8u Pos_X=0; Pos_X<Eia608_Columns; Pos_X++)
+                            if (Line[Pos_X].Value)
+                            {
+                                HasContent=true;
+                                break;
+                            }
+                        if (HasContent)
+                        {
+                            Stream.LineCount++;
+                            LineMaxCountPerEvent_Temp++;
+                        }
+                    }
+                    if (Stream.LineMaxCountPerEvent<LineMaxCountPerEvent_Temp)
+                        Stream.LineMaxCountPerEvent=LineMaxCountPerEvent_Temp;
                     HasChanged();
-                    Streams[StreamPos]->Synched=false;
+                    Stream.Synched=false;
+                    Stream.Count_PopOn++;
+                    if (Stream.FirstDisplay_Delay_Type==(int8u)-1)
+                    {
+                        if (!HasJumped)
+                            Stream.FirstDisplay_Delay_Frames=Frame_Count_NotParsedIncluded;
+                        Stream.FirstDisplay_Delay_Type=0;
+                    }
+                    }
                     break; //EOC - End of Caption
         default   : Illegal(0x14, cc_data_2);
+    }
+    if (FrameInfo.DTS!=(int64u)-1 && FrameInfo.DUR!=(int64u)-1)
+    {
+        Stream.Duration_End_Command=(FrameInfo.DTS)/1000000.0;
+        Stream.Duration_End_Command_WasJustUpdated=true;
     }
 }
 
@@ -1098,23 +1249,51 @@ void File_Eia608::Character_Fill(wchar_t Character)
     size_t StreamPos=TextMode*2+DataChannelMode;
     if (StreamPos>=Streams.size() || Streams[StreamPos]==NULL || !Streams[StreamPos]->Synched)
         return; //Not synched
-
-    if (Streams[StreamPos]->x==Eia608_Columns)
+    stream& Stream=*Streams[StreamPos];
+    if (!Stream.InBack)
     {
-        Streams[StreamPos]->x--; //There is a problem
+        Stream.Count_CurrentHasContent=true;
+    }
+
+    if (Stream.x==Eia608_Columns)
+    {
+        Stream.x--; //There is a problem
 
         //TODO: Put it at the end, for the conversion
         //TODO: Handle special chars
     }
 
-    if (Streams[StreamPos]->InBack)
-        Streams[StreamPos]->CC_NonDisplayed[Streams[StreamPos]->y][Streams[StreamPos]->x].Value=Character;
+    if (Stream.InBack)
+        Stream.CC_NonDisplayed[Stream.y][Stream.x].Value=Character;
     else
-        Streams[StreamPos]->CC_Displayed[Streams[StreamPos]->y][Streams[StreamPos]->x].Value=Character;
+    {
+        vector<vector<character> >& CC_Displayed=Stream.CC_Displayed;
+        bool HasContent=false;
+        vector<character>& Line=CC_Displayed[Stream.y];
+        for (int8u x=0; x<Eia608_Columns; x++)
+            if (Line[x].Value)
+                HasContent=true;
+        if (!HasContent)
+            Stream.LineCount++;
+        CC_Displayed[Stream.y][Stream.x].Value=Character;
+        int64u LineMaxCountPerEvent_Temp=0;
+        for (int8u Pos_Y=0; Pos_Y<Eia608_Rows; Pos_Y++)
+        {
+            bool HasContent=false;
+            vector<character>& Line=CC_Displayed[Pos_Y];
+            for (int8u Pos_X=0; Pos_X<Eia608_Columns; Pos_X++)
+                if (Line[Pos_X].Value)
+                    HasContent=true;
+            if (HasContent)
+                LineMaxCountPerEvent_Temp++;
+        }
+        if (Stream.LineMaxCountPerEvent<LineMaxCountPerEvent_Temp)
+            Stream.LineMaxCountPerEvent=LineMaxCountPerEvent_Temp;
+    }
 
-    Streams[StreamPos]->x++;
+    Stream.x++;
 
-    if (TextMode || !Streams[StreamPos]->InBack)
+    if (TextMode || !Stream.InBack)
         HasChanged();
 
     if (!HasContent)
@@ -1125,8 +1304,16 @@ void File_Eia608::Character_Fill(wchar_t Character)
 //---------------------------------------------------------------------------
 void File_Eia608::HasChanged()
 {
+    size_t StreamPos=TextMode*2+DataChannelMode;
+    if (StreamPos>=Streams.size() || Streams[StreamPos]==NULL || !Streams[StreamPos]->Synched)
+        return; //Not synched
+    if (FrameInfo.DTS!=(int64u)-1)
+    {
+        if (!HasJumped && Streams[StreamPos]->Duration_Start==FLT_MAX)
+            Streams[StreamPos]->Duration_Start=FrameInfo.DTS/1000000.0;
+        Streams[StreamPos]->Duration_End=(FrameInfo.DTS)/1000000.0;
+    }
     #if MEDIAINFO_EVENTS
-            size_t StreamPos=TextMode*2+DataChannelMode;
             if (StreamPos<Streams.size() && Streams[StreamPos])
             EVENT_BEGIN (Eia608, CC_Content, 0)
                 Event.Field=1+cc_type;

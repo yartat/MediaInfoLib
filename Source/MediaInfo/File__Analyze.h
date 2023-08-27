@@ -204,6 +204,7 @@ public :
         struct servicedescriptor
         {
             string language;
+            std::bitset<2> wide_aspect_ratio;
         };
         typedef std::map<int8u, servicedescriptor> servicedescriptors608;
         typedef std::map<int8u, servicedescriptor> servicedescriptors708;
@@ -882,16 +883,17 @@ public :
     // Others, specialized
     //***************************************************************************
 
-    #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES)
-    void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance);
+    #if defined(MEDIAINFO_AV1_YES) || defined(MEDIAINFO_AVC_YES) || defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MPEGTS_YES)
+    void Get_MasteringDisplayColorVolume(Ztring& MasteringDisplay_ColorPrimaries, Ztring& MasteringDisplay_Luminance, bool FromAV1=false);
+    void Get_LightLevel(Ztring &MaxCLL, Ztring &MaxFALL);
     #endif
-    #if defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MATROSKA_YES) || defined(MEDIAINFO_MXF_YES)
+    #if defined(MEDIAINFO_AV1_YES) || defined(MEDIAINFO_AVC_YES) || defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MATROSKA_YES) || defined(MEDIAINFO_MXF_YES) || defined(MEDIAINFO_MPEGTS_YES)
     struct mastering_metadata_2086
     {
         int16u Primaries[8];
         int32u Luminance[2];
     };
-    void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance, mastering_metadata_2086 &Meta);
+    void Get_MasteringDisplayColorVolume(Ztring &MasteringDisplay_ColorPrimaries, Ztring &MasteringDisplay_Luminance, mastering_metadata_2086 &Meta, bool FromAV1=false);
     #endif
     #if defined(MEDIAINFO_MPEGPS_YES) || defined(MEDIAINFO_MPEGTS_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_MK_YES)
     void dvcC(bool has_dependency_pid=false, std::map<std::string, Ztring>* Infos=NULL);
@@ -1274,7 +1276,8 @@ protected :
     void Streams_Finish_HumanReadable_PerStream(stream_t StreamKind, size_t StreamPos, size_t Parameter);
 
     void Tags ();
-    void Video_FrameRate_Rounding (size_t Pos, video Parameter);
+    float64 Video_FrameRate_Rounded (float64 Value);
+    void Video_FrameRate_Rounding (stream_t StreamKind, size_t Pos, size_t Parameter);
     void Video_BitRate_Rounding (size_t Pos, video Parameter);
     void Audio_BitRate_Rounding (size_t Pos, audio Parameter);
 

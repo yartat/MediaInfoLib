@@ -202,7 +202,7 @@ const char*  DolbyE_ChannelPositions[64]=
     "Front: L R / Front: L R",
     "Front: L R / Front: C / Front: C",
     "Front: C / Front: C / Front: C / Front: C",
-    "Front: L C R, Side: L R, Rear: L R, LFE",
+    "Front: L C R, Side: L R, Back: L R, LFE",
     "Front: L C C C R, Side: L R, LFE",
     "",
     "",
@@ -309,7 +309,7 @@ const char*  DolbyE_ChannelPositions_PerProgram(int8u program_config, int8u prog
         case 17 :
         case 21 :   return "Front: C";
         case 11 :   return "Front: L C R, Side: L R, LFE";
-        case 22 :   return "Front: L C R, Side: L R, Rear: L R, LFE";
+        case 22 :   return "Front: L C R, Side: L R, Back: L R, LFE";
         case 23 :   return "Front: L C C C R, Side: L R, LFE";
         default :   return "";
     }
@@ -725,6 +725,8 @@ int mgi_bitstream_pos_z_to_Q15(bool pos_z_sign, int8u pos_z_bits)
 }
 
 //---------------------------------------------------------------------------
+namespace
+{
 struct speaker_info
 {
     int8u AzimuthAngle; //0 to 180 (right, if AzimuthDirection is false) or 179 (left, if AzimuthDirection is true)
@@ -742,6 +744,7 @@ bool operator== (const speaker_info& L, const speaker_info& R)
     return L.AzimuthAngle==R.AzimuthAngle
         && L.ElevationDirectionAngle==R.ElevationDirectionAngle
         && L.Flags==R.Flags;
+}
 }
 extern string Aac_ChannelLayout_GetString(const Aac_OutputChannel* const OutputChannels, size_t OutputChannels_Size);
 static const size_t SpeakerInfos_Size=43;
@@ -960,7 +963,9 @@ File_DolbyE::File_DolbyE()
 
     //Temp
     SMPTE_time_code_StartTimecode=(int64u)-1;
+    frame_rate_code=0;
     FrameInfo.DTS=0;
+    program_config=0;
 }
 
 //***************************************************************************
@@ -1936,6 +1941,7 @@ void File_DolbyE::metadata_segment()
 
     {
         //CRC test
+        /*
         size_t Pos_End=Buffer_Offset*8+(size_t)Element_Size*8-Data_BS_Remain();
         size_t Pos_Begin=Pos_End-(metadata_segment_size+1)*bit_depth; //+1 for CRC
         int8u BitSkip_Begin=Pos_Begin%8;
@@ -1951,6 +1957,7 @@ void File_DolbyE::metadata_segment()
             // CRC is wrong
             Param_Info1("metadata_crc NOK");
         }
+        */
     }
 
     Element_End0();
@@ -2040,6 +2047,7 @@ void File_DolbyE::guard_band()
     Skip_B2(                                                    "crc");
     {
         //CRC test
+        /*
         size_t Pos_End=Buffer_Offset+Element_Offset;
         size_t Pos_Begin=Pos_End-(element_length+2); //+2 for CRC
 
@@ -2049,6 +2057,7 @@ void File_DolbyE::guard_band()
             // CRC is wrong
             Param_Info1("crc NOK");
         }
+        */
         Element_End0();
         int64u RemainingBytes=Element_Size-Element_Offset;
         if (RemainingBytes && RemainingBytes<bit_depth/4)
@@ -3155,6 +3164,7 @@ void File_DolbyE::audio_segment()
 
             #if MEDIAINFO_TRACE
                 //CRC test
+                /*
                 size_t Pos_End=Buffer_Offset*8+(size_t)Element_Size*8-Data_BS_Remain();
                 int8u BitSkip_Begin=Pos_Begin%8;
                 Pos_Begin/=8;
@@ -3169,6 +3179,7 @@ void File_DolbyE::audio_segment()
                     //CRC is wrong
                     Param_Info1("NOK");
                 }
+                */
             #endif //MEDIAINFO_TRACE
         }
     }
@@ -3247,6 +3258,7 @@ void File_DolbyE::metadata_extension_segment()
 
     #if MEDIAINFO_TRACE
         //CRC test
+        /*
         size_t Pos_End=Buffer_Offset*8+(size_t)Element_Size*8-Data_BS_Remain();
         int8u BitSkip_Begin=Pos_Begin%8;
         Pos_Begin/=8;
@@ -3261,6 +3273,7 @@ void File_DolbyE::metadata_extension_segment()
             //CRC is wrong
             Param_Info1("NOK");
         }
+        */
     #endif //MEDIAINFO_TRACE
 
     Element_End0();
@@ -3327,6 +3340,7 @@ void File_DolbyE::audio_extension_segment()
 
             #if MEDIAINFO_TRACE
                 //CRC test
+                /*
                 size_t Pos_End=Buffer_Offset*8+(size_t)Element_Size*8-Data_BS_Remain();
                 int8u BitSkip_Begin=Pos_Begin%8;
                 Pos_Begin/=8;
@@ -3341,6 +3355,7 @@ void File_DolbyE::audio_extension_segment()
                     //CRC is wrong
                     Param_Info1("NOK");
                 }
+                */
             #endif //MEDIAINFO_TRACE
         }
     }
@@ -3393,6 +3408,7 @@ void File_DolbyE::meter_segment()
 
     #if MEDIAINFO_TRACE
         //CRC test
+        /*
         size_t Pos_End=Buffer_Offset*8+(size_t)Element_Size*8-Data_BS_Remain();
         size_t Pos_Begin=Pos_End-(meter_segment_size+1)*bit_depth; //+1 for CRC
         int8u BitSkip_Begin=Pos_Begin%8;
@@ -3408,6 +3424,7 @@ void File_DolbyE::meter_segment()
             //CRC is wrong
             Param_Info1("NOK");
         }
+        */
     #endif //MEDIAINFO_TRACE
 
     Element_End0();

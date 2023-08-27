@@ -72,15 +72,22 @@ private :
     void Rawcooked_AfterData(bool HasMask, bool UseMask=false);
     void Rawcooked_FileName();
     void Rawcooked_FileName(bool HasMask, bool UseMask=false);
+    void Rawcooked_InData();
+    void Rawcooked_InData(bool HasMask, bool UseMask=false);
     void RawcookedBlock();
     void RawcookedBlock_BeforeData() { Rawcooked_BeforeData(false); }
     void RawcookedBlock_AfterData() { Rawcooked_AfterData(false); }
     void RawcookedBlock_FileHash();
     void RawcookedBlock_FileName() { Rawcooked_FileName(false); }
+    void RawcookedBlock_InData() { Rawcooked_InData(false); }
     void RawcookedBlock_MaskAdditionBeforeData() { Rawcooked_BeforeData(true, true); }
     void RawcookedBlock_MaskAdditionAfterData() { Rawcooked_AfterData(true, true); }
     void RawcookedBlock_MaskAdditionFileName() { Rawcooked_FileName(true, true); }
+    void RawcookedBlock_MaskAdditionInData() { Rawcooked_InData(true, true); }
     void RawcookedSegment();
+    void RawcookedSegment_FileHash() { RawcookedBlock_FileHash(); }
+    void RawcookedSegment_FileName() { Rawcooked_FileName(false); }
+    void RawcookedSegment_InData() { Rawcooked_BeforeData(false, false); }
     void RawcookedSegment_LibraryName();
     void RawcookedSegment_LibraryVersion();
     void RawcookedTrack();
@@ -88,9 +95,11 @@ private :
     void RawcookedTrack_AfterData() { RawcookedBlock_AfterData(); }
     void RawcookedTrack_FileHash() { RawcookedBlock_FileHash(); }
     void RawcookedTrack_FileName() { RawcookedBlock_FileName(); }
+    void RawcookedTrack_InData() { RawcookedBlock_InData(); }
     void RawcookedTrack_MaskBaseBeforeData() { Rawcooked_BeforeData(true, false); }
     void RawcookedTrack_MaskBaseAfterData() { Rawcooked_AfterData(true, false); }
     void RawcookedTrack_MaskBaseFileName() { Rawcooked_FileName(true, false); }
+    void RawcookedTrack_MaskBaseInData() { Rawcooked_InData(true, false); }
     void Segment();
     void Segment_SeekHead();
     void Segment_SeekHead_Seek();
@@ -126,9 +135,9 @@ private :
     void Segment_Cluster_BlockGroup_Block_Lace();
     void Segment_Cluster_BlockGroup_BlockVirtual(){Skip_XX(Element_Size, "Data");};
     void Segment_Cluster_BlockGroup_BlockAdditions(){};
-    void Segment_Cluster_BlockGroup_BlockAdditions_BlockMore(){};
-    void Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAddID(){UInteger_Info();};
-    void Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAdditional(){Skip_XX(Element_Size, "Data");};
+    void Segment_Cluster_BlockGroup_BlockAdditions_BlockMore();
+    void Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAddID();
+    void Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAdditional();
     void Segment_Cluster_BlockGroup_BlockDuration();
     void Segment_Cluster_BlockGroup_ReferencePriority(){UInteger_Info();};
     void Segment_Cluster_BlockGroup_ReferenceBlock(){UInteger_Info();};
@@ -164,7 +173,7 @@ private :
     void Segment_Tracks_TrackEntry_MaxBlockAdditionID(){UInteger_Info();};
     void Segment_Tracks_TrackEntry_Name();
     void Segment_Tracks_TrackEntry_Language();
-    void Segment_Tracks_TrackEntry_LanguageIETF(){String_Info();};
+    void Segment_Tracks_TrackEntry_LanguageIETF(){Segment_Tracks_TrackEntry_Language();};
     void Segment_Tracks_TrackEntry_CodecID();
     void Segment_Tracks_TrackEntry_CodecPrivate();
     void Segment_Tracks_TrackEntry_CodecName(){UTF8_Info();};
@@ -248,11 +257,12 @@ private :
     void Segment_Tracks_TrackEntry_TrickTrackFlag(){UInteger_Info();};
     void Segment_Tracks_TrackEntry_TrickMasterTrackUID(){UInteger_Info();};
     void Segment_Tracks_TrackEntry_TrickMasterTrackSegmentUID(){UInteger_Info();};
-    void Segment_Tracks_TrackEntry_BlockAdditionMapping(){};
+    void Segment_Tracks_TrackEntry_BlockAdditionMapping();
+    void Segment_Tracks_TrackEntry_BlockAdditionMapping_Manage();
     void Segment_Tracks_TrackEntry_BlockAdditionMapping_BlockAddIDName(){UTF8_Info();};
     void Segment_Tracks_TrackEntry_BlockAdditionMapping_BlockAddIDType();
     void Segment_Tracks_TrackEntry_BlockAdditionMapping_BlockAddIDExtraData();
-    void Segment_Tracks_TrackEntry_BlockAdditionMapping_BlockAddIDValue(){UInteger_Info();};
+    void Segment_Tracks_TrackEntry_BlockAdditionMapping_BlockAddIDValue();
     void Segment_Tracks_TrackEntry_ContentEncodings(){};
     void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding(){};
     void Segment_Tracks_TrackEntry_ContentEncodings_ContentEncoding_ContentEncodingOrder(){UInteger_Info();};
@@ -314,7 +324,7 @@ private :
     void Segment_Chapters_EditionEntry_ChapterAtom_ChapterDisplay();
     void Segment_Chapters_EditionEntry_ChapterAtom_ChapterDisplay_ChapString();
     void Segment_Chapters_EditionEntry_ChapterAtom_ChapterDisplay_ChapLanguage();
-    void Segment_Chapters_EditionEntry_ChapterAtom_ChapterDisplay_ChapLanguageIETF(){String_Info();};
+    void Segment_Chapters_EditionEntry_ChapterAtom_ChapterDisplay_ChapLanguageIETF(){Segment_Chapters_EditionEntry_ChapterAtom_ChapterDisplay_ChapLanguage();};
     void Segment_Chapters_EditionEntry_ChapterAtom_ChapterDisplay_ChapCountry(){String_Info();};
     void Segment_Chapters_EditionEntry_ChapterAtom_ChapProcess(){};
     void Segment_Chapters_EditionEntry_ChapterAtom_ChapProcess_ChapProcessCodecID(){UInteger_Info();};
@@ -334,10 +344,25 @@ private :
     void Segment_Tags_Tag_SimpleTag(){};
     void Segment_Tags_Tag_SimpleTag_TagName();
     void Segment_Tags_Tag_SimpleTag_TagLanguage();
-    void Segment_Tags_Tag_SimpleTag_TagLanguageIETF(){String_Info();};
+    void Segment_Tags_Tag_SimpleTag_TagLanguageIETF(){Segment_Tags_Tag_SimpleTag_TagLanguage();};
     void Segment_Tags_Tag_SimpleTag_TagDefault(){UInteger_Info();};
     void Segment_Tags_Tag_SimpleTag_TagString();
     void Segment_Tags_Tag_SimpleTag_TagBinary(){Skip_XX(Element_Size, "Data");};
+
+    // Extra
+    enum hdr_format
+    {
+        HdrFormat_SmpteSt209440,
+        HdrFormat_SmpteSt2086,
+        HdrFormat_Max,
+    };
+    typedef std::map<video, Ztring[HdrFormat_Max]> hdr;
+    hdr                                 HDR;
+    void sei_message_user_data_registered_itu_t_t35();
+    void sei_message_user_data_registered_itu_t_t35_B5();
+    void sei_message_user_data_registered_itu_t_t35_B5_003C();
+    void sei_message_user_data_registered_itu_t_t35_B5_003C_0001();
+    void sei_message_user_data_registered_itu_t_t35_B5_003C_0001_04();
 
     struct stream
     {
@@ -367,6 +392,7 @@ private :
         int64u                  PixelCropRight;
         int64u                  PixelCropTop;
         mastering_metadata_2086      MasteringMetadata;
+        std::map<int64u, File__Analyze*> BlockAdditions;
         #if MEDIAINFO_TRACE
             size_t Trace_Segment_Cluster_Block_Count;
         #endif // MEDIAINFO_TRACE
@@ -405,6 +431,8 @@ private :
         {
             delete Parser; //Parser=NULL;
             delete[] ContentCompSettings_Buffer; //ContentCompSettings_Buffer=NULL;
+            for (auto BlockAddition : BlockAdditions)
+                delete BlockAddition.second;
         }
     };
     std::map<int64u, stream> Stream;
@@ -435,6 +463,10 @@ private :
     int64u   TrackType;
     int64u   AudioBitDepth;
 
+    //Temp - BlockAddition
+    int64u  BlockAddIDType;
+    int64u  BlockAddIDValue;
+
     //Temp
     int8u   InvalidByteMax;
     int64u  Format_Version;
@@ -457,7 +489,6 @@ private :
     string  AttachedFile_FileName;
     string  AttachedFile_FileMimeType;
     string  AttachedFile_FileDescription;
-    int64u  BlockAddIDType;
     struct crc32
     {
         int64u  Pos;

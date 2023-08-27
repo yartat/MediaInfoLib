@@ -33,6 +33,7 @@ namespace MediaInfoLib
 
 class File_DolbyVisionMetadata;
 class File_Adm;
+class File_Iab;
 class File_DolbyAudioMetadata;
 
 //***************************************************************************
@@ -223,6 +224,11 @@ protected :
     void Dolby_PHDRMetadataTrackSubDescriptor();
     void Omneon_010201010100();
     void Omneon_010201020100();
+    void FFV1PictureSubDescriptor();
+    void MGASoundEssenceDescriptor();
+    void MGAAudioMetadataSubDescriptor();
+    void MGASoundfieldGroupLabelSubDescriptor();
+    void SADMAudioMetadataSubDescriptor();
 
     //Common
     void GenerationInterchangeObject();
@@ -352,6 +358,22 @@ protected :
     void JPEG2000PictureSubDescriptor_PictureComponentSizing(); //800B
     void JPEG2000PictureSubDescriptor_CodingStyleDefault();     //
     void JPEG2000PictureSubDescriptor_QuantizationDefault();    //
+    void FFV1PictureSubDescriptor_InitializationMetadata();     //
+    void FFV1PictureSubDescriptor_IdenticalGOP();               //
+    void FFV1PictureSubDescriptor_MaxGOP();                     //
+    void FFV1PictureSubDescriptor_MaximumBitRate();             //
+    void FFV1PictureSubDescriptor_Version();                    //
+    void FFV1PictureSubDescriptor_MicroVersion();               //
+    void MGASoundEssenceBlockAlign() {WaveAudioDescriptor_BlockAlign();};
+    void MGASoundEssenceAverageBytesPerSecond() {WaveAudioDescriptor_AvgBps();}
+    void MGASoundEssenceSequenceOffset() {WaveAudioDescriptor_SequenceOffset();};
+    void MGALinkID();                                           //
+    void MGAAudioMetadataIndex();                               //
+    void MGAAudioMetadataIdentifier();                          //
+    void MGAAudioMetadataPayloadULArray();                      //
+    void MGAMetadataSectionLinkID();                            //
+    void SADMMetadataSectionLinkID();                           //
+    void SADMProfileLevelULBatch();                             //
     void MpegAudioDescriptor_BitRate();                         //
     void MultipleDescriptor_FileDescriptors();                  //3F01
     void PrimaryExtendedSpokenLanguage();                       //
@@ -648,6 +670,7 @@ protected :
     bool   FooterPartitionAddress_Jumped;
     bool   PartitionPack_Parsed;
     bool   HeaderPartition_IsOpen;
+    bool   Is1001;
     size_t IdIsAlwaysSame_Offset;
 
     //Primer
@@ -759,6 +782,7 @@ protected :
         #if MEDIAINFO_TRACE
             int64u  Trace_Count;
         #endif // MEDIAINFO_TRACE
+        int32u  ShouldCheckAvcHeaders;
         frame_info  FrameInfo;
 
         essence()
@@ -779,8 +803,11 @@ protected :
             #if MEDIAINFO_TRACE
                 Trace_Count=0;
             #endif // MEDIAINFO_TRACE
+            ShouldCheckAvcHeaders=0;
             FrameInfo.DTS=(int64u)-1;
         }
+        essence(const essence&) = delete;
+        essence(essence&&) = delete;
 
         ~essence()
         {
@@ -801,6 +828,7 @@ protected :
         Ztring  ScanType;
         stream_t StreamKind;
         size_t   StreamPos;
+        File__Analyze* Parser;
         float64 SampleRate;
         float64 DisplayAspectRatio;
         int128u InstanceUID;
@@ -873,6 +901,7 @@ protected :
         {
             StreamKind=Stream_Max;
             StreamPos=(size_t)-1;
+            Parser=NULL;
             SampleRate=0;
             DisplayAspectRatio=0;
             InstanceUID.hi=(int64u)-1;
@@ -920,6 +949,17 @@ protected :
             //AudioChannelLabelSubDescriptor specific
             SoundfieldGroupLinkID.hi=(int64u)-1;
             SoundfieldGroupLinkID.lo=(int64u)-1;
+        }
+        descriptor(const descriptor&) = delete;
+        descriptor(descriptor& b)
+        {
+            *this = b;
+            b.Parser = nullptr;
+        }
+
+        ~descriptor()
+        {
+            delete Parser;
         }
 		bool Is_Interlaced() const
         {
@@ -1163,6 +1203,9 @@ protected :
     void           ChooseParser_Vc3(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
     void           ChooseParser_TimedText(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
     void           ChooseParser_Aac(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
+    void           ChooseParser_Adif(const essences::iterator& Essence, const descriptors::iterator& Descriptor);
+    void           ChooseParser_Adts(const essences::iterator& Essence, const descriptors::iterator& Descriptor);
+    void           ChooseParser_Latm(const essences::iterator& Essence, const descriptors::iterator& Descriptor);
     void           ChooseParser_Ac3(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
     void           ChooseParser_Alaw(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
     void           ChooseParser_ChannelGrouping(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
@@ -1173,8 +1216,10 @@ protected :
     void           ChooseParser_SmpteSt0337(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
     void           ChooseParser_Jpeg2000(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
     void           ChooseParser_ProRes(const essences::iterator &Essence, const descriptors::iterator &Descriptor);
+    void           ChooseParser_Ffv1(const essences::iterator& Essence, const descriptors::iterator& Descriptor);
     void           ChooseParser_DolbyVisionFrameData(const essences::iterator& Essence, const descriptors::iterator& Descriptor);
     void           ChooseParser_Iab(const essences::iterator& Essence, const descriptors::iterator& Descriptor);
+    void           ChooseParser_Mga(const essences::iterator& Essence, const descriptors::iterator& Descriptor);
 
     //Helpers
     int32u Vector(int32u ExpectedLength=(int32u)-1);
@@ -1209,8 +1254,7 @@ protected :
         int64u SDTI_PackageMetadataSet_Trace_Count;
         int64u Padding_Trace_Count;
     #endif // MEDIAINFO_TRACE
-    string SystemScheme1_TimeCodeArray_StartTimecode;
-    int64u SystemScheme1_TimeCodeArray_StartTimecode_ms;
+    TimeCode SystemScheme1_TimeCodeArray_StartTimecode;
     int64u SystemScheme1_FrameRateFromDescriptor;
     bool   Essences_FirstEssence_Parsed;
     bool   MayHaveCaptionsInStream;
@@ -1235,7 +1279,6 @@ protected :
     #endif //MEDIAINFO_ADVANCED
     #if defined(MEDIAINFO_ANCILLARY_YES)
         File_Ancillary* Ancillary;
-        bool            Ancillary_IsBinded;
     #endif //defined(MEDIAINFO_ANCILLARY_YES)
 
     //Hints
@@ -1332,13 +1375,16 @@ protected :
 
     // Extra metadata
     int64u ExtraMetadata_Offset;
-    set<int32u> ExtraMetadata_SID;
+    std::set<int32u> ExtraMetadata_SID;
     File_DolbyVisionMetadata* DolbyVisionMetadata;
     File_DolbyAudioMetadata* DolbyAudioMetadata;
     #if defined(MEDIAINFO_ADM_YES)
     File_Adm* Adm;
     #endif
-
+    #if defined(MEDIAINFO_IAB_YES)
+    File_Iab* Adm_ForLaterMerge;
+    #endif
+        
     //Demux
     #if MEDIAINFO_DEMUX
         bool Demux_HeaderParsed;

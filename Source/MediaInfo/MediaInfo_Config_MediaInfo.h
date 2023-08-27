@@ -31,6 +31,9 @@
 #include "ZenLib/CriticalSection.h"
 #include "ZenLib/Translation.h"
 #include "ZenLib/InfoMap.h"
+#if MEDIAINFO_ADVANCED
+    #include "MediaInfo/TimeCode.h"
+#endif //MEDIAINFO_ADVANCED
 using namespace ZenLib;
 using std::string;
 //---------------------------------------------------------------------------
@@ -144,6 +147,8 @@ public :
         float64       File_DefaultFrameRate_Get ();
         void          File_DefaultTimeCode_Set (string NewValue);
         string        File_DefaultTimeCode_Get ();
+        Ztring        File_DefaultTimeCodeDropFrame_Set (const String& NewValue);
+        int8u         File_DefaultTimeCodeDropFrame_Get ();
     #endif //MEDIAINFO_ADVANCED
 
     #if MEDIAINFO_ADVANCED
@@ -160,6 +165,8 @@ public :
         bool          File_HighestFormat_Get ();
         void          File_ChannelLayout_Set(bool NewValue);
         bool          File_ChannelLayout_Get();
+        void          File_FrameIsAlwaysComplete_Set(bool NewValue) { File_FrameIsAlwaysComplete = NewValue; }
+        bool          File_FrameIsAlwaysComplete_Get() { return File_FrameIsAlwaysComplete; }
 #endif //MEDIAINFO_ADVANCED
 
     #if MEDIAINFO_DEMUX
@@ -348,8 +355,8 @@ public :
     bool          File_DvDif_Analysis_Get ();
     #endif //defined(MEDIAINFO_DVDIF_ANALYZE_YES)
     #if MEDIAINFO_MACROBLOCKS
-    void          File_Macroblocks_Parse_Set (bool NewValue);
-    bool          File_Macroblocks_Parse_Get ();
+    void          File_Macroblocks_Parse_Set (int NewValue);
+    int           File_Macroblocks_Parse_Get ();
     #endif //MEDIAINFO_MACROBLOCKS
     void          File_GrowingFile_Delay_Set(float64 Value);
     float64       File_GrowingFile_Delay_Get();
@@ -428,6 +435,20 @@ public :
     bool      File_GoTo_IsFrameOffset;
     #endif //MEDIAINFO_SEEK
 
+    //Logs
+    #if MEDIAINFO_ADVANCED
+        struct timecode_dump
+        {
+            std::string List;
+            TimeCode LastTC;
+            int32u FramesMax=0;
+            int64u FrameCount=0;
+            string Attributes_First;
+            string Attributes_Last;
+        };
+        std::map<std::string, timecode_dump>* TimeCode_Dumps;
+    #endif //MEDIAINFO_ADVANCED
+
 private :
     bool                    FileIsSeekable;
     bool                    FileIsSub;
@@ -449,11 +470,13 @@ private :
         int64u              File_SequenceFilesSkipFrames;
         float64             File_DefaultFrameRate;
         string              File_DefaultTimeCode;
+        int8u               File_DefaultTimeCodeDropFrame;
         bool                File_Source_List;
         bool                File_RiskyBitRateEstimation;
         bool                File_MergeBitRateInfo;
         bool                File_HighestFormat;
         bool                File_ChannelLayout;
+        bool                File_FrameIsAlwaysComplete;
         #if MEDIAINFO_DEMUX
             bool                File_Demux_Unpacketize_StreamLayoutChange_Skip;
         #endif //MEDIAINFO_DEMUX
@@ -577,7 +600,7 @@ private :
     bool                    File_DvDif_Analysis;
     #endif //defined(MEDIAINFO_DVDIF_ANALYZE_YES)
     #if MEDIAINFO_MACROBLOCKS
-    bool                    File_Macroblocks_Parse;
+    int                     File_Macroblocks_Parse;
     #endif //MEDIAINFO_MACROBLOCKS
     float64                 File_GrowingFile_Delay;
     bool                    File_GrowingFile_Force;

@@ -14,7 +14,59 @@
 
 //---------------------------------------------------------------------------
 #include "MediaInfo/Setup.h"
+#include <algorithm>
+#include <iterator>
+#include <string>
+using namespace std;
 //---------------------------------------------------------------------------
+
+
+//***************************************************************************
+// Constants
+//***************************************************************************
+
+//---------------------------------------------------------------------------
+#if defined(MEDIAINFO_MPEG7_YES)
+//---------------------------------------------------------------------------
+
+namespace MediaInfoLib
+{
+
+//---------------------------------------------------------------------------
+static constexpr const char* ProRes_Profile_Names[]= // Time sorted list
+{
+    "422 Proxy",                        // 2007
+    "422 LT",
+    "422",
+    "422 HQ",
+    "4444",                             // 2009
+    "4444 XQ",
+    "RAW",                              // 2018
+    "RAW HQ"
+};
+const char* ProRes_Profile_Name(size_t Index)
+{
+    return ProRes_Profile_Names[Index];
+}
+size_t ProRes_Profile_Index(const string& ProfileS) // Note: 1-based, 0 means not found
+{
+    size_t Profile;
+    auto Pos=find(begin(ProRes_Profile_Names), end(ProRes_Profile_Names), ProfileS);
+    if (Pos==end(ProRes_Profile_Names))
+        return 0;
+    return distance(begin(ProRes_Profile_Names), Pos)+1;
+}
+
+//---------------------------------------------------------------------------
+} //NameSpace
+
+//---------------------------------------------------------------------------
+#endif //...
+//---------------------------------------------------------------------------
+
+//***************************************************************************
+//
+//***************************************************************************
 
 //---------------------------------------------------------------------------
 #if defined(MEDIAINFO_PRORES_YES)
@@ -36,6 +88,7 @@ const char* Mpegv_colour_primaries(int8u colour_primaries);
 const char* Mpegv_transfer_characteristics(int8u transfer_characteristics);
 const char* Mpegv_matrix_coefficients(int8u matrix_coefficients);
 const char* Mpegv_matrix_coefficients_ColorSpace(int8u matrix_coefficients);
+const char* Mk_Video_Colour_Range(int8u range);
 
 //---------------------------------------------------------------------------
 static const char* ProRes_chrominance_factor(int8u chrominance_factor)
@@ -110,6 +163,45 @@ void File_ProRes::Streams_Fill()
 //***************************************************************************
 // Buffer - Global
 //***************************************************************************
+
+//---------------------------------------------------------------------------
+void File_ProRes::Read_Buffer_OutOfBand()
+{
+    //Handling FFmpeg style (glbl atom)
+    while (Element_Offset<Element_Size)
+    {
+        Element_Begin1("Atom");
+            int32u  Size, Name;
+            Element_Begin1("Header");
+                Get_C4 (Size,                                   "Size");
+                Get_C4 (Name,                                   "Name");
+            Element_End();
+            Element_Name(Ztring().From_CC4(Name));
+            switch (Name)
+            {
+                case 0x41434C52: //ACLR
+                    {
+                    Get_C4(Name,                                "Name");
+                    if (Name==0x41434C52 && Size==24)
+                    {
+                        int8u Range;
+                        Skip_C4(                                "Text?");
+                        Skip_B3(                                "Reserved");
+                        Get_B1 (Range,                          "Range");
+                        Fill(Stream_Video, 0, Video_colour_range, Mk_Video_Colour_Range(Range));
+                        Skip_B4(                                "Reserved");
+                    }
+                    else if (Size>12)
+                        Skip_XX(Size-12,                        "Unknown");
+                    }
+                    break;
+                default:
+                        if (Size>8)
+                            Skip_XX(Size-8,                    "Unknown");
+            }
+        Element_End();
+    }
+}
 
 //---------------------------------------------------------------------------
 void File_ProRes::Read_Buffer_Continue()

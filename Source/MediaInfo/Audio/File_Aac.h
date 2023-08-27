@@ -21,6 +21,7 @@
 #endif
 #include "MediaInfo/Tag/File__Tags.h"
 #include "MediaInfo/Audio/File_Usac.h"
+#include "MediaInfo/Audio/File_Aac_GeneralAudio_Sbr.h"
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -81,41 +82,6 @@ enum Aac_OutputChannel
 // Class File_Aac
 //***************************************************************************
 
-struct sbr_handler
-{
-    //sbr_header
-    int8u  bs_amp_res[2];
-    int8u  bs_amp_res_FromHeader;
-    int8u  bs_start_freq;
-    int8u  bs_stop_freq;
-    int8u  bs_xover_band;
-    int8u  bs_freq_scale;
-    int8u  bs_alter_scale;
-    int8u  bs_noise_bands;
-
-    //sbr_grid
-    int8u   bs_num_env[2];
-    bool    bs_freq_res[2][8];
-    int8u   bs_num_noise[2];
-
-    //sbr_dtdf
-    int8u   bs_df_env[2][4];
-    int8u   bs_df_noise[2][2];
-
-    //Computed values
-    int8u  num_noise_bands;
-    int8u  num_env_bands[2];
-};
-
-struct ps_handler
-{
-    bool   enable_iid;
-    bool   enable_icc;
-    bool   enable_ext;
-    int8u  iid_mode;
-    int8u  icc_mode;
-};
-
 typedef const int8s (*sbr_huffman)[2];
 
 class File_Aac : public File_Usac, public File__Tags_Helper
@@ -128,13 +94,18 @@ public :
     {
         Mode_Unknown,
         Mode_AudioSpecificConfig,
-        Mode_raw_data_block,
+        Mode_payload,
         Mode_ADIF,
         Mode_ADTS,
         Mode_LATM,
     };
     mode   Mode;
     void   AudioSpecificConfig_OutOfBand(int64s sampling_frequency, int8u audioObjectType=(int8u)-1, bool sbrData=false, bool psData=false, bool sbrPresentFlag=false, bool psPresentFlag=false);
+
+    // Conformance
+    #if MEDIAINFO_CONFORMANCE
+        int16u SamplingRate;
+    #endif
 
     //Constructor/Destructor
     File_Aac();
@@ -156,7 +127,8 @@ protected :
     //Buffer - Global
     void Read_Buffer_Continue ();
     void Read_Buffer_Continue_AudioSpecificConfig();
-    void Read_Buffer_Continue_raw_data_block();
+    void Read_Buffer_Continue_payload();
+    void Read_Buffer_Unsynched();
 
     //Buffer - Synchro
     bool Synchronize();
@@ -243,6 +215,11 @@ protected :
     #if MEDIAINFO_ADVANCED
         int64u  aac_frame_length_Total;
     #endif //MEDIAINFO_ADVANCED
+    #if MEDIAINFO_MACROBLOCKS
+        int     ParseCompletely;
+    #else //MEDIAINFO_MACROBLOCKS
+        static constexpr int ParseCompletely=0;
+    #endif //MEDIAINFO_MACROBLOCKS
 
     //***********************************************************************
     // Elements - Speech coding (HVXC)
@@ -271,6 +248,7 @@ protected :
     void program_config_element             ();
 
     //Elements - GA bitstream
+    void payload                            (size_t BitsNotIncluded=(size_t)-1);
     void raw_data_block                     ();
     void single_channel_element             ();
     void channel_pair_element               ();
@@ -307,8 +285,9 @@ protected :
     void sbr_sinusoidal_coding              (bool ch);
     int16u sbr_huff_dec                     (const sbr_huffman& Table, const char* Name);
 
-    //Elements - SBR - PS
+    //Elements - SBR - Extensions
     void ps_data                            (size_t End);
+    void esbr_data                          (size_t End);
 
     //Elements - Perceptual noise substitution (PNS)
     bool is_noise                           (size_t group, size_t sfb);
@@ -358,6 +337,8 @@ protected :
 
     //Temp - Position
     size_t  raw_data_block_Pos;
+    size_t  ChannelPos_Temp;
+    size_t  ChannelCount_Temp;
 
     //***********************************************************************
     // Elements - Structured Audio (SA)

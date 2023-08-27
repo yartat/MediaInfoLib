@@ -33,35 +33,18 @@ namespace MediaInfoLib
 // Utils
 //***************************************************************************
 
-static int64u Scc_str2timecode(const char* Value)
+//---------------------------------------------------------------------------
+static unsigned char Char2Hex (unsigned char Char)
 {
-    const size_t Length=strlen(Value);
-         if (Length==11
-     && Value[0]>='0' && Value[0]<='9'
-     && Value[1]>='0' && Value[1]<='9'
-     && Value[2]==':'
-     && Value[3]>='0' && Value[3]<='9'
-     && Value[4]>='0' && Value[4]<='9'
-     && Value[5]==':'
-     && Value[6]>='0' && Value[6]<='9'
-     && Value[7]>='0' && Value[7]<='9'
-     && (Value[8]==':' || Value[8]==';')
-     && Value[9]>='0' && Value[9]<='9'
-     && Value[10]>='0' && Value[10]<='9')
-    {
-        int64u ToReturn=(int64u)(Value[0]-'0')*10*60*60*1000000000
-                       +(int64u)(Value[1]-'0')   *60*60*1000000000
-                       +(int64u)(Value[3]-'0')   *10*60*1000000000
-                       +(int64u)(Value[4]-'0')      *60*1000000000
-                       +(int64u)(Value[6]-'0')      *10*1000000000
-                       +(int64u)(Value[7]-'0')         *1000000000
-                       +(int64u)(Value[9]-'0')         * 333333333
-                       +(int64u)(Value[10]-'0')        *  33333333;
-
-        return ToReturn;
-    }
+         if (Char<='9' && Char>='0')
+        Char-='0';
+    else if (Char<='f' && Char>='a')
+        Char-='a'-10;
+    else if (Char<='F' && Char>='A')
+        Char-='A'-10;
     else
-        return (int64u)-1;
+        Char =0;
+    return Char;
 }
 
 //***************************************************************************
@@ -119,8 +102,6 @@ void File_Scc::Read_Buffer_Unsynched()
 #if MEDIAINFO_SEEK
 void File_Scc::Read_Buffer_AfterParsing()
 {
-    if (Parser && File_Offset+Buffer_Size==File_Size)
-         Parser->Open_Buffer_Unsynch();
 }
 #endif //MEDIAINFO_SEEK
 
@@ -131,6 +112,8 @@ void File_Scc::Read_Buffer_AfterParsing()
 //---------------------------------------------------------------------------
 void File_Scc::Streams_Finish()
 {
+    if (TimeCode_FirstFrame.GetFramesMax() && Frame_Count_NotParsedIncluded!=(int64u)-1)
+        Fill(Stream_Text, 0, Text_TimeCode_LastFrame, (TimeCode_FirstFrame+(Frame_Count_NotParsedIncluded-1)).ToString());
     if (Parser && Parser->Status[IsAccepted])
     {
         Finish(Parser);
@@ -139,6 +122,11 @@ void File_Scc::Streams_Finish()
             Stream_Prepare(Stream_Text);
             Merge(*Parser, Stream_Text, StreamPos_Last, Pos2);
             Fill(Stream_Text, StreamPos_Last, Text_ID, Parser->Retrieve(Stream_Text, Pos2, Text_ID), true);
+            if (Pos2)
+            {
+                Fill(Stream_Text, StreamPos_Last, Text_TimeCode_FirstFrame, Retrieve_Const(Stream_Text, 0, Text_TimeCode_FirstFrame));
+                Fill(Stream_Text, StreamPos_Last, Text_TimeCode_LastFrame, Retrieve_Const(Stream_Text, 0, Text_TimeCode_LastFrame));
+            }
         }
     }
 }
@@ -208,6 +196,117 @@ void File_Scc::FileHeader_Parse()
     //Init
     Parser=new File_Eia608();
     Open_Buffer_Init(Parser);
+
+    // Trying to detect frame rate
+    vector<TimeCode> TimeCodes;
+    vector<int8u> FrameRates;
+    FrameRates.push_back(24);
+    FrameRates.push_back(25);
+    FrameRates.push_back(30);
+    int8u FrameRateSlowDown[2];
+    FrameRateSlowDown[0]=6;
+    FrameRateSlowDown[1]=5;
+    int8u HighestFrame=0;
+    int8u HighestFrame_Adapted=0;
+    size_t Begin=Buffer_Offset+(size_t)Element_Offset;
+    for (size_t End=Begin; End<Buffer_Size; End++)
+    {
+        if (Buffer[End]!=0x0D && Buffer[End]!=0x0A)
+            continue;
+        if (End-Begin>=11)
+        {
+            size_t Space=Begin;
+            while (Space<End && Buffer[Space]!=' ' && Buffer[Space]!='\t')
+                Space++;
+            TimeCode Temp(TimeCode::string_view((const char*)Buffer+Begin, Space-Begin), -1);
+            if (Temp.IsSet())
+            {
+                if (HighestFrame<Temp.GetFrames())
+                    HighestFrame=Temp.GetFrames();
+                if (HighestFrame_Adapted<Temp.GetFrames())
+                    HighestFrame_Adapted=Temp.GetFrames();
+                if (TimeCodes.empty())
+                {
+                    Fill(Stream_Text, 0, Text_TimeCode_FirstFrame, string((const char*)Buffer+Begin, 11), true, true);
+                    TimeCode_FirstFrame=Temp;
+                    Fill(Stream_Text, 0, Text_TimeCode_Source, "Container", Unlimited, true, true);
+                    for (size_t i=0; i<FrameRates.size(); i++)
+                    {
+                        Temp.SetFramesMax(FrameRates[i]-1);
+                        Temp.SetDropFrame(Buffer[Begin+8]==';');
+                        TimeCodes.push_back(Temp);
+                    }
+                }
+                else
+                {
+                    for (size_t i=0; i<TimeCodes.size(); i++)
+                    {
+                        auto Temp2(Temp);
+                        Temp2.SetFramesMax(TimeCodes[i].GetFramesMax());
+                        if (Temp2<TimeCodes[i])
+                            {
+                                int8u NewHighestFrame=TimeCodes[i].GetFramesMax();
+                                TimeCodes[i]--; // Time code of the last frame
+                                while (TimeCodes[i].GetFrames()!=TimeCodes[i].GetFramesMax())
+                                {
+                                    NewHighestFrame++;
+                                    TimeCodes[i]--;
+                                }
+                                if (HighestFrame_Adapted<NewHighestFrame)
+                                    HighestFrame_Adapted=NewHighestFrame;
+                                TimeCodes.erase(TimeCodes.begin()+i);
+                                i--;
+                            }
+                    }
+                }
+
+                Begin+=11;
+                for(; Begin+5<=End; Begin+=5)
+                {
+                    for (size_t i=0; i<TimeCodes.size(); i++)
+                    {
+                        if (i<=1)
+                        {
+                            FrameRateSlowDown[i]++;
+                            if (FrameRateSlowDown[i]>6-i)
+                            {
+                                FrameRateSlowDown[i]=0;
+                                continue;
+                            }
+                        }
+                        TimeCodes[i]++;
+                    }
+                }
+            }
+        }
+        while (End<Buffer_Size && (Buffer[End]==0x0D || Buffer[End]==0x0A))
+            End++;
+        Begin=End;
+    }
+    if (HighestFrame)
+    {
+        Fill(Stream_Text, 0, Text_TimeCode_MaxFrameNumber, HighestFrame);
+        Fill(Stream_Text, 0, Text_TimeCode_MaxFrameNumber_Theory, HighestFrame_Adapted);
+    }
+    #if MEDIAINFO_ADVANCED
+        float64 FrameRate_F=Video_FrameRate_Rounded(Config->File_DefaultFrameRate_Get());
+        if (!FrameRate_F)
+            FrameRate_F=30/1.001;
+    #else //MEDIAINFO_ADVANCED
+        const float64 FrameRate_F=30/1.001;
+    #endif //MEDIAINFO_ADVANCED
+    FrameDurationNanoSeconds=float64_int64s(1000000000/FrameRate_F);
+    if (FrameRate_F>0 && FrameRate_F<0x100)
+    {
+        FrameRate=(int8u)float64_int64s(FrameRate_F);
+        FrameRate_Is1001=FrameRate_F!=FrameRate;
+    }
+    else
+        FrameRate=0;
+    Fill(Stream_Text, 0, Text_FrameRate, FrameRate_F);
+    TimeCode_FirstFrame.SetFramesMax(FrameRate-1);
+    TimeCode_FirstFrame.Set1001fps(FrameRate_Is1001);
+    Fill(Stream_Text, 0, Text_Delay, (int64s)TimeCode_FirstFrame.ToMilliseconds());
 }
 
 //***************************************************************************
@@ -251,18 +350,20 @@ void File_Scc::Data_Parse()
     //Parsing
     string TimeStamp;
     Get_String(11, TimeStamp,                                   "TimeStamp");
-    Parser->FrameInfo.DTS=Scc_str2timecode(TimeStamp.c_str());
+    TimeCode Temp(TimeStamp, FrameRate-1, TimeCode::FPS1001(FrameRate_Is1001));
+    Frame_Count_NotParsedIncluded=Temp.ToFrames()-TimeCode_FirstFrame.ToFrames();
+    Parser->FrameInfo.DTS=Temp.ToMilliseconds()*1000000;
+    Parser->FrameInfo.DUR=FrameDurationNanoSeconds;
     while (Element_Offset+5<=Element_Size)
     {
         int8u Buffer_Temp[2];
-        Buffer_Temp[0]=(Buffer[Buffer_Offset+(size_t)Element_Offset+1]-(Buffer[Buffer_Offset+(size_t)Element_Offset+1]>='a'?('a'-10):'0'))<<4
-                     | (Buffer[Buffer_Offset+(size_t)Element_Offset+2]-(Buffer[Buffer_Offset+(size_t)Element_Offset+2]>='a'?('a'-10):'0'));
-        Buffer_Temp[1]=(Buffer[Buffer_Offset+(size_t)Element_Offset+3]-(Buffer[Buffer_Offset+(size_t)Element_Offset+3]>='a'?('a'-10):'0'))<<4
-                     | (Buffer[Buffer_Offset+(size_t)Element_Offset+4]-(Buffer[Buffer_Offset+(size_t)Element_Offset+4]>='a'?('a'-10):'0'));
+        Buffer_Temp[0]=Char2Hex(Buffer[Buffer_Offset+(size_t)Element_Offset+1])<<4
+                     | Char2Hex(Buffer[Buffer_Offset+(size_t)Element_Offset+2]);
+        Buffer_Temp[1]=Char2Hex(Buffer[Buffer_Offset+(size_t)Element_Offset+3])<<4
+                     | Char2Hex(Buffer[Buffer_Offset+(size_t)Element_Offset+4]);
         Open_Buffer_Continue(Parser, Buffer_Temp, 2);
         Element_Offset+=5;
-        if (Parser->FrameInfo.DTS!=(int64u)-1)
-            Parser->FrameInfo.DTS+=33333333;
+        Frame_Count_NotParsedIncluded=Parser->Frame_Count_NotParsedIncluded;
     }
 }
 

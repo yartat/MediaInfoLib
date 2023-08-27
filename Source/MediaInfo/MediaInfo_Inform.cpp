@@ -67,6 +67,7 @@ Ztring Xml_Name_Escape_0_7_78 (const Ztring &Name)
 {
     Ztring ToReturn(Name);
     ToReturn.FindAndReplace(__T(" "), __T("_"), 0, Ztring_Recursive);
+    ToReturn.FindAndReplace(__T("-"), Ztring(), 0, Ztring_Recursive);
     ToReturn.FindAndReplace(__T("/"), __T("_"), 0, Ztring_Recursive);
     ToReturn.FindAndReplace(__T("("), Ztring(), 0, Ztring_Recursive);
     ToReturn.FindAndReplace(__T(")"), Ztring(), 0, Ztring_Recursive);
@@ -87,7 +88,7 @@ Ztring Xml_Name_Escape_0_7_78 (const Ztring &Name)
             ToReturn_Pos++;
     }
 
-    if (ToReturn.operator()(0)>='0' && ToReturn.operator()(0)<='9')
+    if ((ToReturn.operator()(0)>='0' && ToReturn.operator()(0)<='9') || ToReturn.operator()(0)=='-')
         ToReturn.insert(0, 1, __T('_'));
 
     if (ToReturn.empty())
@@ -98,6 +99,7 @@ Ztring Xml_Name_Escape_0_7_78 (const Ztring &Name)
 #endif //defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
 
 //---------------------------------------------------------------------------
+std::string URL_Encoded_Encode(const std::string& URL);
 extern MediaInfo_Config Config;
 extern const Char* MediaInfo_Version;
 //---------------------------------------------------------------------------
@@ -147,6 +149,42 @@ Ztring MediaInfo_Internal::Inform()
                 return Ztring();
         }
     #endif //MEDIAINFO_TRACE
+
+    #if MEDIAINFO_ADVANCED
+        if (Config.TimeCode_Dumps)
+        {
+            string Result="<media";
+            if (Config.ParseSpeed<1.0)
+                Result+=" full=\"0\"";
+            Ztring Options=Get(Stream_General, 0, General_CompleteName, Info_Options);
+            if (InfoOption_ShowInInform<Options.size() && Options[InfoOption_ShowInInform]==__T('Y'))
+            {
+                Result+=" ref=\"";
+                Result+=XML_Encode(Get(Stream_General, 0, General_CompleteName)).To_UTF8();
+                Result+='\"';
+            }
+            Result+=" format=\"";
+            Result+=XML_Encode(Get(Stream_General, 0, General_Format)).To_UTF8();
+            Result+="\">\n";
+            for (const auto& TimeCode_Dump : *Config.TimeCode_Dumps)
+            {
+                Result+="  <timecode_stream";
+                Result+=TimeCode_Dump.second.Attributes_First;
+                Result+=" frame_count=\""+std::to_string(TimeCode_Dump.second.FrameCount)+'\"';
+                Result+=TimeCode_Dump.second.Attributes_Last;
+                if (TimeCode_Dump.second.List.empty())
+                    Result+="/>\n";
+                else
+                {
+                    Result+=">\n";
+                    Result+=TimeCode_Dump.second.List;
+                    Result+="  </timecode_stream>\n";
+                }
+            }
+            Result+="</media>";
+            return Ztring().From_UTF8(Result);
+        }
+    #endif //MEDIAINFO_ADVANCED
 
     #if defined(MEDIAINFO_EBUCORE_YES)
         if (MediaInfoLib::Config.Inform_Get()==__T("EBUCore_1.5"))
@@ -199,6 +237,12 @@ Ztring MediaInfo_Internal::Inform()
     #if defined(MEDIAINFO_MPEG7_YES)
         if (MediaInfoLib::Config.Inform_Get()==__T("MPEG-7"))
             return Export_Mpeg7().Transform(*this);
+        if (MediaInfoLib::Config.Inform_Get()==__T("MPEG-7_Strict"))
+            return Export_Mpeg7().Transform(*this, Export_Mpeg7::Version_Strict);
+        if (MediaInfoLib::Config.Inform_Get()==__T("MPEG-7_Relaxed"))
+            return Export_Mpeg7().Transform(*this, Export_Mpeg7::Version_BestEffort_Strict);
+        if (MediaInfoLib::Config.Inform_Get()==__T("MPEG-7_Extended"))
+            return Export_Mpeg7().Transform(*this, Export_Mpeg7::Version_BestEffort_Extended);
     #endif //defined(MEDIAINFO_MPEG7_YES)
     #if defined(MEDIAINFO_PBCORE_YES)
         if (MediaInfoLib::Config.Inform_Get()==__T("PBCore_1") || MediaInfoLib::Config.Inform_Get()==__T("PBCore1")) // 1.x
@@ -364,6 +408,7 @@ Ztring MediaInfo_Internal::Inform()
     bool XML_0_7_78_MA=false;
     bool XML_0_7_78_MI=false;
     bool JSON=false;
+    bool Conformance_JSON=false;
     bool CSV=false;
     #if defined(MEDIAINFO_HTML_YES)
     if (MediaInfoLib::Config.Inform_Get()==__T("HTML"))
@@ -378,8 +423,10 @@ Ztring MediaInfo_Internal::Inform()
         XML_0_7_78_MI=true;
     #endif //defined(MEDIAINFO_XML_YES)
      #if defined(MEDIAINFO_JSON_YES)
-    if (MediaInfoLib::Config.Inform_Get()==__T("JSON"))
+    if (MediaInfoLib::Config.Inform_Get()==__T("JSON") || MediaInfoLib::Config.Inform_Get()==__T("JSON_URL") || MediaInfoLib::Config.Inform_Get()==__T("Conformance_JSON"))
         JSON=true;
+    if (MediaInfoLib::Config.Inform_Get()==__T("JSON_URL") || MediaInfoLib::Config.Inform_Get()==__T("Conformance_JSON"))
+        Conformance_JSON=true;
     #endif //defined(MEDIAINFO_JSON_YES)
     #if defined(MEDIAINFO_CSV_YES)
     if (MediaInfoLib::Config.Inform_Get()==__T("CSV"))
@@ -393,7 +440,7 @@ Ztring MediaInfo_Internal::Inform()
     {
         Node_Main=new Node("media");
         Ztring Options=Get(Stream_General, 0, General_CompleteName, Info_Options);
-        if (InfoOption_ShowInInform<Options.size() && Options[InfoOption_ShowInInform]==__T('Y'))
+        if (InfoOption_ShowInInform<Options.size() && Options[InfoOption_ShowInInform]==__T('Y') && !Conformance_JSON)
             Node_Main->Add_Attribute("ref", Get(Stream_General, 0, General_CompleteName));
         if (Info && !Info->ParserName.empty())
             Node_Main->Add_Attribute("parser", Info->ParserName);
@@ -446,8 +493,11 @@ Ztring MediaInfo_Internal::Inform()
             {
                 Ztring A=Get((stream_t)StreamKind, StreamPos, __T("StreamKind"));
 
-                Node_Current->Add_Attribute("type", A);
-                if (!B.empty()) Node_Current->Add_Attribute("typeorder", B);
+                if (!Conformance_JSON)
+                {
+                    Node_Current->Add_Attribute("type", A);
+                    if (!B.empty()) Node_Current->Add_Attribute("typeorder", B);
+                }
                 Node* Track=new Node();
                 Track->RawContent=Inform((stream_t)StreamKind, StreamPos, false).To_UTF8();
                 Node_Current->Childs.push_back(Track);
@@ -505,23 +555,28 @@ Ztring MediaInfo_Internal::Inform()
         {
             Retour=Ztring().From_UTF8(To_XML(*Node_Main, 0, false, false));
             delete Node_Main;
-            delete Node_MI;
         }
     #endif //MEDIAINFO_XML_YES
     #if defined(MEDIAINFO_JSON_YES)
         if (JSON)
         {
-            Retour=__T("{\n");
+            Retour+=__T('{');
+            if (!Conformance_JSON)
+                Retour+=__T('\n');
             Node Node_Version("creatingLibrary");
             Node_Version.Add_Child("name", Ztring("MediaInfoLib"));
             Node_Version.Add_Child("version", Ztring(MediaInfo_Version).SubString(__T(" - v"), Ztring()));
-            Node_Version.Add_Child("url", Ztring(__T("http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/MediaInfo")));
-            Retour+=Ztring().From_UTF8(To_JSON(Node_Version, 0, false, false))+__T(",\n");
+            if (!Conformance_JSON)
+                Node_Version.Add_Child("url", Ztring(__T("http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/MediaInfo")));
+            Retour+=Ztring().From_UTF8(To_JSON(Node_Version, 0, false, false, false))+__T(',');
+            if (!Conformance_JSON)
+                Retour+=__T('\n');
 
-            Retour+=Ztring().From_UTF8(To_JSON(*Node_Main, 0, false, false));
-            Retour+=__T("\n}");
+            Retour+=Ztring().From_UTF8(To_JSON(*Node_Main, 0, false, false, false));
+            if (!Conformance_JSON)
+                Retour+=__T('\n');
+            Retour+=__T('}');
             delete Node_Main;
-            delete Node_MI;
         }
     #endif //MEDIAINFO_JSON_YES
 
@@ -546,6 +601,11 @@ Ztring MediaInfo_Internal::Inform()
             }
         }
     #endif //MEDIAINFO_TRACE
+
+    #if defined(MEDIAINFO_JSON_YES)
+    if (MediaInfoLib::Config.Inform_Get()==__T("JSON_URL") || MediaInfoLib::Config.Inform_Get()==__T("Conformance_JSON"))
+        Retour.From_UTF8("https://mediaarea.net/MoreInfo?mi="+URL_Encoded_Encode(Retour.To_UTF8()));
+    #endif //defined(MEDIAINFO_JSON_YES)
 
     return Retour;
 
@@ -587,6 +647,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
         bool XML=false;
         bool XML_0_7_78=false;
         bool JSON=false;
+        bool Conformance_JSON=false;
         #endif //MEDIAINFO_XML_YES || MEDIAINFO_JSON_YES
 
         #if defined(MEDIAINFO_HTML_YES)
@@ -599,7 +660,8 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
             XML=true;
         #endif //defined(MEDIAINFO_XML_YES)
         #if defined(MEDIAINFO_JSON_YES)
-        JSON=MediaInfoLib::Config.Inform_Get()==__T("JSON")?true:false;
+        JSON=(MediaInfoLib::Config.Inform_Get()==__T("JSON") || MediaInfoLib::Config.Inform_Get()==__T("JSON_URL") || MediaInfoLib::Config.Inform_Get()==__T("Conformance_JSON"))?true:false;
+        Conformance_JSON=MediaInfoLib::Config.Inform_Get()==__T("JSON_URL") || MediaInfoLib::Config.Inform_Get()==__T("Conformance_JSON");
         #endif //defined(MEDIAINFO_JSON_YES)
         #if defined(MEDIAINFO_CSV_YES)
         bool CSV=MediaInfoLib::Config.Inform_Get()==__T("CSV")?true:false;
@@ -662,6 +724,14 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                 Shouldshow=true;
             if (!Shouldshow && MediaInfoLib::Config.Complete_Get())
                 Shouldshow=true;
+            #if defined(MEDIAINFO_JSON_YES)
+                if (Conformance_JSON)
+                {
+                    Ztring Name=Get((stream_t)StreamKind, StreamPos, Champ_Pos, Info_Name);
+                    if (Name!=__T("Format") && Name.rfind(__T("Conformance"), 11))
+                        Shouldshow=false; // Override, it is intended only for conformance checks
+                }
+            #endif 
             if (Shouldshow && !Get((stream_t)StreamKind, StreamPos, Champ_Pos, Info_Text).empty())
             {
                 #if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
@@ -719,10 +789,14 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                         size_t Space=SubName.rfind(' ');
                         if (Space!=(size_t)-1)
                             SubName.erase(0, Space+1);
-                        size_t NumbersPos=SubName.find_last_not_of("0123456789");
+                        size_t NumbersPos=SubName.find_first_of("0123456789");
                         if (NumbersPos!=(size_t)-1)
-                            SubName.resize(NumbersPos+1);
-                        bool IsArray=(NextName.size()==Nom.size()+4 && NextName.find(__T(" Pos"), Nom.size())==Nom.size());
+                            SubName.resize(NumbersPos);
+                        if (XML_0_7_78 || JSON)
+                            SubName=Xml_Name_Escape_0_7_78(Ztring().From_UTF8(SubName)).To_UTF8();
+                        else
+                            SubName=Xml_Name_Escape(Ztring().From_UTF8(SubName)).To_UTF8();
+                        bool IsArray=NumbersPos!=(size_t)-1;
                         Node* Node_Sub=new Node(SubName.c_str(), IsArray);
                         Fields_Current->push_back(Node_Sub);
                         Nested.resize(Nested.size()+1);
@@ -815,7 +889,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                             Valeur.erase(SeparatorPos);
                         }
                     }
-                    if ((XML_0_7_78 || JSON) && (Nom==__T("Format_Profile") || Nom==__T("SamplingRate") || Nom==__T("Channel(s)") || Nom==__T("ChannelPositions") || Nom==__T("ChannelLayout")))
+                    if ((XML_0_7_78 || JSON) && StreamKind==Stream_Audio && (Nom==__T("Format_Profile") || Nom==__T("SamplingRate") || Nom==__T("Channel(s)") || Nom==__T("ChannelPositions") || Nom==__T("ChannelLayout")))
                     {
                         size_t SlashPos = Valeur.find(__T(" / "));
                         if (SlashPos!=string::npos)
@@ -880,7 +954,15 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
             if (XML)
                 Retour+=Ztring().From_UTF8(To_XML(*(Fields[Field]), 1, false, false));
             else if (JSON)
-                Retour+=Ztring().From_UTF8(To_JSON(*(Fields[Field]), 1, false, false)+(Field<Fields.size()-1?",\n":""));
+            {
+                Retour+=Ztring().From_UTF8(To_JSON(*(Fields[Field]), 1, false, false, false));
+                if (Field<Fields.size()-1)
+                {
+                    Retour+=__T(',');
+                    if (!Conformance_JSON)
+                        Retour+=__T('\n');
+                }
+            }
             delete Fields[Field];
         }
         #endif //defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
@@ -946,7 +1028,12 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                 Elements_Index=2;
         }
         else
-            Elements_Index=2;
+        {
+            if (!Get(StreamKind, StreamPos, Elements(0)).empty())
+                Elements_Index=1;
+            else
+                Elements_Index=2;
+        }
 
         //Replace
         while (Elements(Elements_Index).SubString(__T("%"), __T("%")).size()>0)

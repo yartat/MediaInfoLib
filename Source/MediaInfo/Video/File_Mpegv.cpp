@@ -1443,13 +1443,13 @@ void File_Mpegv::Streams_Fill()
         {
             if (group_start_closed_gop_Open)
             {
-                Fill(Stream_Video, 0, "Gop_OpenClosed", "Open");
+                Fill(Stream_Video, 0, Video_Gop_OpenClosed, "Open");
                 if (group_start_closed_gop)
-                    Fill(Stream_Video, 0, "Gop_OpenClosed_FirstFrame", "Closed");
+                    Fill(Stream_Video, 0, Video_Gop_OpenClosed_FirstFrame, "Closed");
             }
             else
             {
-                Fill(Stream_Video, 0, "Gop_OpenClosed", "Closed");
+                Fill(Stream_Video, 0, Video_Gop_OpenClosed, "Closed");
             }
         }
 
@@ -1584,25 +1584,27 @@ void File_Mpegv::Streams_Finish()
     }
     else if (!TimeCodeIsNotTrustable && Time_End_Seconds!=Error && FrameRate)
     {
-        TimeCode Time_Begin_TC;
-        const int8u ceilFrameRate=(int8u)ceil(FrameRate);
-        Time_Begin_TC.FramesPerSecond=ceilFrameRate;
-        Time_Begin_TC.DropFrame=group_start_IsParsed?group_start_drop_frame_flag:((FrameRate-ceilFrameRate)?true:false);
-        Time_Begin_TC.Hours=(int8u)(Time_Begin_Seconds/3600);
-        Time_Begin_TC.Minutes=(int8u)((Time_Begin_Seconds%3600)/60);
-        Time_Begin_TC.Seconds=(int8u)(Time_Begin_Seconds%60);
-        Time_Begin_TC.Frames=(int8u)Time_Begin_Frames;
-        TimeCode Time_End_TC;
-        Time_End_TC.FramesPerSecond=ceilFrameRate;
-        Time_End_TC.DropFrame=Time_Begin_TC.DropFrame;
-        Time_End_TC.Hours=(int8u)(Time_End_Seconds/3600);
-        Time_End_TC.Minutes=(int8u)((Time_End_Seconds%3600)/60);
-        Time_End_TC.Seconds=(int8u)(Time_End_Seconds%60);
-        Time_End_TC.Frames=(int8u)Time_End_Frames;
-        int64u Time_Begin_FrameCount=Time_Begin_TC.ToFrames();
-        int64u Time_End_FrameCount = Time_End_TC.ToFrames();
-        Fill(Stream_Video, 0, Video_FrameCount, Time_End_FrameCount-Time_Begin_FrameCount, 0);
-        Fill(Stream_Video, 0, Video_Duration, (Time_End_FrameCount-Time_Begin_FrameCount)/FrameRate*1000, 0);
+        const int32u ceilFrameRate=(int32u)ceil(FrameRate);
+        if (Time_End_Frames>=ceilFrameRate)
+        {
+            auto AddToSeconds=Time_End_Frames/ceilFrameRate;
+            auto NewFrames=Time_End_Frames%ceilFrameRate;
+            Time_End_Seconds+=AddToSeconds;
+            Time_End_Frames=NewFrames;
+        }
+        bool DropFrame=group_start_IsParsed?group_start_drop_frame_flag:((FrameRate==ceilFrameRate)?true:false);
+        int32u FramesMax=ceilFrameRate-1;
+        TimeCode Time_Begin_TC(Time_Begin_Seconds/3600, (int8u)((Time_Begin_Seconds%3600)/60), (int8u)(Time_Begin_Seconds%60), Time_Begin_Frames, FramesMax, TimeCode::DropFrame(DropFrame));
+        TimeCode Time_End_TC  (Time_End_Seconds  /3600, (int8u)((Time_End_Seconds  %3600)/60), (int8u)(Time_End_Seconds  %60), Time_End_Frames  , FramesMax, TimeCode::DropFrame(DropFrame));
+        if (Time_Begin_TC.IsValid() && Time_End_TC.IsValid())
+        {
+            int64u FrameCount=Time_End_TC.ToFrames()-Time_Begin_TC.ToFrames();
+            if (FrameCount)
+            {
+                Fill(Stream_Video, 0, Video_FrameCount, FrameCount, 0);
+                Fill(Stream_Video, 0, Video_Duration, FrameCount/FrameRate*1000, 0);
+            }
+        }
     }
 
     //picture_coding_types
@@ -1766,7 +1768,7 @@ bool File_Mpegv::Synched_Test()
 void File_Mpegv::Synched_Init()
 {
     if (!Frame_Count_Valid)
-        Frame_Count_Valid=Config->ParseSpeed>=0.3?512:2;
+        Frame_Count_Valid=Config->ParseSpeed>=0.3?512:(IsSub?1:2);
 
     //Temp
     BVOP_Count=0;
@@ -3436,8 +3438,8 @@ void File_Mpegv::user_data_start_DTG1()
                 if (vertical_size_value && Mpegv_aspect_ratio1[aspect_ratio_information])
                     DAR=((float32)(0x1000*horizontal_size_extension+horizontal_size_value))/(0x1000*vertical_size_extension+vertical_size_value)/Mpegv_aspect_ratio1[aspect_ratio_information];
             }
-            if (DAR>=1.330 && DAR<1.336) ((File_AfdBarData*)DTG1_Parser)->aspect_ratio_FromContainer=0; //4/3
-            if (DAR>=1.774 && DAR<1.780) ((File_AfdBarData*)DTG1_Parser)->aspect_ratio_FromContainer=1; //16/9
+            if (DAR>=4.0/3.0*0.95 && DAR<4.0/3.0*1.05) ((File_AfdBarData*)DTG1_Parser)->aspect_ratio_FromContainer=0; //4/3
+            if (DAR>=16.0/9.0*0.95 && DAR<16.0/9.0*1.05) ((File_AfdBarData*)DTG1_Parser)->aspect_ratio_FromContainer=1; //16/9
         }
         if (DTG1_Parser->PTS_DTS_Needed)
         {

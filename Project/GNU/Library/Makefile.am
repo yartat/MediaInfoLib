@@ -51,6 +51,7 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/Audio/File_Amr.cpp \
                        ../../../Source/MediaInfo/Audio/File_Amv.cpp \
                        ../../../Source/MediaInfo/Audio/File_Ape.cpp \
+                       ../../../Source/MediaInfo/Audio/File_Aptx100.cpp \
                        ../../../Source/MediaInfo/Audio/File_Au.cpp \
                        ../../../Source/MediaInfo/Audio/File_Caf.cpp \
                        ../../../Source/MediaInfo/Audio/File_Celt.cpp \
@@ -66,6 +67,7 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/Audio/File_Iab.cpp \
                        ../../../Source/MediaInfo/Audio/File_ImpulseTracker.cpp \
                        ../../../Source/MediaInfo/Audio/File_La.cpp \
+                       ../../../Source/MediaInfo/Audio/File_Mga.cpp \
                        ../../../Source/MediaInfo/Audio/File_Midi.cpp \
                        ../../../Source/MediaInfo/Audio/File_Module.cpp \
                        ../../../Source/MediaInfo/Audio/File_Mpc.cpp \
@@ -154,6 +156,7 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/Multiple/File_MpegTs.cpp \
                        ../../../Source/MediaInfo/Multiple/File_MpegTs_Duplicate.cpp \
                        ../../../Source/MediaInfo/Multiple/File_Mxf.cpp \
+                       ../../../Source/MediaInfo/Multiple/File_Nsv.cpp \
                        ../../../Source/MediaInfo/Multiple/File_Nut.cpp \
                        ../../../Source/MediaInfo/Multiple/File_Ogg.cpp \
                        ../../../Source/MediaInfo/Multiple/File_Ogg_SubElement.cpp \
@@ -228,9 +231,11 @@ lib@MediaInfoLib_LibName@_la_SOURCES = \
                        ../../../Source/MediaInfo/Video/File_Vc1.cpp \
                        ../../../Source/MediaInfo/Video/File_Vc3.cpp \
                        ../../../Source/MediaInfo/Video/File_Vp8.cpp \
+                       ../../../Source/MediaInfo/Video/File_Vp9.cpp \
                        ../../../Source/MediaInfo/Video/File_Y4m.cpp \
                        ../../../Source/MediaInfo/XmlUtils.cpp \
-                       ../../../Source/MediaInfo/OutputHelpers.cpp
+                       ../../../Source/MediaInfo/OutputHelpers.cpp \
+                       ../../../Source/ThirdParty/tfsxml/tfsxml.c
 
 @MediaInfoLib_LibName@includedir = $(includedir)/MediaInfo
 @MediaInfoLib_LibName@include_HEADERS = \
@@ -280,7 +285,6 @@ endif
 
 if COMPILE_TINYXML2
 lib@MediaInfoLib_LibName@_la_SOURCES += \
-                       ../../../Source/ThirdParty/tfsxml/tfsxml.c \
                        ../../../Source/ThirdParty/tinyxml2/tinyxml2.cpp
 endif
 
@@ -289,6 +293,7 @@ lib@MediaInfoLib_LibName@_la_LDFLAGS     = -no-undefined -version-info 0:0:0
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libmediainfo.pc
 
+AM_CXXFLAGS = -std=c++11
 AM_CPPFLAGS = -I../../../Source -I../../../../ZenLib/Source
 
 TESTS_DIR = test

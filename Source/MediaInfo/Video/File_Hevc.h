@@ -349,6 +349,7 @@ private :
     //Elements
     void slice_segment_layer();
     void video_parameter_set();
+    void video_parameter_sets_creating_data(int8u vps_video_parameter_set_id, int8u vps_max_sub_layers_minus1);
     void seq_parameter_set();
     void pic_parameter_set();
     void access_unit_delimiter();
@@ -363,20 +364,26 @@ private :
     void sei_message_user_data_registered_itu_t_t35();
     void sei_message_user_data_registered_itu_t_t35_B5();
     void sei_message_user_data_registered_itu_t_t35_B5_0031();
+    void sei_message_user_data_registered_itu_t_t35_B5_0031_DTG1();
     void sei_message_user_data_registered_itu_t_t35_B5_0031_GA94();
     void sei_message_user_data_registered_itu_t_t35_B5_0031_GA94_03();
     void sei_message_user_data_registered_itu_t_t35_B5_0031_GA94_03_Delayed(int32u seq_parameter_set_id);
+    void sei_message_user_data_registered_itu_t_t35_B5_0031_GA94_09();
     void sei_message_user_data_registered_itu_t_t35_B5_003A();
     void sei_message_user_data_registered_itu_t_t35_B5_003A_00();
     void sei_message_user_data_registered_itu_t_t35_B5_003A_02();
     void sei_message_user_data_registered_itu_t_t35_B5_003C();
     void sei_message_user_data_registered_itu_t_t35_B5_003C_0001();
     void sei_message_user_data_registered_itu_t_t35_B5_003C_0001_04();
+    void sei_message_user_data_registered_itu_t_t35_26();
+    void sei_message_user_data_registered_itu_t_t35_26_0004();
+    void sei_message_user_data_registered_itu_t_t35_26_0004_0005();
     void sei_message_user_data_unregistered(int32u payloadSize);
     void sei_message_user_data_unregistered_Ateme(int32u payloadSize);
     void sei_message_user_data_unregistered_x265(int32u payloadSize);
     void sei_message_recovery_point();
     void sei_message_active_parameter_sets();
+    void sei_time_code();
     void sei_message_decoded_picture_hash(int32u payloadSize);
     void sei_message_mastering_display_colour_volume();
     void sei_message_light_level();
@@ -472,11 +479,14 @@ private :
     Ztring                              Encoded_Library_Settings;
     enum hdr_format
     {
-        HdrFormat_EtsiTs103433,
+        HdrFormat_SmpteSt209410,
         HdrFormat_SmpteSt209440,
+        HdrFormat_EtsiTs103433,
+        HdrFormat_HdrVivid,
         HdrFormat_SmpteSt2086,
+        HdrFormat_Max,
     };
-    typedef std::map<hdr_format, std::map<video, Ztring> > hdr;
+    typedef std::map<video, Ztring[HdrFormat_Max]> hdr;
     hdr                                 HDR;
     Ztring                              EtsiTS103433;
     int32u  chroma_format_idc;
@@ -484,8 +494,8 @@ private :
     int32u  slice_type;
     int32u  chroma_sample_loc_type_top_field;
     int32u  chroma_sample_loc_type_bottom_field;
-    int16u  maximum_content_light_level;
-    int16u  maximum_frame_average_light_level;
+    Ztring  maximum_content_light_level;
+    Ztring  maximum_frame_average_light_level;
     int8u   nuh_layer_id;
     int8u   profile_space;
     int8u   profile_idc;

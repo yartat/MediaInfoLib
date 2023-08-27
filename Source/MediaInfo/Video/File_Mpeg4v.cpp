@@ -304,7 +304,7 @@ bool File_Mpeg4v::Synched_Test()
 void File_Mpeg4v::Synched_Init()
 {
     if (!Frame_Count_Valid)
-        Frame_Count_Valid=Config->ParseSpeed>=0.3?30:2;
+        Frame_Count_Valid=Config->ParseSpeed>=0.3?30:(IsSub?1:2);
 
     //Count of a Packets
     IVOP_Count=0;
@@ -1411,7 +1411,7 @@ void File_Mpeg4v::user_data_start()
                     {
                         Date[4]=__T('-');
                         Date[7]=__T('-');
-                        Library_Date=__T("UTC ")+Date;
+                        Library_Date=Date+__T(" UTC");
                     }
                 }
             }

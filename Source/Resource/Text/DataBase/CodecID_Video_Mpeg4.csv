@@ -62,6 +62,10 @@ blnd;Alpha Compositor;;;;;;;
 blur;Blur;;;;;;CMYK;
 brlt;Blackmagic RAW;;;https://www.blackmagicdesign.com/products/blackmagicraw;LT;;;
 brxq;Blackmagic RAW;;;https://www.blackmagicdesign.com/products/blackmagicraw;XQ;;;
+brst;Blackmagic RAW;;;https://www.blackmagicdesign.com/products/blackmagicraw;ST;;;
+brvm;Blackmagic RAW;;;https://www.blackmagicdesign.com/products/blackmagicraw;VM;;;
+brhq;Blackmagic RAW;;;https://www.blackmagicdesign.com/products/blackmagicraw;HQ;;;
+brvl;Blackmagic RAW;;;https://www.blackmagicdesign.com/products/blackmagicraw;VL;;;
 CFHD;CineForm;;CineForm High-Definition (HD) wavelet codec;http://www.cineform.com/;;;;
 CHQX;Canopus HQX;;;;;;;
 CLLC;Canopus Lossless;;;;;;;
@@ -169,6 +173,8 @@ SVQ3;Sorenson 3;;Sorenson Media Video 3 (Apple QuickTime 5);http://www.apple.com
 v210;YUV;AJA Video Systems Xena;;;;;YUV;4:2:2
 V210;YUV;AJA Video Systems Xena;;;;;YUV;4:2:2
 vc-1;VC-1;;SMPTE VC-1;http://www.smpte.org/;;;YUV;
+vvc1;VVC;;Versatile Video Coding;;;;;
+vvi1;VVC;;Versatile Video Coding;;;;;
 WMV3;VC-1;WMV3;Windows Media Video 9;http://www.microsoft.com/windows/windowsmedia/format/codecdownload.aspx;;;;
 WRLE;Bitmap;;Windows BMP image format;http://www.apple.com/quicktime/download/standalone.html;;;YUV;
 xd50;MPEG Video;;;http://www.apple.com/quicktime/download/standalone.html;;;YUV

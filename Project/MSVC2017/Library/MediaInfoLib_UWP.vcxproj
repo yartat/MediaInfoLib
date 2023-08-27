@@ -197,6 +197,7 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Dsdiff.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Dsf.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Iab.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Mga.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Mpegh3da.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_OpenMG.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Opus.cpp" />
@@ -263,6 +264,7 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Amr.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Amv.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Ape.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Aptx100.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Au.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Dts.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_ExtendedModule.cpp" />
@@ -299,6 +301,7 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Ivf.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Lxf.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_MiXml.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Nsv.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_P2_Clip.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Pmp.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Ptx.cpp" />
@@ -327,7 +330,12 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Text\File_Teletext.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Text\File_TimedText.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Text\File_Ttml.cpp" />
-    <ClCompile Include="..\..\..\Source\MediaInfo\TimeCode.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\TimeCode.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Av1.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_CineForm.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_DolbyVisionMetadata.cpp" />
@@ -416,6 +424,7 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Export\Export_PBCore.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Vc3.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Vp8.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Vp9.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Y4m.cpp" />
     <ClCompile Include="..\..\..\Source\ThirdParty\aes-gladman\aescrypt.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
@@ -499,6 +508,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Dsdiff.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Dsf.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Iab.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Mga.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Mpegh3da.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_OpenMG.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Opus.h" />
@@ -562,6 +572,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Ism.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Ivf.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Lxf.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Nsv.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_P2_Clip.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Pmp.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Ptx.h" />
@@ -593,6 +604,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Amr.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Amv.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Ape.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Aptx100.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Au.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Dts.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_ExtendedModule.h" />
@@ -707,6 +719,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Export\Export_PBCore.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_Vc3.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_Vp8.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_Vp9.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_Y4m.h" />
     <ClInclude Include="..\..\..\Source\ThirdParty\aes-gladman\aes.h" />
     <ClInclude Include="..\..\..\Source\ThirdParty\aes-gladman\aescpp.h" />

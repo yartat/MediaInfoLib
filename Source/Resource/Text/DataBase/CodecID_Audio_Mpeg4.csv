@@ -4,18 +4,21 @@ aac ;AAC;;;
 ac-3;AC-3;;;;
 alac;ALAC;;Apple Lossless Audio Codec;http://www.apple.com/quicktime/download/standalone.html;
 alaw;ADPCM;;;http://www.apple.com/quicktime/download/standalone.html;
-dtsc;DTS;;Digital Theater Systems;http://www.dts.com;
-dtsh;DTS;HRA;Digital Theater Systems High Res;http://www.dts.com;
-dtsl;DTS;MA;Digital Theater Systems Master Audio;http://www.dts.com;
-dtse;DTS;Express;;Digital Theater Systems Low Bitrate;http://www.dts.com;
+dtsc;DTS;;;http://www.dts.com;
+dtsh;DTS;;;http://www.dts.com;HRA
+dtsl;DTS;;;http://www.dts.com;MA
+dtse;DTS;;;http://www.dts.com;Express
+dtsx;DTS-UHD;;;http://www.dts.com
 dvca;PCM;;;http://www.apple.com/quicktime/download/standalone.html;
 ec-3;E-AC-3;;;;
 enca;(Encrypted);;;;
-fl32;PCM ; ;;http://www.apple.com/quicktime/download/standalone.html;
+fl32;PCM;;;http://www.apple.com/quicktime/download/standalone.html;
 fl64;PCM;;;http://www.apple.com/quicktime/download/standalone.html;
+fLaC;FLAC;;;
 ima4;ADPCM;;;http://www.apple.com/quicktime/download/standalone.html;
 in24;PCM;;;http://www.apple.com/quicktime/download/standalone.html;
 in32;PCM;;;http://www.apple.com/quicktime/download/standalone.html;
+ipcm;PCM;;;;
 lpcm;PCM;;;;
 MAC3;MACE 3;;;;
 MAC6;MACE 6;;;;

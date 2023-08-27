@@ -17,6 +17,7 @@
 
 //---------------------------------------------------------------------------
 #include "MediaInfo/File__Analyze.h"
+#include "MediaInfo/TimeCode.h"
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -53,6 +54,10 @@ private :
 
     //Temp
     File__Analyze* Parser;
+    int64u FrameDurationNanoSeconds;
+    int8u FrameRate;
+    bool  FrameRate_Is1001;
+    TimeCode TimeCode_FirstFrame;
 };
 
 } //NameSpace

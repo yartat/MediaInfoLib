@@ -37,13 +37,17 @@ namespace MediaInfoLib
 //***************************************************************************
 
 //---------------------------------------------------------------------------
-extern const size_t Aac_sampling_frequency_Size=13;
-extern const size_t Aac_sampling_frequency_Size_Usac=31; // USAC expands Aac_sampling_frequency[]
-extern const int32u Aac_sampling_frequency[Aac_sampling_frequency_Size_Usac]=
-{96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
- 16000, 12000, 11025,  8000,  7350,     0,     0, 57600,
- 51200, 40000, 38400, 34150, 28800, 25600, 20000, 19200,
- 17075, 14400, 12800,  9600,     0,     0,     0};
+extern const int32u Aac_sampling_frequency[]=
+{
+     96000, 88200, 64000, 48000,
+     44100, 32000, 24000, 22050,
+     16000, 12000, 11025,  8000,
+      7350,     0,     0, 57600,
+     51200, 40000, 38400, 34150,
+     28800, 25600, 20000, 19200,
+     17075, 14400, 12800,  9600,
+         0,     0,     0,
+};
 
 //---------------------------------------------------------------------------
 static const char* Aac_Adts_ID[]=
@@ -162,9 +166,7 @@ const char* Aac_audioObjectType(int8u audioObjectType)
 }
 
 //---------------------------------------------------------------------------
-static const int8u Aac_Channels_Size_Usac=14;
-static const int8u Aac_Channels_Size=21;
-static const int8u Aac_Channels[Aac_Channels_Size]=
+extern const int8u Aac_Channels[Aac_Channels_Size]=
 {
     0,
     1,
@@ -374,8 +376,6 @@ static const char* const Aac_OutputChannelPosition[Aac_OutputChannelPosition_Siz
 };
 extern string Aac_OutputChannelPosition_GetString(int8u OutputChannelPosition)
 {
-    if (!OutputChannelPosition)
-        return string();
     if (OutputChannelPosition>=Aac_OutputChannelPosition_Size)
         return "OutputChannelPosition"+Ztring::ToZtring(OutputChannelPosition).To_UTF8();
 
@@ -401,12 +401,18 @@ extern string Aac_ChannelLayout_GetString(const Aac_OutputChannel* const OutputC
     Value.resize(Value.size()-1);
     return Value;
 }
-extern string Aac_ChannelLayout_GetString(int8u ChannelLayout, bool IsMpegh3da=false)
+string Aac_ChannelLayout_GetString(int8u ChannelLayout, bool IsMpegh3da=false, bool IsTip=false)
 {
     if (!ChannelLayout)
         return string();
+    if (ChannelLayout==1)
+        return IsTip?" (M)":"M";
     if (ChannelLayout>=(IsMpegh3da?Aac_Channels_Size:Aac_Channels_Size_Usac))
+    {
+        if (IsTip)
+            return {};
         return "ChannelLayout"+Ztring::ToZtring(ChannelLayout).To_UTF8();
+    }
 
     // Compute start/end in Aac_ChannelLayout array
     int Aac_ChannelLayout_Start=0;
@@ -415,7 +421,10 @@ extern string Aac_ChannelLayout_GetString(int8u ChannelLayout, bool IsMpegh3da=f
     int Aac_ChannelLayout_End=Aac_ChannelLayout_Start+Aac_Channels[ChannelLayout];
 
     // Build the string
-    return Aac_ChannelLayout_GetString((IsMpegh3da?Aac_ChannelLayout_MpegH:Aac_ChannelLayout)+Aac_ChannelLayout_Start, Aac_ChannelLayout_End-Aac_ChannelLayout_Start);
+    auto V=Aac_ChannelLayout_GetString((IsMpegh3da?Aac_ChannelLayout_MpegH:Aac_ChannelLayout)+Aac_ChannelLayout_Start, Aac_ChannelLayout_End-Aac_ChannelLayout_Start);
+    if (IsTip)
+        return " ("+V+')';
+    return V;
 }
 extern string Aac_ChannelLayout_GetString(const vector<Aac_OutputChannel>& OutputChannels)
 {
@@ -516,6 +525,8 @@ extern string Aac_ChannelMode_GetString(int8u ChannelLayout, bool IsMpegh3da=fal
 {
     if (!ChannelLayout)
         return string();
+    if (ChannelLayout==1)
+        return "M";
     if (ChannelLayout>=(IsMpegh3da?Aac_Channels_Size:Aac_Channels_Size_Usac))
         return "ChannelLayout"+Ztring::ToZtring(ChannelLayout).To_UTF8();
 
@@ -536,17 +547,19 @@ extern string Aac_ChannelMode_GetString(const vector<Aac_OutputChannel>& OutputC
 }
 
 //---------------------------------------------------------------------------
-int8u Aac_AudioSpecificConfig_sampling_frequency_index(const int64s sampling_frequency)
+int8u Aac_AudioSpecificConfig_sampling_frequency_index(const int64s sampling_frequency, bool usac=false)
 {
     if (sampling_frequency>=92017) return 0;
     if (sampling_frequency>=75132) return 1;
     if (sampling_frequency>=55426) return 2;
     if (sampling_frequency>=46009) return 3;
-    if (sampling_frequency>=37566) return 4;
+    if (sampling_frequency>=37566 && !usac) return 4;
+    if (sampling_frequency>=42000 && usac) return 4;
+    if (sampling_frequency>=35777 && usac) return 17;
     if (sampling_frequency>=27713) return 5;
     if (sampling_frequency>=23004) return 6;
     if (sampling_frequency>=18783) return 7;
-    if (sampling_frequency>=13856) return 8;
+    if (sampling_frequency>=13856 || usac) return 8;
     if (sampling_frequency>=11502) return 9;
     if (sampling_frequency>=9391) return 10;
     return 11;
@@ -572,6 +585,10 @@ void File_Aac::AudioSpecificConfig (size_t End)
         Frequency_b=Aac_sampling_frequency[sampling_frequency_index];
     else
         Frequency_b=0;
+    #if MEDIAINFO_CONFORMANCE
+        if (ConformanceFlags && SamplingRate && Frequency_b!=SamplingRate) //TODO: handling of AAC implicit SBR
+            Fill_Conformance("Crosscheck AudioSampleEntry samplerate", ("MP4 AudioSampleEntry samplerate " + to_string(SamplingRate) + " does not match MP4 AudioSpecificConfig samplingFrequency " + to_string(Frequency_b)).c_str());
+    #endif
     Get_S1 (4, channelConfiguration,                            "channelConfiguration"); Param_Info1(Aac_ChannelConfiguration[channelConfiguration]);
     if (audioObjectType==5 || audioObjectType==29)
     {
@@ -769,7 +786,7 @@ void File_Aac::AudioSpecificConfig (size_t End)
         Skip_BS(Data_BS_Remain()-End,                           LastByte?"Unknown":"Padding");
     }
 
-    FILLING_BEGIN();
+    //FILLING_BEGIN();
         AudioSpecificConfig_OutOfBand (Frequency_b, audioObjectType, sbrData, psData, sbrPresentFlag, psPresentFlag);
         if (Frame_Count==(size_t)-1)
         {
@@ -778,7 +795,7 @@ void File_Aac::AudioSpecificConfig (size_t End)
             else
                 File__Analyze::Finish();
         }
-    FILLING_END()
+    //FILLING_END()
 }
 
 //---------------------------------------------------------------------------
@@ -832,6 +849,10 @@ void File_Aac::AudioSpecificConfig_OutOfBand (int64s sampling_frequency_, int8u 
         Infos["ChannelPositions/String2"].From_UTF8(Aac_ChannelConfiguration2_GetString(channelConfiguration));
         Infos["ChannelLayout"].From_UTF8(Aac_ChannelLayout_GetString(channelConfiguration));
     }
+    else if (audioObjectType_==42 && !Conf.WaitForNextIndependantFrame && Conf.numOutChannels)
+    {
+        Infos["Channel(s)"].From_Number(Conf.numOutChannels);
+    }
 
     if (sbrPresentFlag || !Infos["Format_Settings_SBR"].empty())
     {
@@ -858,10 +879,6 @@ void File_Aac::AudioSpecificConfig_OutOfBand (int64s sampling_frequency_, int8u 
         FillInfosHEAACv2(psData ? __T("Explicit") : __T("NBC")); // "Not Backward Compatible");
     else if (psData)
         Infos["Format_Settings_PS"]=__T("No (Explicit)");
-
-    //Commercial names
-    if (Infos["Format"]==__T("USAC"))
-        Infos["Format_Commercial_IfAny"]=__T("xHE-AAC");
 }
 
 //---------------------------------------------------------------------------
@@ -1148,7 +1165,7 @@ void File_Aac::PayloadMux()
                                 Frame_Count_Valid=0;
                             }
                             else
-                                raw_data_block();
+                                payload(Data_BS_Remain()-8*MuxSlotLengthBytes[streamID[prog][lay]]);
                             break;
                     case 1 :
                             Skip_BS(8 * (frameLength[streamID[prog][lay]] + 20),"payload[streamID[prog][lay]]");
@@ -1169,7 +1186,7 @@ void File_Aac::PayloadMux()
             switch(frameLengthType[streamID[prog][lay]])
             {
                 case 0 :
-                        raw_data_block(); //Skip_BS(MuxSlotLengthBytes[streamID[prog][lay]], "payload[streamID[prog][lay]]");
+                        payload(); //Skip_BS(MuxSlotLengthBytes[streamID[prog][lay]], "payload[streamID[prog][lay]]");
                         break;
                 case 1 :
                         Skip_BS(8*(frameLength[streamID[prog][lay]]+20), "payload[streamID[prog][lay]]");
@@ -1291,7 +1308,7 @@ void File_Aac::adif_header()
 
     FILLING_BEGIN();
         Fill(Stream_General, 0, General_Format, "ADIF", Unlimited, true, true);
-        Fill(Stream_General, 0, General_HeaderSize, Element_Size);
+        Fill(Stream_General, 0, General_HeaderSize, Element_Offset);
         Fill(Stream_General, 0, General_OverallBitRate_Mode, bitstream_type?"VBR":"CBR");
 
         for (size_t StreamPos=0; StreamPos<Count_Get(Stream_Audio); StreamPos++)
@@ -1302,9 +1319,6 @@ void File_Aac::adif_header()
             if (bitrate>0)
                 Infos[bitstream_type?"BitRate_Maximum":"BitRate"].From_Number(bitrate);
         }
-
-        //No more need data
-        File__Tags_Helper::Finish("ADIF");
     FILLING_END();
 }
 
@@ -1404,7 +1418,10 @@ void File_Aac::adts_fixed_header()
             Infos["ChannelLayout"].From_UTF8(Aac_ChannelLayout_GetString(channelConfiguration));
             if (IsSub)
                 Infos["MuxingMode"].From_UTF8("ADTS");
+            ChannelCount_Temp=Aac_Channels_Get(channelConfiguration);
         }
+    FILLING_ELSE();
+        ChannelCount_Temp=0;
     FILLING_END();
 }
 

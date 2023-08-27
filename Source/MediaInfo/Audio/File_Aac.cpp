@@ -23,6 +23,8 @@
 //---------------------------------------------------------------------------
 #include "MediaInfo/Audio/File_Aac.h"
 #include "MediaInfo/MediaInfo_Config_MediaInfo.h"
+#include <string>
+using namespace std;
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -32,7 +34,8 @@ namespace MediaInfoLib
 // Infos
 //***************************************************************************
 
-extern const size_t Aac_sampling_frequency_Size;
+extern const char* Aac_audioObjectType(int8u audioObjectType);
+extern string Mpeg4_Descriptors_AudioProfileLevelIndicationString(const profilelevel_struct& ProfileLevel);
 
 //***************************************************************************
 // Constructor/Destructor
@@ -64,6 +67,11 @@ File_Aac::File_Aac()
     Frame_Count_Valid=0;
     FrameIsAlwaysComplete=false;
     Mode=Mode_Unknown;
+    
+    //Conformance
+    #if MEDIAINFO_CONFORMANCE
+        SamplingRate=0;
+    #endif
 
     audioObjectType=(int8u)-1;
     extensionAudioObjectType=(int8u)-1;
@@ -78,6 +86,9 @@ File_Aac::File_Aac()
     #if MEDIAINFO_ADVANCED
         aac_frame_length_Total=0;
     #endif //MEDIAINFO_ADVANCED
+    #if MEDIAINFO_MACROBLOCKS
+        ParseCompletely=0;
+    #endif //MEDIAINFO_MACROBLOCKS
 
     //Temp - Main
     muxConfigPresent=true;
@@ -87,6 +98,8 @@ File_Aac::File_Aac()
     sbr=NULL;
     ps=NULL;
     raw_data_block_Pos=0;
+    ChannelPos_Temp=0;
+    ChannelCount_Temp=0;
 
     //Temp
     CanFill=true;
@@ -115,6 +128,8 @@ void File_Aac::Streams_Accept()
                             TestContinuousFileNames();
         default : ;
     }
+    if (Frame_Count_NotParsedIncluded==(int64u)-1)
+        Frame_Count_NotParsedIncluded=0;
 }
 
 //---------------------------------------------------------------------------
@@ -206,6 +221,31 @@ void File_Aac::Streams_Finish()
             Fill(Stream_Audio, 0, Audio_BitRate_Mode, "CBR");
         }
     }
+
+    if (Mode==Mode_ADTS && !ChannelCount_Temp && ChannelPos_Temp && Retrieve_Const(Stream_Audio, 0, Audio_Channel_s_).empty())
+        Fill(Stream_Audio, 0, Audio_Channel_s_, ChannelPos_Temp);
+
+    #if MEDIAINFO_CONFORMANCE
+        if (audioObjectType==42 && !ConformanceFlags) {
+            ConformanceFlags.set(Usac);
+        }
+        if (Retrieve_Const(Stream_Audio, 0, "ConformanceErrors").empty() && Retrieve_Const(Stream_Audio, 0, "ConformanceWarnings").empty() && Retrieve_Const(Stream_Audio, 0, "ConformanceInfos").empty()) { //TODO: check why called twice in some cases
+        if (ProfileLevel.profile != UnknownAudio && ProfileLevel.profile != UnspecifiedAudio
+            && ((audioObjectType == 42 && !ConformanceFlags[BaselineUsac] && !ConformanceFlags[xHEAAC])
+             || (audioObjectType != 42 && (ConformanceFlags[BaselineUsac] || ConformanceFlags[xHEAAC])))) {
+            string ProfileLevelString = Mpeg4_Descriptors_AudioProfileLevelIndicationString(ProfileLevel);
+            auto audioObjectTypeString = to_string(audioObjectType);
+            auto audioObjectTypeTemp = Aac_audioObjectType(audioObjectType);
+            if (audioObjectTypeTemp && *audioObjectTypeTemp) {
+                audioObjectTypeString += " (";
+                audioObjectTypeString += audioObjectTypeTemp;
+                audioObjectTypeString += ')';
+            }
+            Fill_Conformance("Crosscheck InitialObjectDescriptor audioProfileLevelIndication", ("MP4 InitialObjectDescriptor audioProfileLevelIndication " + ProfileLevelString + " does not permit MP4 AudioSpecificConfig audioObjectType " + audioObjectTypeString).c_str(), bitset8().set(Usac).set(BaselineUsac).set(xHEAAC));
+        }
+        Streams_Finish_Conformance();
+        }
+    #endif
 }
 
 //***************************************************************************
@@ -251,6 +291,8 @@ bool File_Aac::FileHeader_Begin()
         File__Tags_Helper::Accept("ADIF");
         MustSynchronize=false;
     }
+    else if (Mode==Mode_ADIF)
+        File__Tags_Helper::Reject("ADIF");
 
     return true;
 }
@@ -269,13 +311,7 @@ void File_Aac::FileHeader_Parse()
 void File_Aac::FileHeader_Parse_ADIF()
 {
     adif_header();
-    BS_Begin();
-    raw_data_block();
-    BS_End();
-
-    FILLING_BEGIN();
-        File__Tags_Helper::Finish();
-    FILLING_END();
+    Mode=Mode_payload;
 }
 
 //***************************************************************************
@@ -289,15 +325,22 @@ void File_Aac::Read_Buffer_Continue()
         return;
 
     if (Frame_Count==0)
+    {
         PTS_Begin=FrameInfo.PTS;
+        #if MEDIAINFO_MACROBLOCKS
+            ParseCompletely=Config->File_Macroblocks_Parse_Get();
+        #endif //MEDIAINFO_MACROBLOCKS
+    }
 
     switch(Mode)
     {
         case Mode_AudioSpecificConfig : Read_Buffer_Continue_AudioSpecificConfig(); break;
-        case Mode_raw_data_block      : Read_Buffer_Continue_raw_data_block(); break;
+        case Mode_payload             : Read_Buffer_Continue_payload(); break;
         case Mode_ADIF                :
+        case Mode_LATM:
         case Mode_ADTS                : File__Tags_Helper::Read_Buffer_Continue(); break;
-        default                       : ;
+        default                       : if (Frame_Count)
+                                            File__Tags_Helper::Finish();
     }
 }
 
@@ -311,20 +354,14 @@ void File_Aac::Read_Buffer_Continue_AudioSpecificConfig()
     BS_End();
 
     Infos_AudioSpecificConfig=Infos;
-    Mode=Mode_raw_data_block; //Mode_AudioSpecificConfig only once
+    Mode=Mode_payload; //Mode_AudioSpecificConfig only once
 }
 
 //---------------------------------------------------------------------------
-void File_Aac::Read_Buffer_Continue_raw_data_block()
+void File_Aac::Read_Buffer_Continue_payload()
 {
-    if (Frame_Count>Frame_Count_Valid)
-    {
-        Skip_XX(Element_Size,                                   "Data");
-        return; //Parsing completely only the 1st frame
-    }
-
     BS_Begin();
-    raw_data_block();
+    payload();
     BS_End();
     if (FrameIsAlwaysComplete && Element_Offset<Element_Size)
         Skip_XX(Element_Size-Element_Offset,                    "Unknown");
@@ -344,11 +381,28 @@ void File_Aac::Read_Buffer_Continue_raw_data_block()
             //No more need data
             if (Mode==Mode_LATM)
                 File__Analyze::Accept();
-            File__Analyze::Finish();
+            File__Analyze::Fill();
+            if (Config->ParseSpeed<1.0)
+            {
+                Open_Buffer_Unsynch();
+                if (!IsSub && Mode!=Mode_LATM) //Mainly for knowinf it is ADIF, which has sometimes tags at the end
+                {
+                    Mode=Mode_Unknown;
+                    File__Tags_Helper::Finish();
+                }
+                else
+                    File__Analyze::Finish();
+            }
         }
     FILLING_ELSE();
         Infos=Infos_AudioSpecificConfig;
     FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+void File_Aac::Read_Buffer_Unsynched()
+{
+    FrameInfo=frame_info();
 }
 
 //***************************************************************************
@@ -755,6 +809,7 @@ void File_Aac::Data_Parse()
             File__Analyze::Accept();
 
         //Filling
+        TS_Add(frame_length);
         if (Frame_Count>=Frame_Count_Valid && Config->ParseSpeed<1.0)
         {
             //No more need data
@@ -765,6 +820,8 @@ void File_Aac::Data_Parse()
                                         if (!Status[IsFilled])
                                         {
                                             Fill();
+                                            if (File_Offset+Buffer_Offset+Element_Size!=File_Size)
+                                                Open_Buffer_Unsynch();
                                             if (!IsSub)
                                                 File__Tags_Helper::Finish();
                                         }
@@ -773,8 +830,6 @@ void File_Aac::Data_Parse()
             }
 
         }
-
-        TS_Add(frame_length);
     FILLING_END();
 }
 

@@ -319,12 +319,12 @@ void File_Gxf::Streams_Finish()
     {
         int64u TimeCode_FirstFrame_ms=((File_Gxf_TimeCode*)Streams[TimeCode->first].Parsers[0])->TimeCode_FirstFrame_ms;
         string TimeCode_FirstFrame=((File_Gxf_TimeCode*)Streams[TimeCode->first].Parsers[0])->TimeCode_FirstFrame;
-        bool   TimeCode_FirstFrame_Striped=false;
+        bool   TimeCode_FirstFrame_Stripped=false;
         if (TimeCode_FirstFrame_ms==(int64u)-1)
         {
             TimeCode_FirstFrame_ms=TimeCode->second.Milliseconds;
             TimeCode_FirstFrame=TimeCode->second.String;
-            TimeCode_FirstFrame_Striped=true;
+            TimeCode_FirstFrame_Stripped=true;
         }
         if (TimeCode_FirstFrame_ms!=(int64u)-1)
         {
@@ -334,8 +334,8 @@ void File_Gxf::Streams_Finish()
             Fill(Stream_Other, StreamPos_Last, Other_Type, "Time code");
             Fill(Stream_Other, StreamPos_Last, Other_Format, "SMPTE TC");
             Fill(Stream_Other, StreamPos_Last, Other_TimeCode_FirstFrame, TimeCode_FirstFrame.c_str());
-            if (TimeCode_FirstFrame_Striped)
-                Fill(Stream_Other, StreamPos_Last, Other_TimeCode_Striped, "Yes");
+            if (TimeCode_FirstFrame_Stripped)
+                Fill(Stream_Other, StreamPos_Last, Other_TimeCode_Stripped, "Yes");
             if (TimeCode->first<Streams.size())
                 Fill(Stream_Other, StreamPos_Last, Other_Title, Streams[TimeCode->first].MediaName);
         }
@@ -1254,20 +1254,14 @@ void File_Gxf::map()
             //Test on TimeCode
             if (TimeCode_Parsed && !Invalid)
             {
-                std::map<int8u, tc>::iterator TimeCode=TimeCodes.find(TrackID);
-                if (TimeCode==TimeCodes.end() || TimeCode->second.Milliseconds==(int64u)-1)
+                std::map<int8u, tc>::iterator TimeCode_Item=TimeCodes.find(TrackID);
+                if (TimeCode_Item==TimeCodes.end() || TimeCode_Item->second.Milliseconds==(int64u)-1)
                 {
                     float64 FrameRate=Gxf_FrameRate(Streams[TrackID].FrameRate_Code);
                     TimeCodes[TrackID].Milliseconds=Hours  *60*60*1000
                                                    +Minutes   *60*1000
                                                    +Seconds      *1000;
-                    MediaInfoLib::TimeCode TC;
-                    TC.Hours=Hours;
-                    TC.Minutes=Minutes;
-                    TC.Seconds=Seconds;
-                    TC.Frames=Fields/2;
-                    TC.DropFrame=DropFrame;
-                    TimeCodes[TrackID].String=TC.ToString();
+                    TimeCodes[TrackID].String=TimeCode(Hours, Minutes, Seconds, Fields/2, 99, TimeCode::DropFrame(DropFrame).Field(Fields%2)).ToString();
 
                     if (!FrameRate)
                     {

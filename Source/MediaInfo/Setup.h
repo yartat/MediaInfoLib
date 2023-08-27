@@ -68,6 +68,9 @@
     #if !defined (MEDIAINFO_TRACE_NO) && !defined (MEDIAINFO_TRACE_YES)
         #define MEDIAINFO_TRACE_NO
     #endif
+    #if !defined (MEDIAINFO_CONFORMANCE_NO) && !defined (MEDIAINFO_CONFORMANCE_YES)
+        #define MEDIAINFO_CONFORMANCE_NO
+    #endif
     #if !defined (MEDIAINFO_FILTER_NO) && !defined (MEDIAINFO_FILTER_YES)
         #define MEDIAINFO_FILTER_NO
     #endif
@@ -246,6 +249,16 @@
         #define MEDIAINFO_ADVANCED2 1
     #else
         #define MEDIAINFO_ADVANCED2 0
+    #endif
+#endif
+#if !defined(MEDIAINFO_CONFORMANCE)
+    #if defined(MEDIAINFO_CONFORMANCE_NO) && defined(MEDIAINFO_CONFORMANCE_YES)
+        #undef MEDIAINFO_CONFORMANCE_NO //MEDIAINFO_CONFORMANCE_YES has priority
+    #endif
+    #if defined(MEDIAINFO_CONFORMANCE_NO)
+        #define MEDIAINFO_CONFORMANCE 0
+    #else
+        #define MEDIAINFO_CONFORMANCE 1
     #endif
 #endif
 #if !defined(MEDIAINFO_MD5)
@@ -548,6 +561,9 @@
 #if !defined(MEDIAINFO_MULTI_NO) && !defined(MEDIAINFO_MXF_NO) && !defined(MEDIAINFO_MXF_YES)
     #define MEDIAINFO_MXF_YES
 #endif
+#if !defined(MEDIAINFO_MULTI_NO) && !defined(MEDIAINFO_NSV_NO) && !defined(MEDIAINFO_NSV_YES)
+    #define MEDIAINFO_NSV_YES
+#endif
 #if !defined(MEDIAINFO_MULTI_NO) && !defined(MEDIAINFO_NUT_NO) && !defined(MEDIAINFO_NUT_YES)
     #define MEDIAINFO_NUT_YES
 #endif
@@ -671,6 +687,9 @@
 #if !defined(MEDIAINFO_VIDEO_NO) && !defined(MEDIAINFO_VP8_NO) && !defined(MEDIAINFO_VP8_YES)
     #define MEDIAINFO_VP8_YES
 #endif
+#if !defined(MEDIAINFO_VIDEO_NO) && !defined(MEDIAINFO_VP9_NO) && !defined(MEDIAINFO_VP9_YES)
+    #define MEDIAINFO_VP9_YES
+#endif
 #if !defined(MEDIAINFO_VIDEO_NO) && !defined(MEDIAINFO_Y4M_NO) && !defined(MEDIAINFO_Y4M_YES)
     #define MEDIAINFO_Y4M_YES
 #endif
@@ -704,6 +723,9 @@
 #if !defined(MEDIAINFO_AUDIO_NO) && !defined(MEDIAINFO_APE_NO) && !defined(MEDIAINFO_APE_YES)
     #define MEDIAINFO_APE_YES
 #endif
+#if !defined(MEDIAINFO_APTX100_NO) && !defined(MEDIAINFO_APTX100_NO) && !defined(MEDIAINFO_APTX100_YES)
+    #define MEDIAINFO_APTX100_YES
+#endif
 #if !defined(MEDIAINFO_AUDIO_NO) && !defined(MEDIAINFO_AU_NO) && !defined(MEDIAINFO_AU_YES)
     #define MEDIAINFO_AU_YES
 #endif
@@ -736,6 +758,9 @@
 #endif
 #if !defined(MEDIAINFO_AUDIO_NO) && !defined(MEDIAINFO_LA_NO) && !defined(MEDIAINFO_LA_YES)
     #define MEDIAINFO_LA_YES
+#endif
+#if !defined(MEDIAINFO_AUDIO_NO) && !defined(MEDIAINFO_MGA_NO) && !defined(MEDIAINFO_MGA_YES)
+    #define MEDIAINFO_MGA_YES
 #endif
 #if !defined(MEDIAINFO_AUDIO_NO) && !defined(MEDIAINFO_MIDI_NO) && !defined(MEDIAINFO_MIDI_YES)
     #define MEDIAINFO_MIDI_YES

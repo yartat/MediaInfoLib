@@ -32,25 +32,728 @@ using namespace std;
 
 namespace MediaInfoLib
 {
+//***************************************************************************
+// Tables
+//***************************************************************************
+
+//---------------------------------------------------------------------------
+const int8s t_huffman_env_1_5dB[120][2]=
+{
+    {   1,    2 },
+    { -64,  -65 },
+    {   3,    4 },
+    { -63,  -66 },
+    {   5,    6 },
+    { -62,  -67 },
+    {   7,    8 },
+    { -61,  -68 },
+    {   9,   10 },
+    { -60,  -69 },
+    {  11,   12 },
+    { -59,  -70 },
+    {  13,   14 },
+    { -58,  -71 },
+    {  15,   16 },
+    { -57,  -72 },
+    {  17,   18 },
+    { -73,  -56 },
+    {  19,   21 },
+    { -74,   20 },
+    { -55,  -75 },
+    {  22,   26 },
+    {  23,   24 },
+    { -54,  -76 },
+    { -77,   25 },
+    { -53,  -78 },
+    {  27,   34 },
+    {  28,   29 },
+    { -52,  -79 },
+    {  30,   31 },
+    { -80,  -51 },
+    {  32,   33 },
+    { -83,  -82 },
+    { -81,  -50 },
+    {  35,   57 },
+    {  36,   40 },
+    {  37,   38 },
+    { -88,  -84 },
+    { -48,   39 },
+    { -90,  -85 },
+    {  41,   46 },
+    {  42,   43 },
+    { -49,  -87 },
+    {  44,   45 },
+    { -89,  -86 },
+    {-124, -123 },
+    {  47,   50 },
+    {  48,   49 },
+    {-122, -121 },
+    {-120, -119 },
+    {  51,   54 },
+    {  52,   53 },
+    {-118, -117 },
+    {-116, -115 },
+    {  55,   56 },
+    {-114, -113 },
+    {-112, -111 },
+    {  58,   89 },
+    {  59,   74 },
+    {  60,   67 },
+    {  61,   64 },
+    {  62,   63 },
+    {-110, -109 },
+    {-108, -107 },
+    {  65,   66 },
+    {-106, -105 },
+    {-104, -103 },
+    {  68,   71 },
+    {  69,   70 },
+    {-102, -101 },
+    {-100,  -99 },
+    {  72,   73 },
+    { -98,  -97 },
+    { -96,  -95 },
+    {  75,   82 },
+    {  76,   79 },
+    {  77,   78 },
+    { -94,  -93 },
+    { -92,  -91 },
+    {  80,   81 },
+    { -47,  -46 },
+    { -45,  -44 },
+    {  83,   86 },
+    {  84,   85 },
+    { -43,  -42 },
+    { -41,  -40 },
+    {  87,   88 },
+    { -39,  -38 },
+    { -37,  -36 },
+    {  90,  105 },
+    {  91,   98 },
+    {  92,   95 },
+    {  93,   94 },
+    { -35,  -34 },
+    { -33,  -32 },
+    {  96,   97 },
+    { -31,  -30 },
+    { -29,  -28 },
+    {  99,  102 },
+    { 100,  101 },
+    { -27,  -26 },
+    { -25,  -24 },
+    { 103,  104 },
+    { -23,  -22 },
+    { -21,  -20 },
+    { 106,  113 },
+    { 107,  110 },
+    { 108,  109 },
+    { -19,  -18 },
+    { -17,  -16 },
+    { 111,  112 },
+    { -15,  -14 },
+    { -13,  -12 },
+    { 114,  117 },
+    { 115,  116 },
+    { -11,  -10 },
+    {  -9,   -8 },
+    { 118,  119 },
+    {  -7,   -6 },
+    {  -5,   -4 }
+};
+
+//---------------------------------------------------------------------------
+const int8s f_huffman_env_1_5dB[120][2]=
+{
+    {   1,    2 },
+    { -64,  -65 },
+    {   3,    4 },
+    { -63,  -66 },
+    {   5,    6 },
+    { -67,  -62 },
+    {   7,    8 },
+    { -68,  -61 },
+    {   9,   10 },
+    { -69,  -60 },
+    {  11,   13 },
+    { -70,   12 },
+    { -59,  -71 },
+    {  14,   16 },
+    { -58,   15 },
+    { -72,  -57 },
+    {  17,   19 },
+    { -73,   18 },
+    { -56,  -74 },
+    {  20,   23 },
+    {  21,   22 },
+    { -55,  -75 },
+    { -54,  -53 },
+    {  24,   27 },
+    {  25,   26 },
+    { -76,  -52 },
+    { -77,  -51 },
+    {  28,   31 },
+    {  29,   30 },
+    { -50,  -78 },
+    { -79,  -49 },
+    {  32,   36 },
+    {  33,   34 },
+    { -48,  -47 },
+    { -80,   35 },
+    { -81,  -82 },
+    {  37,   47 },
+    {  38,   41 },
+    {  39,   40 },
+    { -83,  -46 },
+    { -45,  -84 },
+    {  42,   44 },
+    { -85,   43 },
+    { -44,  -43 },
+    {  45,   46 },
+    { -88,  -87 },
+    { -86,  -90 },
+    {  48,   66 },
+    {  49,   56 },
+    {  50,   53 },
+    {  51,   52 },
+    { -92,  -42 },
+    { -41,  -39 },
+    {  54,   55 },
+    {-105,  -89 },
+    { -38,  -37 },
+    {  57,   60 },
+    {  58,   59 },
+    { -94,  -91 },
+    { -40,  -36 },
+    {  61,   63 },
+    { -20,   62 },
+    {-115, -110 },
+    {  64,   65 },
+    {-108, -107 },
+    {-101,  -97 },
+    {  67,   89 },
+    {  68,   75 },
+    {  69,   72 },
+    {  70,   71 },
+    { -95,  -93 },
+    { -34,  -27 },
+    {  73,   74 },
+    { -22,  -17 },
+    { -16, -124 },
+    {  76,   82 },
+    {  77,   79 },
+    {-123,   78 },
+    {-122, -121 },
+    {  80,   81 },
+    {-120, -119 },
+    {-118, -117 },
+    {  83,   86 },
+    {  84,   85 },
+    {-116, -114 },
+    {-113, -112 },
+    {  87,   88 },
+    {-111, -109 },
+    {-106, -104 },
+    {  90,  105 },
+    {  91,   98 },
+    {  92,   95 },
+    {  93,   94 },
+    {-103, -102 },
+    {-100,  -99 },
+    {  96,   97 },
+    { -98,  -96 },
+    { -35,  -33 },
+    {  99,  102 },
+    { 100,  101 },
+    { -32,  -31 },
+    { -30,  -29 },
+    { 103,  104 },
+    { -28,  -26 },
+    { -25,  -24 },
+    { 106,  113 },
+    { 107,  110 },
+    { 108,  109 },
+    { -23,  -21 },
+    { -19,  -18 },
+    { 111,  112 },
+    { -15,  -14 },
+    { -13,  -12 },
+    { 114,  117 },
+    { 115,  116 },
+    { -11,  -10 },
+    {  -9,   -8 },
+    { 118,  119 },
+    {  -7,   -6 },
+    {  -5,   -4 }
+};
+
+//---------------------------------------------------------------------------
+const int8s t_huffman_env_bal_1_5dB[48][2]=
+{
+    { -64,    1 },
+    { -63,    2 },
+    { -65,    3 },
+    { -62,    4 },
+    { -66,    5 },
+    { -61,    6 },
+    { -67,    7 },
+    { -60,    8 },
+    { -68,    9 },
+    {  10,   11 },
+    { -69,  -59 },
+    {  12,   13 },
+    { -70,  -58 },
+    {  14,   28 },
+    {  15,   21 },
+    {  16,   18 },
+    { -57,   17 },
+    { -71,  -56 },
+    {  19,   20 },
+    { -88,  -87 },
+    { -86,  -85 },
+    {  22,   25 },
+    {  23,   24 },
+    { -84,  -83 },
+    { -82,  -81 },
+    {  26,   27 },
+    { -80,  -79 },
+    { -78,  -77 },
+    {  29,   36 },
+    {  30,   33 },
+    {  31,   32 },
+    { -76,  -75 },
+    { -74,  -73 },
+    {  34,   35 },
+    { -72,  -55 },
+    { -54,  -53 },
+    {  37,   41 },
+    {  38,   39 },
+    { -52,  -51 },
+    { -50,   40 },
+    { -49,  -48 },
+    {  42,   45 },
+    {  43,   44 },
+    { -47,  -46 },
+    { -45,  -44 },
+    {  46,   47 },
+    { -43,  -42 },
+    { -41,  -40 }
+};
+
+//---------------------------------------------------------------------------
+const int8s f_huffman_env_bal_1_5dB[48][2]=
+{
+    { -64,    1 },
+    { -65,    2 },
+    { -63,    3 },
+    { -66,    4 },
+    { -62,    5 },
+    { -61,    6 },
+    { -67,    7 },
+    { -68,    8 },
+    { -60,    9 },
+    {  10,   11 },
+    { -69,  -59 },
+    { -70,   12 },
+    { -58,   13 },
+    {  14,   17 },
+    { -71,   15 },
+    { -57,   16 },
+    { -56,  -73 },
+    {  18,   32 },
+    {  19,   25 },
+    {  20,   22 },
+    { -72,   21 },
+    { -88,  -87 },
+    {  23,   24 },
+    { -86,  -85 },
+    { -84,  -83 },
+    {  26,   29 },
+    {  27,   28 },
+    { -82,  -81 },
+    { -80,  -79 },
+    {  30,   31 },
+    { -78,  -77 },
+    { -76,  -75 },
+    {  33,   40 },
+    {  34,   37 },
+    {  35,   36 },
+    { -74,  -55 },
+    { -54,  -53 },
+    {  38,   39 },
+    { -52,  -51 },
+    { -50,  -49 },
+    {  41,   44 },
+    {  42,   43 },
+    { -48,  -47 },
+    { -46,  -45 },
+    {  45,   46 },
+    { -44,  -43 },
+    { -42,   47 },
+    { -41,  -40 }
+};
+
+//---------------------------------------------------------------------------
+const int8s t_huffman_env_3_0dB[62][2]=
+{
+    { -64,    1 },
+    { -65,    2 },
+    { -63,    3 },
+    { -66,    4 },
+    { -62,    5 },
+    { -67,    6 },
+    { -61,    7 },
+    { -68,    8 },
+    { -60,    9 },
+    {  10,   11 },
+    { -69,  -59 },
+    {  12,   14 },
+    { -70,   13 },
+    { -71,  -58 },
+    {  15,   18 },
+    {  16,   17 },
+    { -72,  -57 },
+    { -73,  -74 },
+    {  19,   22 },
+    { -56,   20 },
+    { -55,   21 },
+    { -54,  -77 },
+    {  23,   31 },
+    {  24,   25 },
+    { -75,  -76 },
+    {  26,   27 },
+    { -78,  -53 },
+    {  28,   29 },
+    { -52,  -95 },
+    { -94,   30 },
+    { -93,  -92 },
+    {  32,   47 },
+    {  33,   40 },
+    {  34,   37 },
+    {  35,   36 },
+    { -91,  -90 },
+    { -89,  -88 },
+    {  38,   39 },
+    { -87,  -86 },
+    { -85,  -84 },
+    {  41,   44 },
+    {  42,   43 },
+    { -83,  -82 },
+    { -81,  -80 },
+    {  45,   46 },
+    { -79,  -51 },
+    { -50,  -49 },
+    {  48,   55 },
+    {  49,   52 },
+    {  50,   51 },
+    { -48,  -47 },
+    { -46,  -45 },
+    {  53,   54 },
+    { -44,  -43 },
+    { -42,  -41 },
+    {  56,   59 },
+    {  57,   58 },
+    { -40,  -39 },
+    { -38,  -37 },
+    {  60,   61 },
+    { -36,  -35 },
+    { -34,  -33 }
+};
+
+//---------------------------------------------------------------------------
+const int8s f_huffman_env_3_0dB[62][2]=
+{
+    { -64,    1 },
+    { -65,    2 },
+    { -63,    3 },
+    { -66,    4 },
+    { -62,    5 },
+    { -67,    6 },
+    {   7,    8 },
+    { -61,  -68 },
+    {   9,   10 },
+    { -60,  -69 },
+    {  11,   12 },
+    { -59,  -70 },
+    {  13,   14 },
+    { -58,  -71 },
+    {  15,   16 },
+    { -57,  -72 },
+    {  17,   19 },
+    { -56,   18 },
+    { -55,  -73 },
+    {  20,   24 },
+    {  21,   22 },
+    { -74,  -54 },
+    { -53,   23 },
+    { -75,  -76 },
+    {  25,   30 },
+    {  26,   27 },
+    { -52,  -51 },
+    {  28,   29 },
+    { -77,  -79 },
+    { -50,  -49 },
+    {  31,   39 },
+    {  32,   35 },
+    {  33,   34 },
+    { -78,  -46 },
+    { -82,  -88 },
+    {  36,   37 },
+    { -83,  -48 },
+    { -47,   38 },
+    { -86,  -85 },
+    {  40,   47 },
+    {  41,   44 },
+    {  42,   43 },
+    { -80,  -44 },
+    { -43,  -42 },
+    {  45,   46 },
+    { -39,  -87 },
+    { -84,  -40 },
+    {  48,   55 },
+    {  49,   52 },
+    {  50,   51 },
+    { -95,  -94 },
+    { -93,  -92 },
+    {  53,   54 },
+    { -91,  -90 },
+    { -89,  -81 },
+    {  56,   59 },
+    {  57,   58 },
+    { -45,  -41 },
+    { -38,  -37 },
+    {  60,   61 },
+    { -36,  -35 },
+    { -34,  -33 }
+};
+
+//---------------------------------------------------------------------------
+const int8s t_huffman_env_bal_3_0dB[24][2]=
+{
+    { -64,    1 },
+    { -63,    2 },
+    { -65,    3 },
+    { -66,    4 },
+    { -62,    5 },
+    { -61,    6 },
+    { -67,    7 },
+    { -68,    8 },
+    { -60,    9 },
+    {  10,   16 },
+    {  11,   13 },
+    { -69,   12 },
+    { -76,  -75 },
+    {  14,   15 },
+    { -74,  -73 },
+    { -72,  -71 },
+    {  17,   20 },
+    {  18,   19 },
+    { -70,  -59 },
+    { -58,  -57 },
+    {  21,   22 },
+    { -56,  -55 },
+    { -54,   23 },
+    { -53,  -52 }
+};
+
+//---------------------------------------------------------------------------
+const int8s f_huffman_env_bal_3_0dB[24][2]=
+{
+    { -64,    1 },
+    { -65,    2 },
+    { -63,    3 },
+    { -66,    4 },
+    { -62,    5 },
+    { -61,    6 },
+    { -67,    7 },
+    { -68,    8 },
+    { -60,    9 },
+    {  10,   13 },
+    { -69,   11 },
+    { -59,   12 },
+    { -58,  -76 },
+    {  14,   17 },
+    {  15,   16 },
+    { -75,  -74 },
+    { -73,  -72 },
+    {  18,   21 },
+    {  19,   20 },
+    { -71,  -70 },
+    { -57,  -56 },
+    {  22,   23 },
+    { -55,  -54 },
+    { -53,  -52 }
+};
+
+//---------------------------------------------------------------------------
+const int8s t_huffman_noise_3_0dB[62][2]=
+{
+    { -64,    1 },
+    { -63,    2 },
+    { -65,    3 },
+    { -66,    4 },
+    { -62,    5 },
+    { -67,    6 },
+    {   7,    8 },
+    { -61,  -68 },
+    {   9,   30 },
+    {  10,   15 },
+    { -60,   11 },
+    { -69,   12 },
+    {  13,   14 },
+    { -59,  -53 },
+    { -95,  -94 },
+    {  16,   23 },
+    {  17,   20 },
+    {  18,   19 },
+    { -93,  -92 },
+    { -91,  -90 },
+    {  21,   22 },
+    { -89,  -88 },
+    { -87,  -86 },
+    {  24,   27 },
+    {  25,   26 },
+    { -85,  -84 },
+    { -83,  -82 },
+    {  28,   29 },
+    { -81,  -80 },
+    { -79,  -78 },
+    {  31,   46 },
+    {  32,   39 },
+    {  33,   36 },
+    {  34,   35 },
+    { -77,  -76 },
+    { -75,  -74 },
+    {  37,   38 },
+    { -73,  -72 },
+    { -71,  -70 },
+    {  40,   43 },
+    {  41,   42 },
+    { -58,  -57 },
+    { -56,  -55 },
+    {  44,   45 },
+    { -54,  -52 },
+    { -51,  -50 },
+    {  47,   54 },
+    {  48,   51 },
+    {  49,   50 },
+    { -49,  -48 },
+    { -47,  -46 },
+    {  52,   53 },
+    { -45,  -44 },
+    { -43,  -42 },
+    {  55,   58 },
+    {  56,   57 },
+    { -41,  -40 },
+    { -39,  -38 },
+    {  59,   60 },
+    { -37,  -36 },
+    { -35,   61 },
+    { -34,  -33 }
+};
+
+//---------------------------------------------------------------------------
+const int8s t_huffman_noise_bal_3_0dB[24][2]=
+{
+    { -64,    1 },
+    { -65,    2 },
+    { -63,    3 },
+    {   4,    9 },
+    { -66,    5 },
+    { -62,    6 },
+    {   7,    8 },
+    { -76,  -75 },
+    { -74,  -73 },
+    {  10,   17 },
+    {  11,   14 },
+    {  12,   13 },
+    { -72,  -71 },
+    { -70,  -69 },
+    {  15,   16 },
+    { -68,  -67 },
+    { -61,  -60 },
+    {  18,   21 },
+    {  19,   20 },
+    { -59,  -58 },
+    { -57,  -56 },
+    {  22,   23 },
+    { -55,  -54 },
+    { -53,  -52 }
+};
+
+//---------------------------------------------------------------------------
+// Master frequency band table
+// k0 = lower frequency boundary
+const int8s Aac_k0_offset[][2][16]=
+{
+    { //96000
+        { -2, -1,  0,  1,  2, 3, 4, 5, 6, 7, 9, 11, 13, 16, 20, 24, },
+        { -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 6,  8, 10, 13, 17, 21, },
+    },
+    { //88200
+        { -2, -1,  0,  1,  2, 3, 4, 5, 6, 7, 9, 11, 13, 16, 20, 24, },
+        { -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 6,  8, 10, 13, 17, 21, },
+    },
+    { //64000
+        { -4, -2, -1,  0,  1,  2,  3,  4,  5, 6, 7, 9, 11, 13, 16, 20, },
+        { -9, -7, -6, -5, -4, -3, -2, -1, -0, 1, 2, 4,  6,  8, 11, 15, },
+    },
+    { //48000
+        {  -4, -2, -1,  0,  1,  2,  3,  4,  5, 6, 7, 9, 11, 13, 16, 20, },
+        { -10, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 3,  5,  7, 10, 14, },
+    },
+    { //44100
+        {  -4, -2, -1,  0,  1,  2,  3,  4,  5, 6, 7, 9, 11, 13, 16, 20, },
+        { -10, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 3,  5,  7, 10, 14, },
+    },
+    { //32000
+        {  -6,  -4,  -2, -1,   0,  1,  2,  3,  4,  5,  6,  7, 9, 11, 13, 16, },
+        { -14, -12, -10, -9,  -8, -7, -6, -5, -4, -3, -2, -1, 1,  3,  5,  8, },
+    },
+    { //24000
+        {  -5,  -3,  -2, -1,   0,  1,  2,  3,  4,  5,  6,  7, 9, 11, 13, 16, },
+        { -13, -11, -10, -9,  -8, -7, -6, -5, -4, -3, -2, -1, 1,  3,  5,  8, },
+    },
+    { //22050
+        {  -5,  -4,  -3, -2, -1,  0,  1,  2,  3,  4,  5,  6, 7, 9, 11, 13, },
+        { -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 1, 3, 5, },
+    },
+    { //16000
+        {  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1,   0,   1,   2,  3,  4,  5,  6,  7, },
+        { -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, },
+    },
+    { //40000
+        { -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10,  -8,  -6,  -4, -2,  0, },
+        { -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -15, -13, -11, -9, -7, },
+    },
+
+};
+const int8u Aac_k0_startMin[10]=
+{
+     7,  7, 10, 11, 12, 16, 16, 17, 24, 32,// 35, 48,  0,  0,  0,  0,
+};
+
+//***************************************************************************
+// Helpers
+//***************************************************************************
 
 //---------------------------------------------------------------------------
 extern const char* Aac_audioObjectType(int8u audioObjectType);
 
 //---------------------------------------------------------------------------
-int8u Aac_AudioSpecificConfig_sampling_frequency_index(const int64s sampling_frequency);
+int8u Aac_AudioSpecificConfig_sampling_frequency_index(const int64s sampling_frequency, bool usac=false);
 
 //---------------------------------------------------------------------------
 // Master frequency band table
 // k0 = lower frequency boundary
-int8u Aac_k0_Compute(int8u bs_start_freq, int8u extension_sampling_frequency_index)
+int8u Aac_k0_Compute(int8u bs_start_freq, int8u extension_sampling_frequency_index, sbr_ratio ratio)
 {
-    return Aac_k0_startMin[extension_sampling_frequency_index]+Aac_k0_offset[extension_sampling_frequency_index][bs_start_freq];
+    return Aac_k0_startMin[extension_sampling_frequency_index]+Aac_k0_offset[extension_sampling_frequency_index][(int)ratio][bs_start_freq];
 }
 
 //---------------------------------------------------------------------------
 // Master frequency band table
 // k2 = upper frequency boundary
-int8u Aac_k2_Compute(int8u bs_stop_freq, int8u extension_sampling_frequency_index, int8u  k0)
+int8u Aac_k2_Compute(int8u bs_stop_freq, int64s sampling_frequency, int8u k0, sbr_ratio ratio)
 {
     switch (bs_stop_freq)
     {
@@ -59,24 +762,52 @@ int8u Aac_k2_Compute(int8u bs_stop_freq, int8u extension_sampling_frequency_inde
         default : ;
     }
 
-    return (int8u)min(64, Aac_k2_stopMin[extension_sampling_frequency_index]+Aac_k2_offset[extension_sampling_frequency_index][bs_stop_freq]);
+    int stopMin;
+    if (sampling_frequency<32000)
+        stopMin=(((2*6000*(ratio==DUAL?128:64))/sampling_frequency)+1)>>1;
+    else if (sampling_frequency<64000)
+        stopMin=(((2*8000*(ratio==DUAL?128:64))/sampling_frequency)+1)>>1;
+    else
+        stopMin=(((2*10000*(ratio==DUAL?128:64))/sampling_frequency)+1)>>1;
+
+    stopMin=min(stopMin, 64);
+
+    int8u Diff0[13];
+    int8u Diff1[14];
+    float Power=pow((float)64/(float)stopMin, (float)1/(float)13);
+    float Power2=(float)stopMin;
+    int8s Temp1=(int8s)(Power2+0.5);
+    for (int8u k=0; k<13; k++)
+    {
+        int8s Temp0=Temp1;
+        Power2*=Power;
+        Temp1=(int8s)(Power2+0.5);
+        Diff0[k]=Temp1-Temp0;
+    }
+    sort(Diff0, Diff0+13);
+
+    Diff1[0]=stopMin;
+    for (int8u Pos=1; Pos<14; Pos++)
+        Diff1[Pos]=Diff1[Pos-1]+Diff0[Pos-1];
+
+    return (int8u)min((int8u)64, Diff1[bs_stop_freq]);
 }
 
 //---------------------------------------------------------------------------
 //Helper
-static int8u Aac_bands_Compute(bool warp, int8u bands, int8u a0, int8u a1)
+int8u Aac_bands_Compute(bool warp, int8u bands, int8u a0, int8u a1, float quad=1.0)
 {
     float div=(float)log(2.0);
     if (warp)
         div*=(float)1.3;
 
-    return (int8u)(bands*log((float)a1/(float)a0)/div+0.5);
+    return (int8u)((bands*log((float)a1/(float)a0)/div+0.5)/quad);
 }
 
 //---------------------------------------------------------------------------
 // Master frequency band table
 // Computing for bs_freq_scale = 0
-static bool Aac_f_master_Compute_0(int8u &num_env_bands_Master, int8u* f_Master, sbr_handler *sbr, int8u  k0, int8u  k2)
+bool Aac_f_master_Compute_0(int8u &num_env_bands_Master, int8u* f_Master, sbr_handler *sbr, int8u  k0, int8u  k2)
 {
     int8u dk, numBands;
     if (sbr->bs_alter_scale)
@@ -133,14 +864,21 @@ static bool Aac_f_master_Compute_0(int8u &num_env_bands_Master, int8u* f_Master,
 //---------------------------------------------------------------------------
 // Master frequency band table
 // Computing for bs_freq_scale != 0
-static int int8u_cmp(const void *a, const void *b)
+int int8u_cmp(const void *a, const void *b)
 {
-    return ((int8u)(*(int8u*)a - *(int8u*)b));
+    return *(int8u*)a - *(int8u*)b;
 }
-static bool Aac_f_master_Compute(int8u &num_env_bands_Master, int8u* f_Master, sbr_handler *sbr, int8u  k0, int8u  k2)
+bool Aac_f_master_Compute(int8u &num_env_bands_Master, int8u* f_Master, sbr_handler *sbr, int8u  k0, int8u  k2)
 {
     int8u temp1[]={6, 5, 4 };
     int8u bands=temp1[sbr->bs_freq_scale-1];
+    if (sbr->ratio==QUAD && k0<bands)
+        bands=floor((float)k0/2);
+    float divisor;
+    if (sbr->ratio==QUAD && k0<bands*2)
+        divisor=1.2;
+    else
+        divisor=1.0;
 
     int8u twoRegions, k1;
     if ((float)k2/(float)k0>2.2449)
@@ -154,7 +892,7 @@ static bool Aac_f_master_Compute(int8u &num_env_bands_Master, int8u* f_Master, s
         k1=k2;
     }
 
-    int8u numBands0=2*Aac_bands_Compute(false, bands, k0, k1);
+    int8u numBands0=2*Aac_bands_Compute(false, bands, k0, k1, divisor);
     if (numBands0 == 0 || numBands0 >= 64)
         return false;
 
@@ -191,7 +929,7 @@ static bool Aac_f_master_Compute(int8u &num_env_bands_Master, int8u* f_Master, s
     int8u numBands1;
     int8u vDk1[64] = { 0 };
     int8u vk1[64];
-    numBands1=2*Aac_bands_Compute(true, bands, k1, k2);
+    numBands1=2*Aac_bands_Compute(sbr->bs_alter_scale, bands, k1, k2, divisor);
     if (numBands1 == 0 || numBands0 + numBands1 >= 64)
         return false;
 
@@ -208,7 +946,7 @@ static bool Aac_f_master_Compute(int8u &num_env_bands_Master, int8u* f_Master, s
 
     if (vDk1[0]<vDk0[numBands0-1])
     {
-        qsort(vDk1, numBands1+1, sizeof(int8u), int8u_cmp);
+        qsort(vDk1, numBands1, sizeof(int8u), int8u_cmp);
         int8u change=vDk0[numBands0-1]-vDk1[0];
         vDk1[0]=vDk0[numBands0-1];
         vDk1[numBands1 - 1] = vDk1[numBands1 - 1] - change;
@@ -234,7 +972,7 @@ static bool Aac_f_master_Compute(int8u &num_env_bands_Master, int8u* f_Master, s
 
 //---------------------------------------------------------------------------
 // Derived frequency border tables
-static bool Aac_bands_Compute(const int8u &num_env_bands_Master, int8u* f_Master, sbr_handler *sbr, int8u  k2)
+bool Aac_bands_Compute(const int8u &num_env_bands_Master, int8u* f_Master, sbr_handler *sbr, int8u  k2)
 {
     sbr->num_env_bands[1]=num_env_bands_Master-sbr->bs_xover_band;
     sbr->num_env_bands[0]=(sbr->num_env_bands[1]>>1)+(sbr->num_env_bands[1]-((sbr->num_env_bands[1]>>1)<<1));
@@ -247,33 +985,44 @@ static bool Aac_bands_Compute(const int8u &num_env_bands_Master, int8u* f_Master
     else
     {
         sbr->num_noise_bands=Aac_bands_Compute(false, sbr->bs_noise_bands, f_Master[sbr->bs_xover_band], k2);
-        if (sbr->num_noise_bands<1 || sbr->num_noise_bands>5)
+        if (sbr->num_noise_bands>5)
             return false;
+        if (!sbr->num_noise_bands)
+            sbr->num_noise_bands++; //Never 0
     }
 
     return true;
 }
 
 //---------------------------------------------------------------------------
-static bool Aac_Sbr_Compute(sbr_handler *sbr, int8u extension_sampling_frequency_index)
+bool Aac_Sbr_Compute(sbr_handler *sbr, const int64s sampling_frequency, bool usac)
 {
-    if (extension_sampling_frequency_index>=9)
-        return 0; //Not supported
-    int8u k0=Aac_k0_Compute(sbr->bs_start_freq, extension_sampling_frequency_index);
-    int8u k2=Aac_k2_Compute(sbr->bs_stop_freq, extension_sampling_frequency_index, k0);
-    if (k2<=k0) return false;
-    switch (extension_sampling_frequency_index)
+    int8u extension_sampling_frequency_index=Aac_AudioSpecificConfig_sampling_frequency_index((int32u)sampling_frequency, usac);
+    if (extension_sampling_frequency_index==17)
+        extension_sampling_frequency_index=9; // arrays have 40000 Hz item right after 16000 Hz item
+    else if (extension_sampling_frequency_index>9)
+        return false; //Not supported
+
+    int8u k0=Aac_k0_Compute(sbr->bs_start_freq, extension_sampling_frequency_index, sbr->ratio);
+    int8u k2=Aac_k2_Compute(sbr->bs_stop_freq, sampling_frequency, k0, sbr->ratio);
+    if (k2<=k0)
+        return false;
+    if (sbr->ratio==QUAD)
     {
-        case  0 :
-        case  1 :
-        case  2 :
-        case  3 : if ((k2-k0)>32) return false; break;
-        case  4 : if ((k2-k0)>35) return false; break;
-        case  5 :
-        case  6 :
-        case  7 :
-        case  8 : if ((k2-k0)>48) return false; break;
-        default : ;
+        if (k2-k0>56)
+            return false;
+    }
+    else
+    {
+        switch (extension_sampling_frequency_index)
+        {
+            case  0 :
+            case  1 :
+            case  2 :
+            case  3 : if ((k2-k0)>32) return false; break;
+            case  4 : if ((k2-k0)>35) return false; break;
+            default : if ((k2-k0)>48) return false; break;
+        }
     }
 
     int8u  num_env_bands_Master;
@@ -355,7 +1104,7 @@ void File_Aac::sbr_extension_data(size_t End, int8u id_aac, bool crc_flag)
             if (extension_sampling_frequency_index==(int8u)-1)
             {
                 extension_sampling_frequency=(int32u)(Frequency_b*2);
-                extension_sampling_frequency_index=Aac_AudioSpecificConfig_sampling_frequency_index(extension_sampling_frequency);
+                extension_sampling_frequency_index=Aac_AudioSpecificConfig_sampling_frequency_index(extension_sampling_frequency, false);
             }
 
             delete sbrs[raw_data_block_Pos];
@@ -364,7 +1113,7 @@ void File_Aac::sbr_extension_data(size_t End, int8u id_aac, bool crc_flag)
 
             sbr_header();
 
-            if (!Aac_Sbr_Compute(sbr, extension_sampling_frequency_index))
+            if (!Aac_Sbr_Compute(sbr, Frequency_b*2, false))
             {
                 delete sbrs[raw_data_block_Pos]; sbr=sbrs[raw_data_block_Pos]=NULL;
             }
@@ -481,7 +1230,10 @@ void File_Aac::sbr_single_channel_element()
                 switch (bs_extension_id)
                 {
                     case 2 : ps_data(End); break; //EXTENSION_ID_PS
-                    default: ;
+                    case 3 : esbr_data(End); break; //EXTENSION_ID_ESBR
+                    default:
+                            if (End<Data_BS_Remain())
+                                Skip_BS(Data_BS_Remain()-End,   "(unknown)");
                 }
             }
             if (End<Data_BS_Remain())
@@ -583,6 +1335,7 @@ void File_Aac::sbr_channel_pair_element()
         //Coupling
         sbr->bs_num_env    [1]=sbr->bs_num_env    [0];
         sbr->bs_num_noise  [1]=sbr->bs_num_noise  [0];
+        sbr->bs_amp_res    [1]=sbr->bs_amp_res    [0];
         for (int8u env=0; env<sbr->bs_num_env[0]; env++)
             sbr->bs_freq_res[1][env]=sbr->bs_freq_res[0][env];
     }
@@ -630,7 +1383,10 @@ void File_Aac::sbr_channel_pair_element()
                 switch (bs_extension_id)
                 {
                     case 2 : ps_data(End); break; //EXTENSION_ID_PS
-                    default: ;
+                    case 3 : esbr_data(End); break; //EXTENSION_ID_ESBR
+                    default:
+                            if (End<Data_BS_Remain())
+                                Skip_BS(Data_BS_Remain()-End,   "(unknown)");
                 }
             }
             if (End<Data_BS_Remain())
@@ -755,6 +1511,19 @@ void File_Aac::sbr_sinusoidal_coding(bool)
     for (int8u n=0; n<sbr->num_env_bands[1]; n++)
         Skip_SB(                                                "bs_add_harmonic[ch][n]");
     Element_End0();
+}
+
+//---------------------------------------------------------------------------
+void File_Aac::esbr_data(size_t End)
+{
+    Skip_BS(Data_BS_Remain()-End,                               "(not implemented)");
+
+    FILLING_BEGIN();
+        if (Infos["Format_Profile"].find(__T("eSBR"))==string::npos)
+        {
+            Infos["Format_Profile"]=__T("HE-AAC+eSBR");
+        }
+    FILLING_END();
 }
 
 } //NameSpace

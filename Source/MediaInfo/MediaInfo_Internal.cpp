@@ -72,11 +72,13 @@
         #undef Yield
         #undef max
     }
-    #elif defined(_POSIX_PRIORITY_SCHEDULING)
-        #include <sched.h>
+    #else
         #include <unistd.h>
         #include <signal.h>
-    #endif //_POSIX_PRIORITY_SCHEDULING
+        #if defined(_POSIX_PRIORITY_SCHEDULING) // Note: unistd.h must be included first
+            #include <sched.h>
+        #endif //_POSIX_PRIORITY_SCHEDULING
+    #endif
     #include <ctime>
 #endif
 using namespace ZenLib;
@@ -300,12 +302,12 @@ extern const Char* MediaInfo_Version;
 //***************************************************************************
 // Modifiers - ChannelLayout_2018
 //***************************************************************************
-static const size_t ChannelLayout_2018_Size=63;
-static const char* ChannelLayout_2018[ChannelLayout_2018_Size][2] =
+static const char* ChannelLayout_2018[][2] =
 {
     { "BC", "Cb" },
     { "BL", "Lb" },
     { "BR", "Rb" },
+    { "BS", "Rb" },
     { "CI", "Bfc" },
     { "CL", "Ls" },
     { "CR", "Rs" },
@@ -318,13 +320,14 @@ static const char* ChannelLayout_2018[ChannelLayout_2018_Size][2] =
     { "Cvr", "Tbc" },
     { "FC", "C" },
     { "FL", "L" },
-    { "FLC", "Lscr" },
+    { "FLC", "Lc" },
     { "FR", "R" },
-    { "FRC", "Rscr" },
+    { "FRC", "Rc" },
+    { "LC", "Lc" },
     { "LI", "Bfl" },
-    { "Lc", "Lscr" },
+    { "LS", "Ls" },
     { "Lfh", "Tfl" },
-    { "Lh", "Vhl" },
+    { "Lh", "Tfl" },
     { "Lhr", "Tbl" },
     { "Lhs", "Tfl" },
     { "Lrh", "Tbl" },
@@ -336,14 +339,16 @@ static const char* ChannelLayout_2018[ChannelLayout_2018_Size][2] =
     { "Lv", "Tfl" },
     { "Lvh", "Tfl" },
     { "Lvr", "Tbl" },
-    { "Lvss", "Tll" },
+    { "Lvss", "Tsl" },
     { "Oh", "Tc" },
-    { "Rc", "Rscr" },
     { "Rfh", "Tfrr" },
-    { "Rh", "Vhr" },
+    { "Rh", "Tfr" },
     { "Rhr", "Tbr" },
     { "Rhs", "Tfr" },
+    { "RC", "Rc" },
     { "RI", "Bfr" },
+    { "RS", "Rs" },
+    { "Rls", "Lb" },
     { "Rrh", "Tbr" },
     { "Rrs", "Rb" },
     { "Rsc", "Rscr" },
@@ -357,6 +362,7 @@ static const char* ChannelLayout_2018[ChannelLayout_2018_Size][2] =
     { "S", "Cb" },
     { "SL", "Ls" },
     { "SR", "Rs" },
+    { "SW", "LFE" },
     { "TBC", "Tbc" },
     { "TBL", "Tbl" },
     { "TBR", "Tbr" },
@@ -367,13 +373,19 @@ static const char* ChannelLayout_2018[ChannelLayout_2018_Size][2] =
     { "Ts", "Tc" },
     { "Vhc", "Tfc" },
 };
-static const size_t ChannelLayout_2018_Aac_Size=3;
-static const char* ChannelLayout_2018_Aac[ChannelLayout_2018_Aac_Size][2] =
+static const size_t ChannelLayout_2018_Size=sizeof(ChannelLayout_2018)/sizeof(decltype(*ChannelLayout_2018));
+static const char* ChannelLayout_2018_Aac[][2] =
 {
     { "Cb", "Bfc" },
     { "Lb", "Bfl" },
     { "Rb", "Bfr" },
+    // Found in DTS-UHD, similar to AAC for channels above + theses additions
+    { "Ltf", "Tfl" }, // Merged with Lh ("top" vs "high")
+    { "Rtf", "Tfr" }, // Merged with Rh ("top" vs "high")
+    { "Ltr", "Tbl" }, // Merged with Lhr ("top" vs "high")
+    { "Rtr", "Tbr" }, // Merged with Rhr ("top" vs "high")
 };
+static const size_t ChannelLayout_2018_Aac_Size=sizeof(ChannelLayout_2018_Aac)/sizeof(decltype(*ChannelLayout_2018_Aac));
 Ztring ChannelLayout_2018_Rename(const Ztring& Channels, const Ztring& Format)
 {
     ZtringList List;
@@ -381,7 +393,7 @@ Ztring ChannelLayout_2018_Rename(const Ztring& Channels, const Ztring& Format)
     List.Write(Channels);
     size_t LfePos[3];
     memset(LfePos, -1, sizeof(LfePos));
-    bool IsAac=(Format==__T("USAC") || Format==__T("MPEG-H 3D Audio"));
+    bool IsAac=(Format==__T("AAC") || Format==__T("USAC") || Format==__T("MPEG-H 3D Audio") || Format==__T("DTS-UHD"));
     for (size_t i=0; i<List.size(); i++)
     {
         Ztring& ChannelName=List[i];
@@ -422,7 +434,9 @@ Ztring ChannelLayout_2018_Rename(stream_t StreamKind, size_t Parameter, ZtringLi
         case Stream_Audio:
             switch (Parameter)
             {
-                case Audio_ChannelLayout: return ChannelLayout_2018_Rename(Info[Parameter], StreamFormat);
+                case Audio_ChannelLayout:
+                case Audio_ChannelLayout_Original:
+                    return ChannelLayout_2018_Rename(Info[Parameter], StreamFormat);
                 default:;
             }
             break;
@@ -537,7 +551,6 @@ Ztring HighestFormat(stream_t StreamKind, size_t Parameter, const ZtringList& In
         return Ztring();
 
     static const Char* _16ch =__T("16-ch");
-    static const Char* _9624=__T("96/24");
     static const Char* Bluray=__T("Blu-ray Disc");
     static const Char* AC3=__T("AC-3");
     static const Char* EAC3=__T("E-AC-3");
@@ -563,12 +576,15 @@ Ztring HighestFormat(stream_t StreamKind, size_t Parameter, const ZtringList& In
     static const Char* Express=__T("Express");
     static const Char* HEAACv2 = __T("HE-AACv2");
     static const Char* HEAAC = __T("HE-AAC");
-    static const Char* HRA=__T("HRA");
+    static const Char* HEAAC_ESBR = __T("HE-AAC+eSBR");
     static const Char* JOC=__T("JOC");
     static const Char* LC=__T("LC");
     static const Char* LCSBR=__T("LC SBR");
     static const Char* LCSBRPS=__T("LC SBR PS");
+    static const Char* LCESBR=__T("LC SBR eSBR");
     static const Char* LTP=__T("LTP");
+    static const Char* X=__T("X");
+    static const Char* IMAX=__T("IMAX");
     static const Char* MA=__T("MA");
     static const Char* Main=__T("Main");
     static const Char* MLP=__T("MLP");
@@ -576,6 +592,13 @@ Ztring HighestFormat(stream_t StreamKind, size_t Parameter, const ZtringList& In
     static const Char* NonCore=__T("non-core");
     static const Char* Scalable=__T("scalable");
     static const Char* SSR=__T("SSR");
+    static const Char* XBR=__T("XBR");
+    static const Char* XCh=__T("XCh");
+    static const Char* XCH=__T("XCH");
+    static const Char* XXCh=__T("XXCh");
+    static const Char* XXCH=__T("XXCH");
+    static const Char* X96=__T("X96");
+    static const Char* x96=__T("x96");
 
     ShouldReturn=true; 
     switch (Parameter_Generic)
@@ -643,6 +666,8 @@ Ztring HighestFormat(stream_t StreamKind, size_t Parameter, const ZtringList& In
                 const Ztring& Profile=Info[Parameter_Format_Profile];
                 if (Profile.find(HEAACv2)!=string::npos)
                     return LCSBRPS;
+                if (Profile.find(HEAAC_ESBR)!=string::npos)
+                    return LCESBR;
                 if (Profile.find(HEAAC)!=string::npos)
                     return LCSBR;
                 if (Profile.find(LC)!=string::npos)
@@ -666,16 +691,12 @@ Ztring HighestFormat(stream_t StreamKind, size_t Parameter, const ZtringList& In
                     {
                         if (!AdditionalFeatures.empty())
                             AdditionalFeatures+=__T(' ');
-                             if (Profiles[i]==_9624)
-                            AdditionalFeatures+=_9624;
-                        else if (Profiles[i]==Discrete)
-                            AdditionalFeatures+=__T("XXCH");
-                        else if (Profiles[i]==ESDiscrete)
-                            AdditionalFeatures+=__T("ES XXCH");
-                        else if (Profiles[i]==ESMatrix)
+                             if (Profiles[i]==ESMatrix)
                             AdditionalFeatures+=__T("ES");
-                        else if (Profiles[i]==HRA)
-                            AdditionalFeatures+=__T("XBR");
+                        else if (Profiles[i]==Discrete)
+                            AdditionalFeatures+=__T("XCh");
+                        else if (Profiles[i]==ESDiscrete)
+                            AdditionalFeatures+=__T("XCh");
                         else if (Profiles[i]==MA)
                             AdditionalFeatures+=__T("XLL");
                         else
@@ -746,7 +767,12 @@ Ztring HighestFormat(stream_t StreamKind, size_t Parameter, const ZtringList& In
                 if (Profile.find(HEAACv2)!=string::npos)
                     return "Advanced Audio Codec Low Complexity with Spectral Band Replication and Parametric Stereo";
                 if (Profile.find(HEAAC)!=string::npos)
-                    return "Advanced Audio Codec Low Complexity with Spectral Band Replication";
+                {
+                    if (Profile.find(__T("eSBR"))!=string::npos)
+                        return "Advanced Audio Codec Low Complexity with Enhanced Spectral Band Replication";
+                    else
+                        return "Advanced Audio Codec Low Complexity with Spectral Band Replication";
+                }
                 if (Profile.find(LC)!=string::npos)
                     return "Advanced Audio Codec Low Complexity";
             }
@@ -785,6 +811,8 @@ Ztring HighestFormat(stream_t StreamKind, size_t Parameter, const ZtringList& In
             if (Info[Parameter_Format]==AAC)
             {
                 const Ztring& Profile=Info[Parameter_Format_Profile];
+                if (Profile.find(HEAAC_ESBR)!=string::npos)
+                    return "HE-AAC eSBR";
                 if (Profile.find(HEAACv2)!=string::npos)
                     return "HE-AACv2";
                 if (Profile.find(HEAAC)!=string::npos)
@@ -792,19 +820,55 @@ Ztring HighestFormat(stream_t StreamKind, size_t Parameter, const ZtringList& In
             }
             if (Info[Parameter_Format]==DTS)
             {
-                const Ztring& Profile=Info[Parameter_Format_Profile];
-                if (Profile.find(MA)!=string::npos)
-                    return "DTS-HD Master Audio";
-                if (Profile.find(HRA)!=string::npos)
-                    return "DTS-HD High Resolution Audio";
-                if (Profile.find(_9624)!=string::npos)
-                    return "DTS 96/24";
-                if (Profile.find(ESDiscrete)!=string::npos)
-                    return "DTS-ES Discrete";
-                if (Profile.find(ESMatrix)!=string::npos)
-                    return "DTS-ES Matrix";
-                if (Profile.find(Express)!=string::npos)
-                    return "DTS Express";
+                ZtringList Profiles;
+                Profiles.Separator_Set(0, __T(" / "));
+                Profiles.Write(Info[Parameter_Format_Profile]);
+                const char* Value=nullptr;
+                bool HasHRA=false, HasXLL=false;
+                for (size_t i=Profiles.size()-1; i!=(size_t)-1; i--)
+                {
+                    const auto& Profile=Profiles[i];
+                         if (Profile==Core)
+                        ;
+                    else if (Profile==ESMatrix)
+                        Value="DTS-ES";
+                    else if (Profile==ESDiscrete)
+                        Value="DTS-ES Discrete";
+                    else if (Profile==x96)
+                        Value="DTS 96/24";
+                    else if (Profile==X96 || Profile==XBR || Profile==XXCH)
+                    {
+                        Value="DTS-HD High Resolution Audio";
+                        HasHRA=true;
+                    }
+                    else if (Profile==MA)
+                    {
+                         Value="DTS-HD Master Audio";
+                         HasXLL=true;
+                    }
+                    else if (Profile==Express)
+                        Value="DTS Express";
+                    else if (Profile==X)
+                    {
+                        if (HasXLL)
+                            Value="DTS-HD MA + DTS:X";
+                        else if (HasHRA)
+                            Value="DTS-HD HRA + DTS:X";
+                        else
+                            Value="DTS:X";
+                    }
+                    else if (Profile==IMAX)
+                    {
+                        if (HasXLL)
+                            Value="DTS-HD MA + IMAX Enhanced";
+                        else if (HasHRA)
+                            Value="DTS-HD HRA + IMAX Enhanced";
+                        else
+                            Value="IMAX Enhanced";
+                    }
+                }
+                if (Value)
+                    return Value;
             }
             break;
         default:;
@@ -848,7 +912,7 @@ static void CtrlC_Unregister();
 static void Reader_Cin_Add(Reader_Cin_Thread* Thread)
 {
     CriticalSectionLocker ToTerminate_CSL(ToTerminate_CS);
-    if (ToTerminate.empty())
+    if (ToTerminate.empty() && MediaInfoLib::Config.AcceptSignals_Get())
         CtrlC_Register();
     ToTerminate.insert(Thread);
 }
@@ -857,7 +921,7 @@ static void Reader_Cin_Remove(Reader_Cin_Thread* Thread)
 {
     CriticalSectionLocker ToTerminate_CSL(ToTerminate_CS);
     ToTerminate.erase(Thread);
-    if (ToTerminate.empty())
+    if (ToTerminate.empty() && MediaInfoLib::Config.AcceptSignals_Get())
         CtrlC_Unregister();
 }
 
@@ -908,7 +972,7 @@ public:
 
     void Entry()
     {
-        while (!IsTerminating())
+        while (!IsTerminating() && !IsExited())
         {
             if (Buffer_Size[Buffer_Filling]==Buffer_MaxSize) //If end of buffer is reached
             {
@@ -1399,17 +1463,19 @@ void MediaInfo_Internal::Entry()
             {
                 int8u* Buffer_New;
                 size_t Buffer_Size_New;
+                if (Cin.IsExited())
+                    break;
                 Cin.Current(Buffer_New, Buffer_Size_New);
                 if (Buffer_Size_New)
                 {
                     if (Open_Buffer_Continue(Buffer_New, Buffer_Size_New)[File__Analyze::IsFinished])
-                        break;
+                        Reader_Cin_ForceTerminate(&Cin);
+                    if (Config.RequestTerminate)
+                        Cin.RequestTerminate();
                     Cin.IsManaged();
                     if (TimeOut!=-1)
                         LastIn=clock();
                 }
-                else if (Cin.IsExited())
-                    break;
                 else
                 {
                     if (LastIn!=-1)
@@ -2531,9 +2597,9 @@ Ztring MediaInfo_Internal::Inform(std::vector<MediaInfo_Internal*>& Info)
         Result+=MediaInfoLib::Config.LineSeparator_Get();
         Result+=__T("    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"");
         Result+=MediaInfoLib::Config.LineSeparator_Get();
-        Result+=__T("    xsi:schemaLocation=\"http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/mediatrace http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/mediatrace/mediatrace_0_1.xsd\"");
+        Result+=__T("    xsi:schemaLocation=\"http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/mediatrace http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/mediatrace/mediatrace_0_2.xsd\"");
         Result+=MediaInfoLib::Config.LineSeparator_Get();
-        Result+=__T("    version=\"0.1\"");
+        Result+=__T("    version=\"0.2\"");
         Result+=__T(">")+MediaInfoLib::Config.LineSeparator_Get();
         Result+=__T("<creatingLibrary version=\"")+Ztring(MediaInfo_Version).SubString(__T(" - v"), Ztring())+__T("\" url=\"http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/MediaInfo\">MediaInfoLib</creatingLibrary>");
         Result+=MediaInfoLib::Config.LineSeparator_Get();
@@ -2588,6 +2654,32 @@ Ztring MediaInfo_Internal::Inform(std::vector<MediaInfo_Internal*>& Info)
         }
 
         Result+=__T("</MicroMediaTrace>");
+    }
+
+    else if (MediaInfoLib::Config.Inform_Get().MakeLowerCase()==__T("timecodexml"))
+    {
+        Result+=__T("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")+MediaInfoLib::Config.LineSeparator_Get();
+        Result+=__T('<');
+        Result+=__T("MediaTimecode");
+        Result+=MediaInfoLib::Config.LineSeparator_Get();
+        Result+=__T("    xmlns=\"http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/mediatimecode\"");
+        Result+=MediaInfoLib::Config.LineSeparator_Get();
+        Result+=__T("    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"");
+        Result+=MediaInfoLib::Config.LineSeparator_Get();
+        Result+=__T("    xsi:schemaLocation=\"http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/mediatimecode http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/xsd/mediatimecode.xsd\"");
+        Result+=MediaInfoLib::Config.LineSeparator_Get();
+        Result+=__T("    version=\"0.0\"");
+        Result+=__T(">")+MediaInfoLib::Config.LineSeparator_Get();
+        Result+=__T("<creatingLibrary version=\"")+Ztring(MediaInfo_Version).SubString(__T(" - v"), Ztring())+__T("\" url=\"http")+(MediaInfoLib::Config.Https_Get()?Ztring(__T("s")):Ztring())+__T("://mediaarea.net/MediaInfo\">MediaInfoLib</creatingLibrary>");
+        Result+=MediaInfoLib::Config.LineSeparator_Get();
+
+        for (size_t FilePos=0; FilePos<Info.size(); FilePos++)
+            Result+=Info[FilePos]->Inform();
+
+        if (!Result.empty() && Result[Result.size()-1]!=__T('\r') && Result[Result.size()-1]!=__T('\n'))
+            Result+=MediaInfoLib::Config.LineSeparator_Get();
+        Result+=__T("</MediaTimecode");
+        Result+=__T(">")+MediaInfoLib::Config.LineSeparator_Get();
     }
 
     else if (MediaInfoLib::Config.Inform_Get()==__T("XML") || MediaInfoLib::Config.Inform_Get()==__T("MIXML"))

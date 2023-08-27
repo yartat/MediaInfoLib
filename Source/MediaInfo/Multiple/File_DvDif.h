@@ -32,6 +32,7 @@ class File_DvDif : public File__Analyze
 public :
     //In
     int64u Frame_Count_Valid;
+    bool   FrameIsAlwaysComplete;
     int8u  AuxToAnalyze; //Only Aux must be parsed
     bool   IgnoreAudio;
 
@@ -60,6 +61,7 @@ protected :
 
     //Buffer - Global
     #ifdef MEDIAINFO_DVDIF_ANALYZE_YES
+    void Read_Buffer_Init();
     void Read_Buffer_Continue();
     #endif //MEDIAINFO_DVDIF_ANALYZE_YES
     void Read_Buffer_Unsynched();
@@ -209,6 +211,8 @@ protected :
             StoredValues.clear();
         }
     };
+    int16u FSC_WasSet_Sum;
+    int16u FSC_WasNotSet_Sum;
     abst_bf AbstBf_Current_Weighted;
     int32u AbstBf_Current;
     int32u AbstBf_Previous;
@@ -220,6 +224,7 @@ protected :
     bool   REC_ST;
     bool   REC_END;
     bool   REC_IsValid;
+    std::vector<int8u> DirectionSpeed;
     struct dvdate
     {
         int8u  Days;
@@ -270,6 +275,7 @@ protected :
     dvtime Speed_TimeCode_Last;
     dvtime Speed_TimeCode_Current;
     dvtime Speed_TimeCode_Current_Theory;
+    dvtime Speed_TimeCode_Current_Theory2;
     Ztring Speed_TimeCodeZ_First;
     Ztring Speed_TimeCodeZ_Last;
     Ztring Speed_TimeCodeZ_Current;
@@ -281,6 +287,7 @@ protected :
     Ztring Speed_RecTimeZ_Last;
     Ztring Speed_RecTimeZ_Current;
     dvdate Speed_RecDate_Current;
+    dvdate Speed_RecDate_Current_Theory2;
     Ztring Speed_RecDateZ_First;
     Ztring Speed_RecDateZ_Last;
     Ztring Speed_RecDateZ_Current;
@@ -293,6 +300,7 @@ protected :
     {
         Caption_Present,
         Caption_ParityIssueAny,
+        PreviousFrameHasNoAudioSourceControl,
     };
     bitset<32> Captions_Flags;
     enum coherency
@@ -308,8 +316,18 @@ protected :
     bitset<32> Coherency_Flags;
     std::vector<std::vector<int8u> > audio_source_mode; //Per ChannelGroup and Dseq, -1 means not present
     bitset<ChannelGroup_Count*2> ChannelInfo;
-    std::vector<std::vector<size_t> > Audio_Errors; //Per ChannelGroup and Dseq
+    struct audio_errors
+    {
+        size_t Count;
+        std::set<int16u> Values;
+
+        audio_errors():
+            Count(0)
+        {}
+    };
+    std::vector<std::vector<audio_errors> > Audio_Errors; //Per ChannelGroup and Dseq
     std::vector<std::vector<size_t> > Audio_Errors_TotalPerChannel; //Per Channel and Dseq
+
     struct recZ_Single
     {
         int64u FramePos;

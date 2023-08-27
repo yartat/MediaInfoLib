@@ -19,6 +19,7 @@
 #include "MediaInfo/File__Analyze.h"
 #include <vector>
 #include <bitset>
+#include <cfloat>
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -104,7 +105,7 @@ private :
 
         character()
             :
-            Value(L' '),
+            Value(L'\0'),
             Attribute(0x00)
         {
         }
@@ -123,6 +124,21 @@ private :
         size_t  RollUpLines;
         bool    Synched;
 
+        //Stats
+        int64u  Count_PopOn;
+        int64u  Count_RollUp;
+        size_t  Count_PaintOn;
+        int64u  LineCount;
+        int64u  LineMaxCountPerEvent;
+        bool    Count_CurrentHasContent;
+        int8u   FirstDisplay_Delay_Type;
+        size_t  FirstDisplay_Delay_Frames;
+        float32 Duration_Start_Command;
+        float32 Duration_Start;
+        float32 Duration_End;
+        float32 Duration_End_Command;
+        bool    Duration_End_Command_WasJustUpdated;
+
         stream()
         {
             InBack=false;
@@ -131,6 +147,21 @@ private :
             Attribute_Current=0;
             RollUpLines=0;
             Synched=false;
+
+            //Stats
+            Count_PopOn=0;
+            Count_RollUp=0;
+            Count_PaintOn=0;
+            LineCount=0;
+            LineMaxCountPerEvent=0;
+            Count_CurrentHasContent=false;
+            FirstDisplay_Delay_Type=(int8u)-1;
+            FirstDisplay_Delay_Frames=(size_t)-1;
+            Duration_Start_Command=FLT_MAX;
+            Duration_Start=FLT_MAX;
+            Duration_End=FLT_MAX;
+            Duration_End_Command=FLT_MAX;
+            Duration_End_Command_WasJustUpdated=false;
         }
     };
     std::vector<stream*> Streams;
@@ -138,6 +169,8 @@ private :
     int8u cc_data_1_Old;
     int8u cc_data_2_Old;
     bool   HasContent;
+    bool   HasContent_Displayed;
+    bool   HasJumped;
     std::bitset<8> DataDetected; //1=CC1, 2=CC2, 3=T1, 4=T2, 5=XDS
 };
 

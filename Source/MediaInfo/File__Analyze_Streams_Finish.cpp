@@ -31,6 +31,7 @@
 #include "MediaInfo/File__Analyze.h"
 #include "MediaInfo/MediaInfo_Config_MediaInfo.h"
 #include "MediaInfo/MediaInfo_Internal.h"
+#include "MediaInfo/TimeCode.h"
 #if MEDIAINFO_IBI
     #include "MediaInfo/Multiple/File_Ibi.h"
 #endif //MEDIAINFO_IBI
@@ -40,6 +41,7 @@
     #include <fstream>
     #endif //WINDOWS
 #endif //MEDIAINFO_FIXITY
+#include <algorithm>
 using namespace ZenLib;
 //---------------------------------------------------------------------------
 
@@ -77,6 +79,134 @@ Ztring File__Analyze_Encoded_Library_String (const Ztring &CompanyName, const Zt
     }
     else
         return Encoded_Library;
+}
+
+//---------------------------------------------------------------------------
+void Merge_FillTimeCode(File__Analyze& In, const string& Prefix, const TimeCode& TC_Time, float FramesPerSecondF, bool DropFrame, TimeCode::rounding Rounding=TimeCode::Nearest, int32u Frequency=0)
+{
+    if (!TC_Time.IsSet())
+        return;
+    auto FramesPerSecondI=float32_int32s(FramesPerSecondF);
+    TimeCode TC_Frames;
+    string TC_WithExtraSamples_String;
+    if (FramesPerSecondI)
+    {
+        TC_Frames=TC_Time.ToRescaled(FramesPerSecondI-1, TimeCode::DropFrame(DropFrame).FPS1001(FramesPerSecondI!=FramesPerSecondF), Rounding);
+        bool IsRounded=false;
+        if (Rounding==TimeCode::Floor)
+        {
+            //Handling TC_Time rounding issue
+            TimeCode TC_Frames1=TC_Frames+1;
+            TimeCode TC_Frames1_InTime=TC_Frames1.ToRescaled(TC_Time.GetFramesMax(), TimeCode::flags(), TimeCode::Floor);
+            if (TC_Time==TC_Frames1_InTime)
+            {
+                TC_Frames=TC_Frames1;
+                IsRounded=true;
+            }
+        }
+        if (Rounding==TimeCode::Ceil)
+        {
+            //Handling TC_Time rounding issue
+            TimeCode TC_Frames1=TC_Frames-1;
+            TimeCode TC_Frames1_InTime=TC_Frames1.ToRescaled(TC_Time.GetFramesMax(), TimeCode::flags(), TimeCode::Ceil);
+            if (TC_Time==TC_Frames1_InTime)
+            {
+                TC_Frames=TC_Frames1;
+                IsRounded=true;
+            }
+        }
+        TC_WithExtraSamples_String=TC_Frames.ToString();
+
+        if (Frequency)
+        {
+            // With samples
+            int64_t Samples;
+            if (IsRounded)
+                Samples=0;
+            else
+            {
+                TimeCode TC_Frames_InSamples=TC_Frames.ToRescaled(Frequency-1, TimeCode::flags(), Rounding);
+                TimeCode TC_Time_Samples=TC_Time.ToRescaled(Frequency-1, TimeCode::flags(), Rounding);
+                TimeCode TC_ExtraSamples;
+                if (Rounding==TimeCode::Ceil)
+                    TC_ExtraSamples=TC_Frames_InSamples-TC_Time_Samples;
+                else
+                    TC_ExtraSamples=TC_Time_Samples-TC_Frames_InSamples;
+                Samples=TC_ExtraSamples.ToFrames();
+            }
+            if (Samples)
+            {
+                if (Samples>=0)
+                    TC_WithExtraSamples_String+=Rounding==TimeCode::Ceil?'-':'+';
+                TC_WithExtraSamples_String+=std::to_string(Samples);
+                TC_WithExtraSamples_String+="samples";
+            }
+        }
+    }
+
+    if (Prefix.find("TimeCode")!=string::npos)
+    {
+        In.Fill(Stream_Audio, 0, Prefix.c_str(), TC_WithExtraSamples_String, true, true);
+        return;
+    }
+
+    string TC_WithExtraSubFrames_String;
+    if (FramesPerSecondI)
+    {
+        // With subframes
+        constexpr TimeCode::rounding TC_Frames_Sub_Rounding=TimeCode::Ceil;
+        TimeCode TC_Frames_Sub=TC_Time.ToRescaled(FramesPerSecondI*100-1, TimeCode::DropFrame(DropFrame).FPS1001(FramesPerSecondI!=FramesPerSecondF), TC_Frames_Sub_Rounding);
+        bool IsRounded=false;
+        if (TC_Frames_Sub_Rounding==TimeCode::Floor)
+        {
+            //Handling TC_Time rounding issue
+            TimeCode TC_Frames_Sub1=TC_Frames_Sub+1;
+            TimeCode TC_Frames_Sub1_InTime=TC_Frames_Sub1.ToRescaled(TC_Time.GetFramesMax(), TimeCode::flags(), TimeCode::Floor);
+            if (TC_Time==TC_Frames_Sub1_InTime)
+            {
+                TC_Frames_Sub=TC_Frames_Sub1;
+                IsRounded=true;
+            }
+        }
+        if (TC_Frames_Sub_Rounding==TimeCode::Ceil)
+        {
+            //Handling TC_Time rounding issue
+            TimeCode TC_Frames_Sub1=TC_Frames_Sub-1;
+            TimeCode TC_Frames_Sub1_InTime=TC_Frames_Sub1.ToRescaled(TC_Time.GetFramesMax(), TimeCode::flags(), TimeCode::Ceil);
+            if (TC_Time==TC_Frames_Sub1_InTime)
+            {
+                TC_Frames_Sub=TC_Frames_Sub1;
+                IsRounded=true;
+            }
+        }
+        int64_t SubFrames=TC_Frames_Sub.ToFrames();
+        int64_t SubFrames_Main=SubFrames/100;
+        int64_t SubFrames_Part=SubFrames%100;
+        TimeCode TC_Frames_Sub_Main=TimeCode(SubFrames_Main, FramesPerSecondI-1, TimeCode::DropFrame(DropFrame).FPS1001(FramesPerSecondI!=FramesPerSecondF));
+        TC_WithExtraSubFrames_String=TC_Frames_Sub_Main.ToString();
+        if (SubFrames_Part)
+        {
+            TC_WithExtraSubFrames_String+='.';
+            auto Temp=std::to_string(SubFrames_Part);
+            if (Temp.size()==1)
+                Temp.insert(0, 1, '0');
+            TC_WithExtraSubFrames_String+=Temp;
+        }
+    }
+    
+    In.Fill(Stream_Audio, 0, Prefix.c_str(), TC_Time.ToString(), true, true);
+    In.Fill_SetOptions(Stream_Audio, 0, Prefix.c_str(), "N NTY");
+    In.Fill(Stream_Audio, 0, (Prefix+"/String").c_str(), TC_Time.ToString()+(TC_WithExtraSamples_String.empty()?string():(" ("+TC_WithExtraSamples_String+')')), true, true);
+    In.Fill_SetOptions(Stream_Audio, 0, (Prefix+"/String").c_str(), "Y NTN");
+    In.Fill(Stream_Audio, 0, (Prefix+"/TimeCode").c_str(), TC_Frames.ToString(), true, true);
+    if (TC_Frames.IsValid())
+        In.Fill_SetOptions(Stream_Audio, 0, (Prefix+"/TimeCode").c_str(), "N NTN");
+    In.Fill(Stream_Audio, 0, (Prefix+"/TimeCodeSubFrames").c_str(), TC_WithExtraSubFrames_String, true, true);
+    if (!TC_WithExtraSubFrames_String.empty())
+        In.Fill_SetOptions(Stream_Audio, 0, (Prefix+"/TimeCodeSubFrames").c_str(), "N NTN");
+    In.Fill(Stream_Audio, 0, (Prefix+"/TimeCodeSamples").c_str(), Frequency?TC_WithExtraSamples_String:string(), true, true);
+    if (Frequency && !TC_WithExtraSamples_String.empty())
+        In.Fill_SetOptions(Stream_Audio, 0, (Prefix+"/TimeCodeSamples").c_str(), "N NTN");
 }
 
 //---------------------------------------------------------------------------
@@ -674,6 +804,44 @@ void File__Analyze::Streams_Finish_StreamOnly(stream_t StreamKind, size_t Pos)
         if (Retrieve(StreamKind, Pos, Fill_Parameter(StreamKind, Generic_BitRate_Mode)).empty())
             Fill(StreamKind, Pos, Fill_Parameter(StreamKind, Generic_BitRate_Mode), "CBR");
     }
+
+    //ServiceKind
+    auto ServiceKind = Retrieve(StreamKind, Pos, "ServiceKind");
+    if (!ServiceKind.empty())
+    {
+        ZtringList List;
+        List.Separator_Set(0, __T(" / "));
+        List.Write(ServiceKind);
+        if (List.size()>1)
+        {
+            size_t HI_ME_Pos=(size_t)-1;
+            size_t HI_D_Pos=(size_t)-1;
+            static const auto HI_ME_Text=__T("HI-ME");
+            static const auto HI_D_Text=__T("HI-D");
+            static const auto VI_ME_Text=__T("VI-ME");
+            static const auto VI_D_Text=__T("VI-D");
+            for (size_t i=0; i<List.size(); i++)
+            {
+                const auto& Item=List[i];
+                if (HI_ME_Pos==(size_t)-1 && (Item==HI_ME_Text || Item==VI_ME_Text))
+                    HI_ME_Pos=i;
+                if (HI_D_Pos==(size_t)-1 && (Item==HI_D_Text || Item==HI_D_Text))
+                    HI_D_Pos=i;
+            }
+            if (HI_ME_Pos!=(size_t)-1 && HI_D_Pos!=(size_t)-1)
+            {
+                if (HI_ME_Pos>HI_D_Pos)
+                    std::swap(HI_ME_Pos, HI_D_Pos);
+                List[HI_ME_Pos]=__T("HI");
+                List.erase(List.begin()+HI_D_Pos);
+                Fill(StreamKind, Pos, "ServiceKind", List.Read(), true);
+                List.Write(Retrieve(StreamKind, Pos, "ServiceKind/String"));
+                List[HI_ME_Pos].From_UTF8("Hearing Impaired");
+                List.erase(List.begin()+HI_D_Pos);
+                Fill(StreamKind, Pos, "ServiceKind/String", List.Read(), true);
+            }
+        }
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -697,6 +865,25 @@ void File__Analyze::Streams_Finish_StreamOnly_General(size_t StreamPos)
                     Fill(Stream_General, StreamPos, "FileExtension_Invalid", ValidExtensions.Read());
             }
         }
+    }
+
+    //Audio_Channels_Total
+    if (Retrieve_Const(Stream_General, StreamPos, General_Audio_Channels_Total).empty())
+    {
+        auto Audio_Count = Count_Get(Stream_Audio);
+        int64u Channels_Total=0;
+        for (size_t i=0; i<Audio_Count; i++)
+        {
+            int64u Channels=Retrieve_Const(Stream_Audio, i, Audio_Channel_s_).To_int64u();
+            if (!Channels)
+            {
+                Channels_Total=0;
+                break;
+            }
+            Channels_Total+=Channels;
+        }
+        if (Channels_Total)
+            Fill(Stream_General, StreamPos, General_Audio_Channels_Total, Channels_Total);
     }
 }
 
@@ -855,7 +1042,15 @@ void File__Analyze::Streams_Finish_StreamOnly_Video(size_t Pos)
                 if (!HDR_Format_Compatibility[j].empty())
                 {
                     Summary[j]+=__T(", ")+HDR_Format_Compatibility[j]+__T(" compatible");
-                    Commercial[j]=HDR_Format_Compatibility[j].substr(0, HDR_Format_Compatibility[j].find(__T(' ')));
+                    Commercial[j]=HDR_Format_Compatibility[j];
+                    if (!Commercial[j].empty())
+                    {
+                        auto Commercial_Reduce=Commercial[j].find(__T(' '));
+                        if (Commercial_Reduce<Commercial[j].size()-1 && Commercial[j][Commercial_Reduce+1]>='0' && Commercial[j][Commercial_Reduce+1]<='9')
+                            Commercial_Reduce=Commercial[j].find(__T(' '), Commercial_Reduce+1);
+                        if (Commercial_Reduce!=string::npos)
+                            Commercial[j].resize(Commercial_Reduce);
+                    }
                 }
             Fill(Stream_Video, Pos, Video_HDR_Format_String, Summary.Read());
             Fill(Stream_Video, Pos, Video_HDR_Format_Commercial, Commercial.Read());
@@ -1212,6 +1407,51 @@ void File__Analyze::Streams_Finish_StreamOnly_Audio(size_t Pos)
         }
     }
 
+    //ChannelLayout
+    if (Retrieve_Const(Stream_Audio, Pos, Audio_ChannelLayout).empty())
+    {
+        ZtringList ChannelLayout_List;
+        ChannelLayout_List.Separator_Set(0, __T(" "));
+        ChannelLayout_List.Write(Retrieve_Const(Stream_Audio, Pos, Audio_ChannelLayout));
+        size_t ChannelLayout_List_SizeBefore=ChannelLayout_List.size();
+        
+        size_t NumberOfSubstreams=(size_t)Retrieve_Const(Stream_Audio, Pos, "NumberOfSubstreams").To_int64u();
+        for (size_t i=0; i<NumberOfSubstreams; i++)
+        {
+            static const char* const Places[]={ "ChannelLayout", "BedChannelConfiguration" };
+            static constexpr size_t Places_Size=sizeof(Places)/sizeof(decltype(*Places));
+            for (const auto Place : Places)
+            {
+                ZtringList AdditionaChannelLayout_List;
+                AdditionaChannelLayout_List.Separator_Set(0, __T(" "));
+                AdditionaChannelLayout_List.Write(Retrieve_Const(Stream_Audio, Pos, ("Substream"+std::to_string(i)+' '+Place).c_str()));
+                for (auto& AdditionaChannelLayout_Item: AdditionaChannelLayout_List)
+                {
+                    if (std::find(ChannelLayout_List.cbegin(), ChannelLayout_List.cend(), AdditionaChannelLayout_Item)==ChannelLayout_List.cend())
+                        ChannelLayout_List.push_back(std::move(AdditionaChannelLayout_Item));
+                }
+            }
+        }
+        if (ChannelLayout_List.size()!=ChannelLayout_List_SizeBefore)
+        {
+            Fill(Stream_Audio, Pos, Audio_Channel_s_, ChannelLayout_List.size(), 10, true);
+            Clear(Stream_Audio, Pos, Audio_ChannelPositions);
+            Fill(Stream_Audio, Pos, Audio_ChannelLayout, ChannelLayout_List.Read(), true);
+        }
+    }
+
+    //Channel(s)
+    if (Retrieve_Const(Stream_Audio, Pos, Audio_Channel_s_).empty())
+    {
+        size_t NumberOfSubstreams=(size_t)Retrieve_Const(Stream_Audio, Pos, "NumberOfSubstreams").To_int64u();
+        if (NumberOfSubstreams==1)
+        {
+            auto Channels=Retrieve_Const(Stream_Audio, Pos, "Substream0 Channel(s)").To_int32u();
+            if (Channels)
+                Fill(Stream_Audio, Pos, Audio_Channel_s_, Channels);
+        }
+    }
+
     //Duration
     if (Retrieve(Stream_Audio, Pos, Audio_Duration).empty())
     {
@@ -1255,6 +1495,35 @@ void File__Analyze::Streams_Finish_StreamOnly_Audio(size_t Pos)
         if (!Z1.empty())
             Fill(Stream_Audio, Pos, Audio_BitRate_Mode, Z1);
     }
+
+    //Commercial name
+    if (Retrieve(Stream_Audio, Pos, Audio_Format_Commercial_IfAny).empty() && Retrieve(Stream_Audio, Pos, Audio_Format)==__T("USAC") && Retrieve(Stream_Audio, Pos, Audio_Format_Profile).rfind(__T("Extended HE AAC@"), 0)==0)
+    {
+        Fill(Stream_Audio, Pos, Audio_Format_Commercial_IfAny, "xHE-AAC");
+    }
+
+    //Timestamp to timecode
+    auto FramesPerSecondF=Retrieve_Const(Stream_Audio, 0, "Dolby_Atmos_Metadata AssociatedVideo_FrameRate").To_float32();
+    auto DropFrame=Retrieve_Const(Stream_Audio, 0, "Dolby_Atmos_Metadata AssociatedVideo_FrameRate_DropFrame")==__T("Yes");
+    auto SamplingRate=Retrieve_Const(Stream_Audio, 0, Audio_SamplingRate).To_int32u();
+    const auto& FirstFrameOfAction=Retrieve_Const(Stream_Audio, 0, "Dolby_Atmos_Metadata FirstFrameOfAction");
+    if (!FirstFrameOfAction.empty())
+    {
+        auto TC_FirstFrameOfAction=TimeCode(FirstFrameOfAction.To_UTF8());
+        Merge_FillTimeCode(*this, "Dolby_Atmos_Metadata FirstFrameOfAction", TC_FirstFrameOfAction, FramesPerSecondF, DropFrame, TimeCode::Ceil, SamplingRate);
+    }
+    const auto& Start=Retrieve_Const(Stream_Audio, 0, "Programme0 Start");
+    if (!Start.empty())
+    {
+        auto TC_End=TimeCode(Start.To_UTF8());
+        Merge_FillTimeCode(*this, "Programme0 Start", TC_End, FramesPerSecondF, DropFrame, TimeCode::Floor, SamplingRate);
+    }
+    const auto& End=Retrieve_Const(Stream_Audio, 0, "Programme0 End");
+    if (!End.empty())
+    {
+        auto TC_End=TimeCode(End.To_UTF8());
+        Merge_FillTimeCode(*this, "Programme0 End", TC_End, FramesPerSecondF, DropFrame, TimeCode::Ceil, SamplingRate);
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -1267,6 +1536,15 @@ void File__Analyze::Streams_Finish_StreamOnly_Text(size_t Pos)
         float64 Duration=Retrieve(Stream_Text, Pos, Text_Duration).To_float64()/1000;
         if (FrameCount && Duration)
            Fill(Stream_Text, Pos, Text_FrameRate, FrameCount/Duration, 3);
+    }
+
+    //FrameCount from Duration and FrameRate
+    if (Retrieve(Stream_Text, Pos, Text_FrameCount).empty())
+    {
+        float64 Duration=Retrieve(Stream_Text, Pos, Text_Duration).To_float64()/1000;
+        float64 FrameRate=Retrieve(Stream_Text, Pos, Text_FrameRate).To_float64();
+        if (Duration && FrameRate)
+           Fill(Stream_Text, Pos, Text_FrameCount, float64_int64s(Duration*FrameRate));
     }
 }
 
@@ -1330,7 +1608,7 @@ void File__Analyze::Streams_Finish_InterStreams()
         }
 
         //Filling
-        if (IsOK && StreamSize_Total>0 && StreamSize_Total<File_Size)
+        if (IsOK && StreamSize_Total>0 && StreamSize_Total<File_Size && (File_Size==StreamSize_Total || File_Size-StreamSize_Total>8)) //to avoid strange behavior due to rounding, TODO: avoid rounding
             Fill(Stream_General, 0, General_StreamSize, File_Size-StreamSize_Total);
     }
 
@@ -1520,7 +1798,7 @@ void File__Analyze::Streams_Finish_InterStreams()
                 else
                     StreamSizeIsValid=false;
             }
-        if (StreamSizeIsValid && StreamSize>=0) //to avoid strange behavior
+        if (StreamSizeIsValid && (!StreamSize || StreamSize>8)) //to avoid strange behavior due to rounding, TODO: avoid rounding
             Fill(Stream_General, 0, General_StreamSize, StreamSize);
     }
 
@@ -1618,37 +1896,7 @@ void File__Analyze::Streams_Finish_HumanReadable_PerStream(stream_t StreamKind, 
     else if (List_Measure_Value==__T("Yes"))
         YesNo_YesNo(StreamKind, StreamPos, Parameter);
     else
-    {
         Value_Value123(StreamKind, StreamPos, Parameter);
-
-        //Special cases - 120 fps 24/30 mode
-        if (StreamKind==Stream_Video
-         && List_Measure_Value==__T(" fps")
-         && Retrieve(StreamKind, StreamPos, Video_FrameRate).To_int32u()==120
-         && Retrieve(StreamKind, StreamPos, Video_FrameRate_Minimum).To_int32u()==24
-         && Retrieve(StreamKind, StreamPos, Video_FrameRate_Maximum).To_int32u()==30)
-            Fill(Stream_Video, StreamPos_Last, Video_FrameRate_String, MediaInfoLib::Config.Language_Get(Retrieve(StreamKind, StreamPos, Video_FrameRate)+__T(" (24/30)"), __T(" fps")), true);
-
-        //Special cases - Frame rate
-        if (StreamKind==Stream_Video
-         && Parameter==Video_FrameRate
-         && !Retrieve(StreamKind, StreamPos, Video_FrameRate).empty()
-         && !Retrieve(StreamKind, StreamPos, Video_FrameRate_Num).empty()
-         && !Retrieve(StreamKind, StreamPos, Video_FrameRate_Den).empty())
-            Fill(Stream_Video, StreamPos, Video_FrameRate_String, MediaInfoLib::Config.Language_Get(Retrieve(StreamKind, StreamPos, Video_FrameRate)+__T(" (")+Retrieve(StreamKind, StreamPos, Video_FrameRate_Num)+__T("/")+Retrieve(StreamKind, StreamPos, Video_FrameRate_Den)+__T(")"), __T(" fps")), true);
-        if (StreamKind==Stream_Video
-         && Parameter==Video_FrameRate_Original
-         && !Retrieve(StreamKind, StreamPos, Video_FrameRate_Original).empty()
-         && !Retrieve(StreamKind, StreamPos, Video_FrameRate_Original_Num).empty()
-         && !Retrieve(StreamKind, StreamPos, Video_FrameRate_Original_Den).empty())
-            Fill(Stream_Video, StreamPos, Video_FrameRate_Original_String, MediaInfoLib::Config.Language_Get(Retrieve(StreamKind, StreamPos, Video_FrameRate_Original)+__T(" (")+Retrieve(StreamKind, StreamPos, Video_FrameRate_Original_Num)+__T("/")+Retrieve(StreamKind, StreamPos, Video_FrameRate_Original_Den)+__T(")"), __T(" fps")), true);
-        if (StreamKind==Stream_Other
-         && Parameter==Other_FrameRate
-         && !Retrieve(StreamKind, StreamPos, Other_FrameRate).empty()
-         && !Retrieve(StreamKind, StreamPos, Other_FrameRate_Num).empty()
-         && !Retrieve(StreamKind, StreamPos, Other_FrameRate_Den).empty())
-            Fill(Stream_Other, StreamPos, Other_FrameRate_String, MediaInfoLib::Config.Language_Get(Retrieve(StreamKind, StreamPos, Other_FrameRate)+__T(" (")+Retrieve(StreamKind, StreamPos, Other_FrameRate_Num)+__T("/")+Retrieve(StreamKind, StreamPos, Other_FrameRate_Den)+__T(")"), __T(" fps")), true);
-    }
 
     //BitRate_Mode / OverallBitRate_Mode
     if (ParameterName==(StreamKind==Stream_General?__T("OverallBitRate_Mode"):__T("BitRate_Mode")) && MediaInfoLib::Config.ReadByHuman_Get())
@@ -1724,17 +1972,17 @@ void File__Analyze::Streams_Finish_HumanReadable_PerStream(stream_t StreamKind, 
     //Format_Settings_Matrix
     if (StreamKind==Stream_Video && Parameter==Video_Format_Settings_Matrix)
     {
-        Fill(Stream_Video, StreamPos, Video_Format_Settings_Matrix_String, MediaInfoLib::Config.Language_Get_Translate(__T("Format_Settings_Matrix_"), Value));
+        Fill(Stream_Video, StreamPos, Video_Format_Settings_Matrix_String, MediaInfoLib::Config.Language_Get_Translate(__T("Format_Settings_Matrix_"), Value), true);
     }
 
     //Scan type
     if (StreamKind==Stream_Video && Parameter==Video_ScanType)
     {
-        Fill(Stream_Video, StreamPos, Video_ScanType_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value));
+        Fill(Stream_Video, StreamPos, Video_ScanType_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value), true);
     }
     if (StreamKind==Stream_Video && Parameter==Video_ScanType_Original)
     {
-        Fill(Stream_Video, StreamPos, Video_ScanType_Original_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value));
+        Fill(Stream_Video, StreamPos, Video_ScanType_Original_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value), true);
     }
     if (StreamKind==Stream_Video && Parameter==Video_ScanType_StoreMethod)
     {
@@ -1742,21 +1990,21 @@ void File__Analyze::Streams_Finish_HumanReadable_PerStream(stream_t StreamKind, 
         if (!Retrieve(Stream_Video, StreamPos, Video_ScanType_StoreMethod_FieldsPerBlock).empty())
             ToTranslate+=__T('_')+Retrieve(Stream_Video, StreamPos, Video_ScanType_StoreMethod_FieldsPerBlock);
         Ztring Translated=MediaInfoLib::Config.Language_Get(ToTranslate);
-        Fill(Stream_Video, StreamPos, Video_ScanType_StoreMethod_String, Translated.find(__T("StoreMethod_"))?Translated:Value);
+        Fill(Stream_Video, StreamPos, Video_ScanType_StoreMethod_String, Translated.find(__T("StoreMethod_"))?Translated:Value, true);
     }
 
     //Scan order
     if (StreamKind==Stream_Video && Parameter==Video_ScanOrder)
     {
-        Fill(Stream_Video, StreamPos, Video_ScanOrder_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value));
+        Fill(Stream_Video, StreamPos, Video_ScanOrder_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value), true);
     }
     if (StreamKind==Stream_Video && Parameter==Video_ScanOrder_Stored)
     {
-        Fill(Stream_Video, StreamPos, Video_ScanOrder_Stored_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value));
+        Fill(Stream_Video, StreamPos, Video_ScanOrder_Stored_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value), true);
     }
     if (StreamKind==Stream_Video && Parameter==Video_ScanOrder_Original)
     {
-        Fill(Stream_Video, StreamPos, Video_ScanOrder_Original_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value));
+        Fill(Stream_Video, StreamPos, Video_ScanOrder_Original_String, MediaInfoLib::Config.Language_Get_Translate(__T("Interlaced_"), Value), true);
     }
 
     //Interlacement
@@ -1774,19 +2022,19 @@ void File__Analyze::Streams_Finish_HumanReadable_PerStream(stream_t StreamKind, 
     //FrameRate_Mode
     if (StreamKind==Stream_Video && Parameter==Video_FrameRate_Mode)
     {
-        Fill(Stream_Video, StreamPos, Video_FrameRate_Mode_String, MediaInfoLib::Config.Language_Get_Translate(__T("FrameRate_Mode_"), Value));
+        Fill(Stream_Video, StreamPos, Video_FrameRate_Mode_String, MediaInfoLib::Config.Language_Get_Translate(__T("FrameRate_Mode_"), Value), true);
     }
 
     //Compression_Mode
     if (Parameter==Fill_Parameter(StreamKind, Generic_Compression_Mode))
     {
-        Fill(StreamKind, StreamPos, Fill_Parameter(StreamKind, Generic_Compression_Mode_String), MediaInfoLib::Config.Language_Get_Translate(__T("Compression_Mode_"), Value));
+        Fill(StreamKind, StreamPos, Fill_Parameter(StreamKind, Generic_Compression_Mode_String), MediaInfoLib::Config.Language_Get_Translate(__T("Compression_Mode_"), Value), true);
     }
 
     //Delay_Source
     if (Parameter==Fill_Parameter(StreamKind, Generic_Delay_Source))
     {
-        Fill(StreamKind, StreamPos, Fill_Parameter(StreamKind, Generic_Delay_Source_String), MediaInfoLib::Config.Language_Get_Translate(__T("Delay_Source_"), Value));
+        Fill(StreamKind, StreamPos, Fill_Parameter(StreamKind, Generic_Delay_Source_String), MediaInfoLib::Config.Language_Get_Translate(__T("Delay_Source_"), Value), true);
     }
 
     //Gop_OpenClosed

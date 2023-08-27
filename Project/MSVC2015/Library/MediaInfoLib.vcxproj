@@ -129,6 +129,7 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Aac_GeneralAudio_Sbr_Ps.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Aac_Main.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Aac_Others.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Aptx100.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Caf.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Celt.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_ChannelGrouping.cpp" />
@@ -138,6 +139,7 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Dsdiff.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Dsf.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Iab.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Mga.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Mpegh3da.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_OpenMG.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Audio\File_Opus.cpp" />
@@ -240,6 +242,7 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Ivf.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Lxf.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_MiXml.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Nsv.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_P2_Clip.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Pmp.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Multiple\File_Ptx.cpp" />
@@ -268,10 +271,16 @@
     <ClCompile Include="..\..\..\Source\MediaInfo\Text\File_Teletext.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Text\File_TimedText.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Text\File_Ttml.cpp" />
-    <ClCompile Include="..\..\..\Source\MediaInfo\TimeCode.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\TimeCode.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Av1.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_CineForm.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_DolbyVisionMetadata.cpp" />
+    <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Vp9.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\XmlUtils.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\OutputHelpers.cpp" />
     <ClCompile Include="..\..\..\Source\MediaInfo\Video\File_Aic.cpp" />
@@ -430,6 +439,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Aac_GeneralAudio_Sbr.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Aac_GeneralAudio_Sbr_Ps.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Adm.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Aptx100.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Caf.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Celt.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_ChannelGrouping.h" />
@@ -439,6 +449,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Dsdiff.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Dsf.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Iab.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Mga.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Mpegh3da.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_OpenMG.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Audio\File_Opus.h" />
@@ -502,6 +513,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Ism.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Ivf.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Lxf.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Nsv.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_P2_Clip.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Pmp.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Multiple\File_Ptx.h" />
@@ -601,6 +613,7 @@
     <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_Av1.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_CineForm.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_DolbyVisionMetadata.h" />
+    <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_Vp9.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\XmlUtils.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\OutputHelpers.h" />
     <ClInclude Include="..\..\..\Source\MediaInfo\Video\File_Aic.h" />

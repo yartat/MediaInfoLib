@@ -28,6 +28,10 @@
 #include <fstream>
 //---------------------------------------------------------------------------
 
+//---------------------------------------------------------------------------
+using namespace std;
+//---------------------------------------------------------------------------
+
 namespace MediaInfoLib
 {
 
@@ -36,15 +40,20 @@ namespace MediaInfoLib
 //***************************************************************************
 
 //---------------------------------------------------------------------------
+void File_DvDif::Read_Buffer_Init()
+{
+    Analyze_Activated=Config->File_DvDif_Analysis_Get();
+    if (!IsSub)
+        FrameIsAlwaysComplete=Config->File_FrameIsAlwaysComplete_Get();
+    else
+        FrameIsAlwaysComplete=false;
+}
+
+//---------------------------------------------------------------------------
 void File_DvDif::Read_Buffer_Continue()
 {
     if (!Analyze_Activated)
-    {
-        if (Config->File_DvDif_Analysis_Get())
-            Analyze_Activated=true;
-        else
-            return;
-    }
+        return;
 
     #if MEDIAINFO_DEMUX
         if (Demux_UnpacketizeContainer && !Synchro_Manage()) // We need to manage manually synchronization in case of demux
@@ -74,14 +83,18 @@ void File_DvDif::Read_Buffer_Continue()
                        && Buffer[Buffer_Offset+1]==0x00
                        && Buffer[Buffer_Offset+2]==0x00)) // Ignore NULL
                     {
-                        if ((Buffer[Buffer_Offset+1]&0xF0)==0x00) //Dseq=0
+                        if ((Buffer[Buffer_Offset+1]&0xF0)==0x00 && Buffer[Buffer_Offset+2]==0x00) //Dseq=0 && DBN=0
                         {
                             if ((Buffer[Buffer_Offset+1]&0x08)==0x00) //FSC=0
                             {
                                 if ((Buffer[Buffer_Offset+1]&0x04)==0x04) //FSP=1
                                 {
                                     //Errors stats update
-                                    if (Speed_FrameCount_StartOffset!=(int64u)-1)
+                                    if (Speed_FrameCount_StartOffset!=(int64u)-1
+                                        #if MEDIAINFO_ADVANCED
+                                         && !FrameIsAlwaysComplete
+                                        #endif
+                                    )
                                         Errors_Stats_Update();
                                     Speed_FrameCount_StartOffset=File_Offset+Buffer_Offset;
 
@@ -92,7 +105,7 @@ void File_DvDif::Read_Buffer_Continue()
                                 else
                                     FSP_WasNotSet=true;
                             }
-                            else
+                            else if (FSC_WasNotSet_Sum==0 && FSC_WasSet_Sum==0)
                                 FSC_WasSet=true;
                         }
                     }
@@ -138,7 +151,7 @@ void File_DvDif::Read_Buffer_Continue()
                         //Try to find a suitable and trustable Abst
                         if (Speed_FrameCount_StartOffset==-1)
                             Speed_FrameCount_StartOffset=0;
-                        int32s Abst_First;
+                        int32s Abst_First=INT_MAX;
                         int32s Abst_Previous=(AbstBf_Previous>>1)&0x7FFFFF;
                         int32s Abst_Theory_Max=Abst_Previous+(DSF?12:10)*(FSC_WasSet?2:1)*2; //Max 2x the expected gap
                         for (int i=0; i<2; i++)
@@ -506,6 +519,8 @@ void File_DvDif::Read_Buffer_Continue()
                         REC_END=(Buffer[Buffer_Offset+3+2]&0x40)?true:false;
                         REC_IsValid=true;
                         Coherency_Flags.set(Coherency_audio_control);
+
+                        DirectionSpeed.push_back(Buffer[Buffer_Offset+3+3]);
                     }
 
                     //audio_recdate
@@ -572,43 +587,58 @@ void File_DvDif::Read_Buffer_Continue()
                     }
 
                     //Audio errors
-                    if (Buffer[Buffer_Offset+8]==0x80)
                     {
-                        bool Contains_8000=true;
+                        bool Contains_8000=true; // Note: standards indicate these values so old code was using only theses values, now checking all values (except 0 or -1 as it is for silent audio)
                         bool Contains_800800=true;
-                        for (size_t i=8; i<80; i+=2)
-                            if (Buffer[Buffer_Offset+i]  !=0x80
-                             || Buffer[Buffer_Offset+i+1]!=0x00)
+                        int8u ToCheck_8000_0=Buffer[Buffer_Offset+8];
+                        int8u ToCheck_8000_1=Buffer[Buffer_Offset+9];
+                        for (size_t i=10; i<80; i+=2)
+                            if (Buffer[Buffer_Offset+i  ]!=ToCheck_8000_0
+                             || Buffer[Buffer_Offset+i+1]!=ToCheck_8000_1)
                             {
                                 Contains_8000=false;
                                 break;
                             }
-                        for (size_t i=8; i<80; i+=3)
-                            if (Buffer[Buffer_Offset+i]  !=0x80
-                             || Buffer[Buffer_Offset+i+1]!=0x80
-                             || Buffer[Buffer_Offset+i+2]!=0x00)
+                        int8u Contains_800800_0=Buffer[Buffer_Offset+ 8];
+                        int8u Contains_800800_1=Buffer[Buffer_Offset+ 9];
+                        int8u Contains_800800_2=Buffer[Buffer_Offset+10];
+                        for (size_t i=11; i<80; i+=3)
+                            if (Buffer[Buffer_Offset+i  ]!=Contains_800800_0
+                             || Buffer[Buffer_Offset+i+1]!=Contains_800800_1
+                             || Buffer[Buffer_Offset+i+2]!=Contains_800800_2)
                             {
                                 Contains_800800=false;
                                 break;
                             }
-                        if ((/*QU==0 &&*/ Contains_8000)    //16-bit 0x8000
+                        if ((QU==0 && Contains_8000)    //16-bit 0x8000
                          || (QU==1 && Contains_800800)  //12-bit 0x800
                          || (QU==(int8u)-1 && (Contains_8000 || Contains_800800))) //In case of QU is not already detected
                         {
                             uint8_t Channel=(Buffer[Buffer_Offset+1]&0x08)?1:0; //FSC
                             uint8_t Dseq=Buffer[Buffer_Offset+1]>>4;
-                            if (Channel>=Audio_Errors.size())
-                                Audio_Errors.resize(Channel+1);
-                            if (Audio_Errors[Channel].empty())
-                                Audio_Errors[Channel].resize(Dseq_Count);
-                            Audio_Errors[Channel][Dseq]++;
-                            BlockStatus[(File_Offset+Buffer_Offset-Speed_FrameCount_StartOffset)/80]=BlockStatus_NOK;
+                            bool Is16=(QU==(int8u)-1)?(Contains_8000):(QU==0);
+                            int16u Value;
+                            switch (Is16)
+                            {
+                                case 0: Value=(Contains_800800_0<<4)|(Contains_800800_1>>4); break; // Only one half
+                                case 1: Value=(ToCheck_8000_0<<8)|ToCheck_8000_1; break;
+                            }
+                            if (Value && Value!=(0xFFFF>>(Is16?0:4))) // 0 and -1 are often used as silence
+                            {
+                                if (Channel>=Audio_Errors.size())
+                                    Audio_Errors.resize(Channel+1);
+                                if (Audio_Errors[Channel].empty())
+                                    Audio_Errors[Channel].resize(Dseq_Count);
+                                Audio_Errors[Channel][Dseq].Count++;
+                                Audio_Errors[Channel][Dseq].Values.insert(Value);
+                                BlockStatus[(File_Offset+Buffer_Offset-Speed_FrameCount_StartOffset)/80]=BlockStatus_NOK;
+                            }
+                            else
+                                BlockStatus[(File_Offset+Buffer_Offset-Speed_FrameCount_StartOffset)/80]=BlockStatus_OK;
                         }
                         else
                             BlockStatus[(File_Offset+Buffer_Offset-Speed_FrameCount_StartOffset)/80]=BlockStatus_OK;
                     }
-                    else
-                        BlockStatus[(File_Offset+Buffer_Offset-Speed_FrameCount_StartOffset)/80]=BlockStatus_OK;
                 }
                 break;
 
@@ -664,6 +694,10 @@ void File_DvDif::Read_Buffer_Continue()
          && Buffer[Buffer_Offset+1]==0x00
          && Buffer[Buffer_Offset+2]==0x00)
            Speed_Contains_NULL++;
+        if ((Buffer[Buffer_Offset+1]&0x08)==0x00) //FSC=0
+            FSC_WasNotSet_Sum++;
+        else
+            FSC_WasSet_Sum++;
 
         Buffer_Offset+=80;
     }
@@ -671,6 +705,11 @@ void File_DvDif::Read_Buffer_Continue()
     if (!Status[IsAccepted])
         File__Analyze::Buffer_Offset=0;
     Config->State_Set(((float)File_Offset)/File_Size);
+    #if MEDIAINFO_ADVANCED
+        if (FrameIsAlwaysComplete && Speed_FrameCount_StartOffset!=(int64u)-1)
+            Errors_Stats_Update();
+    #endif
+    SCT_Old=4; // For sync
 }
 
 void File_DvDif::Errors_Stats_Update()
@@ -736,6 +775,24 @@ void File_DvDif::Errors_Stats_Update()
                 ChannelInfo=NewChannelInfo;
         }
 
+        // Coherency checking
+        bool FSC_Incoherency=false;
+        if (FSC_WasSet_Sum && FSC_WasSet_Sum)
+        {
+            int FSC_Diff=FSC_WasSet_Sum-FSC_WasNotSet_Sum;
+            if (FSC_Diff<0)
+                FSC_Diff=-FSC_Diff;
+            if (FSC_Diff*2 < FSC_WasSet_Sum+FSC_WasNotSet_Sum)
+            {
+                FSC_WasSet=false;
+                FSC_Incoherency=true;
+            }
+            else
+            {
+                FSC_WasSet=FSC_WasSet_Sum>FSC_WasNotSet_Sum;
+            }
+        }
+
         EVENT_BEGIN(DvDif, Change, 0)
             Event.StreamOffset=Speed_FrameCount_StartOffset;
             Event.FrameNumber=Speed_FrameCount;
@@ -794,6 +851,8 @@ void File_DvDif::Errors_Stats_Update()
                         }
                     }
                 }
+                else if (FSC_Incoherency)
+                    Event.VideoChromaSubsampling=(int32u)-1;
                 else //DV 50 Mbps and 100 Mbps
                     Event.VideoChromaSubsampling=2;
             }
@@ -890,6 +949,7 @@ void File_DvDif::Errors_Stats_Update()
             Event.RecordedDateTime1=0;
             Event.RecordedDateTime2=0;
             int16u RecordedDateTime2Fixed=0;
+            int16u MoreFlags=0;
             Event.Arb=0;
             Event.Verbosity=0;
             Event.Errors=NULL;
@@ -963,7 +1023,7 @@ void File_DvDif::Errors_Stats_Update()
             Errors_Stats_Line+=__T("XX:XX:XX:XX");
             #if MEDIAINFO_EVENTS
                 Event.TimeCode|=0x7FFFF<<8;
-                //Event.TimeCode|=Speed_TimeCode_Current.Time.DropFrame<<7;
+                //Event.TimeCode|=Speed_TimeCode_Current.Time.DropFrame()<<7;
                 Event.TimeCode|=0x3F;
             #endif //MEDIAINFO_EVENTS
         }
@@ -1088,10 +1148,14 @@ void File_DvDif::Errors_Stats_Update()
                 Errors_AreDetected=true;
         }
         else if (Speed_TimeCode_IsValid && Speed_TimeCode_Current.IsValid && Speed_TimeCode_Current_Theory.IsValid
-              && (   Speed_TimeCode_Current.Time.Frames !=Speed_TimeCode_Current_Theory.Time.Frames
-                  || Speed_TimeCode_Current.Time.Seconds!=Speed_TimeCode_Current_Theory.Time.Seconds
-                  || Speed_TimeCode_Current.Time.Minutes!=Speed_TimeCode_Current_Theory.Time.Minutes
-                  || Speed_TimeCode_Current.Time.Hours  !=Speed_TimeCode_Current_Theory.Time.Hours))
+              && !(   Speed_TimeCode_Current.Time.Frames ==Speed_TimeCode_Current_Theory.Time.Frames
+                   && Speed_TimeCode_Current.Time.Seconds==Speed_TimeCode_Current_Theory.Time.Seconds
+                   && Speed_TimeCode_Current.Time.Minutes==Speed_TimeCode_Current_Theory.Time.Minutes
+                   && Speed_TimeCode_Current.Time.Hours  ==Speed_TimeCode_Current_Theory.Time.Hours)
+              && !(Speed_TimeCode_Current.Time.Frames == Speed_TimeCode_Current_Theory2.Time.Frames
+                   && Speed_TimeCode_Current.Time.Seconds==Speed_TimeCode_Current_Theory2.Time.Seconds
+                   && Speed_TimeCode_Current.Time.Minutes==Speed_TimeCode_Current_Theory2.Time.Minutes
+                   && Speed_TimeCode_Current.Time.Hours  ==Speed_TimeCode_Current_Theory2.Time.Hours))
         {
             size_t Speed_TimeCodeZ_Pos=Speed_TimeCodeZ.size();
             Speed_TimeCodeZ.resize(Speed_TimeCodeZ_Pos+1);
@@ -1103,8 +1167,48 @@ void File_DvDif::Errors_Stats_Update()
             Errors_Stats_Line+=__T('N');
             #if MEDIAINFO_EVENTS
                 Event.TimeCode|=1<<30;
+                int32u Time_Current=(((int32u)Speed_TimeCode_Current.Time.Hours          )<<24)
+                                   |(((int32u)Speed_TimeCode_Current.Time.Minutes        )<<16)
+                                   |(((int32u)Speed_TimeCode_Current.Time.Seconds        )<< 8)
+                                   |(((int32u)Speed_TimeCode_Current.Time.Frames         )    );
+                int32u Time_Theory =(((int32u)Speed_TimeCode_Current_Theory2.Time.Hours  )<<24)
+                                   |(((int32u)Speed_TimeCode_Current_Theory2.Time.Minutes)<<16)
+                                   |(((int32u)Speed_TimeCode_Current_Theory2.Time.Seconds)<< 8)
+                                   |(((int32u)Speed_TimeCode_Current_Theory2.Time.Frames )    );
+                if (Time_Current<Time_Theory)
+                    MoreFlags|=1<<1;
             #endif //MEDIAINFO_EVENTS
-            Speed_TimeCode_Current_Theory=Speed_TimeCode_Current;
+            Speed_TimeCode_Current_Theory2=Speed_TimeCode_Current; // Change it only once
+            int8u Frames_Max;
+            if (video_source_stype!=(int8u)-1)
+                Frames_Max=system?25:30;
+            else
+                Frames_Max=DSF?25:30;
+
+            Speed_TimeCode_Current_Theory2.Time.Frames++;
+            if (Speed_TimeCode_Current_Theory2.Time.Frames>=Frames_Max)
+            {
+                Speed_TimeCode_Current_Theory2.Time.Seconds++;
+                Speed_TimeCode_Current_Theory2.Time.Frames=0;
+                if (Speed_TimeCode_Current_Theory2.Time.Seconds>=60)
+                {
+                    Speed_TimeCode_Current_Theory2.Time.Seconds=0;
+                    Speed_TimeCode_Current_Theory2.Time.Minutes++;
+
+                    if (!DSF && Speed_TimeCode_Current_Theory2.Time.DropFrame && Speed_TimeCode_Current_Theory2.Time.Minutes%10)
+                        Speed_TimeCode_Current_Theory2.Time.Frames=2; //frames 0 and 1 are dropped for every minutes except 00 10 20 30 40 50
+
+                    if (Speed_TimeCode_Current_Theory2.Time.Minutes>=60)
+                    {
+                        Speed_TimeCode_Current_Theory2.Time.Minutes=0;
+                        Speed_TimeCode_Current_Theory2.Time.Hours++;
+                        if (Speed_TimeCode_Current_Theory2.Time.Hours>=24)
+                        {
+                            Speed_TimeCode_Current_Theory2.Time.Hours=0;
+                        }
+                    }
+                }
+            }
             TimeCode_Disrupted=true;
             Errors_AreDetected=true;
         }
@@ -1255,6 +1359,20 @@ void File_DvDif::Errors_Stats_Update()
             Errors_Stats_Line+=__T('N');
             #if MEDIAINFO_EVENTS
                 Event.RecordedDateTime1|=1<<30;
+                int64u Time_Current=(((int64u)Speed_RecDate_Current.Years               )<<36)
+                                   |(((int64u)Speed_RecDate_Current.Months              )<<32)
+                                   |(((int64u)Speed_RecDate_Current.Days                )<<24)
+                                   |(((int64u)Speed_RecTime_Current.Time.Hours          )<<16)
+                                   |(((int64u)Speed_RecTime_Current.Time.Minutes        )<< 8)
+                                   |(((int64u)Speed_RecTime_Current.Time.Seconds        )    );
+                int64u Time_Theory =(((int64u)Speed_RecDate_Current_Theory2.Years       )<<36)
+                                   |(((int64u)Speed_RecDate_Current_Theory2.Months      )<<32)
+                                   |(((int64u)Speed_RecDate_Current_Theory2.Days        )<<24)
+                                   |(((int64u)Speed_RecTime_Current_Theory2.Time.Hours  )<<16)
+                                   |(((int64u)Speed_RecTime_Current_Theory2.Time.Minutes)<< 8)
+                                   |(((int64u)Speed_RecTime_Current_Theory2.Time.Seconds));
+                if (Time_Current<Time_Theory)
+                    MoreFlags|=1<<0;
             #endif //MEDIAINFO_EVENTS
             if (!REC_IsValid || REC_ST)
             {
@@ -1311,6 +1429,9 @@ void File_DvDif::Errors_Stats_Update()
             Errors_Stats_Line+=__T('N');
             #if MEDIAINFO_EVENTS
                 Event.Arb|=1<<6;
+                bool IsLess=Speed_Arb_Current.Value<Speed_Arb_Current_Theory.Value;
+                if (IsLess)
+                    MoreFlags|=1<<2;
             #endif //MEDIAINFO_EVENTS
             Speed_Arb_Current_Theory=Speed_Arb_Current;
             Arb_AreDetected=true;
@@ -1431,7 +1552,7 @@ void File_DvDif::Errors_Stats_Update()
                         if (!Audio_Errors_PerDseq && audio_source_mode.empty() && ChannelInfo[ChannelGroup*2+Channel])
                             Audio_Errors_PerDseq=9; //We consider all audio blocks as invalid if the frame has no audio_source for this channel but had it in the previous frames
                         if (!Audio_Errors_PerDseq && ChannelGroup<Audio_Errors.size() && !Audio_Errors[ChannelGroup].empty())
-                            Audio_Errors_PerDseq=Audio_Errors[ChannelGroup][Dseq];
+                            Audio_Errors_PerDseq=Audio_Errors[ChannelGroup][Dseq].Count;
                         if (Audio_Errors_PerDseq)
                         {
                             Audio_Errors_PerChannel+=Audio_Errors_PerDseq;
@@ -1696,6 +1817,8 @@ void File_DvDif::Errors_Stats_Update()
                     Video_StaNonZero=true; // Only if all from the same STA value
             size_t Audio_TotalErrors=0;
             size_t Audio_Errors_PerDseq[16]; //Per Dseq
+            int8u* MoreData=NULL;
+            size_t MoreData_Offset=0;
             if (Audio_Errors.empty())
             {
                 Event1.Audio_Data_Errors_Count=0;
@@ -1706,11 +1829,42 @@ void File_DvDif::Errors_Stats_Update()
                 memset(Audio_Errors_PerDseq, 0, sizeof(Audio_Errors_PerDseq));
                 for (size_t ChannelGroup=0; ChannelGroup<Audio_Errors.size(); ChannelGroup++)
                     for (size_t Dseq=0; Dseq<Dseq_Count; Dseq++)
-                        Audio_Errors_PerDseq[Dseq]+=Audio_Errors[ChannelGroup][Dseq];
+                    {
+                        if (Dseq>=Audio_Errors[ChannelGroup].size())
+                            break;
+                        Audio_Errors_PerDseq[Dseq]+=Audio_Errors[ChannelGroup][Dseq].Count;
+                        std::set<int16u>& Values=Audio_Errors[ChannelGroup][Dseq].Values;
+                        bool Is16=(QU==(int8u)-1)?true:(QU==0);
+                        if (!Values.empty() && (Values.size()>1 || *Values.begin()!=(0x8000>>(Is16?0:4))))
+                        {
+                            if (!MoreData)
+                                MoreData=new int8u[4096] + sizeof(size_t); // TODO: more dynamic allocation
+                            MoreData[MoreData_Offset++]=2+Audio_Errors[ChannelGroup][Dseq].Values.size()*2; // Size of the block
+                            MoreData[MoreData_Offset++]=1; // Audio error value par channel group per Dseq
+                            MoreData[MoreData_Offset++]=ChannelGroup;
+                            MoreData[MoreData_Offset++]=Dseq;
+                            for (std::set<int16u>::iterator Value=Audio_Errors[ChannelGroup][Dseq].Values.begin(); Value!=Audio_Errors[ChannelGroup][Dseq].Values.end(); ++Value)
+                            {
+                                *((int16u*)(MoreData+MoreData_Offset))=*Value&0xFFFF;
+                                MoreData_Offset+=2;
+                            }
+                        }
+                    }
                 for (size_t Dseq=0; Dseq<Dseq_Count; Dseq++)
                     Audio_TotalErrors+=Audio_Errors_PerDseq[Dseq];
                 Event1.Audio_Data_Errors_Count=16;
                 Event1.Audio_Data_Errors=Audio_Errors_PerDseq;
+            }
+            if (!DirectionSpeed.empty())
+            {
+                if (!MoreData)
+                    MoreData=new int8u[4096]+sizeof(size_t); // TODO: more dynamic allocation
+                MoreData[MoreData_Offset++]=DirectionSpeed.size();
+                MoreData[MoreData_Offset++]=2; // DirectionSpeed values
+                for (std::vector<int8u>::iterator DirectionSpeed_Item=DirectionSpeed.begin(); DirectionSpeed_Item!=DirectionSpeed.end(); ++DirectionSpeed_Item)
+                {
+                    MoreData[MoreData_Offset++]=*DirectionSpeed_Item;
+                }
             }
             Event1.Captions_Errors=Captions_Flags[1]?1:0;
             Captions_Flags.reset(1);
@@ -1727,15 +1881,23 @@ void File_DvDif::Errors_Stats_Update()
             Event1.BlockStatus_Count=((DSF?1800:1500)*(FSC_WasSet?2:1));
             Event1.BlockStatus=BlockStatus;
             Event1.AbstBf=AbstBf_Current;
+            Event1.MoreFlags=MoreFlags;
+            if (MoreData)
+            {
+                Event1.MoreData=MoreData-sizeof(size_t);
+                *((size_t*)Event1.MoreData)=MoreData_Offset;
+            }
             Config->Event_Send(NULL, (const int8u*)&Event1, sizeof(MediaInfo_Event_DvDif_Analysis_Frame_1));
             Config->Event_Send(NULL, (const int8u*)&Event, sizeof(MediaInfo_Event_DvDif_Analysis_Frame_0));
             memset(BlockStatus, 0, Event1.BlockStatus_Count);
         #endif //MEDIAINFO_EVENTS
+        if (MoreData)
+            delete (MoreData-sizeof(size_t));
     }
 
     //Speed_TimeCode_Current
-    if (!Speed_TimeCode_Current_Theory.IsValid)
-        Speed_TimeCode_Current_Theory=Speed_TimeCode_Current;
+    Speed_TimeCode_Current_Theory2=Speed_TimeCode_Current; // Don't change it
+    Speed_TimeCode_Current_Theory=Speed_TimeCode_Current;
     if (Speed_TimeCode_Current_Theory.IsValid)
     {
         int8u Frames_Max;
@@ -1771,6 +1933,7 @@ void File_DvDif::Errors_Stats_Update()
     }
 
     //Speed_RecTime_Current_Theory
+    Speed_RecDate_Current_Theory2=Speed_RecDate_Current; //Don't change it
     Speed_RecTime_Current_Theory=Speed_RecTime_Current;
     Speed_RecTime_Current_Theory2=Speed_RecTime_Current; //Don't change it
     if (Speed_RecTime_Current_Theory.IsValid)
@@ -1805,6 +1968,8 @@ void File_DvDif::Errors_Stats_Update()
     }
 
     FSC_WasSet=false;
+    FSC_WasSet_Sum=0;
+    FSC_WasNotSet_Sum=0;
     FSP_WasNotSet=false;
     ssyb_AP3=(int8u)-1;
     AbstBf_Current=(0x7FFFFF)<<1;
@@ -1819,6 +1984,7 @@ void File_DvDif::Errors_Stats_Update()
     Speed_FrameCount++;
     Speed_FrameCount_system[system]++;
     REC_IsValid=false;
+    DirectionSpeed.clear();
     audio_source_mode.clear();
     Speed_Contains_NULL=0;
     Video_STA_Errors.clear();

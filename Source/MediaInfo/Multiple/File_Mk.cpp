@@ -25,6 +25,9 @@
 #if defined(MEDIAINFO_OGG_YES)
     #include "MediaInfo/Multiple/File_Ogg.h"
 #endif
+#if defined(MEDIAINFO_TIMECODE_YES)
+    #include "MediaInfo/Multiple/File_Gxf_TimeCode.h"
+#endif
 #if defined(MEDIAINFO_RM_YES)
     #include "MediaInfo/Multiple/File_Rm.h"
 #endif
@@ -64,6 +67,9 @@
 #if defined(MEDIAINFO_VP8_YES)
     #include "MediaInfo/Video/File_Vp8.h"
 #endif
+#if defined(MEDIAINFO_VP9_YES)
+    #include "MediaInfo/Video/File_Vp9.h"
+#endif
 #if defined(MEDIAINFO_AAC_YES)
     #include "MediaInfo/Audio/File_Aac.h"
 #endif
@@ -98,11 +104,13 @@
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <bitset>
 #include <zlib.h>
 #include "ThirdParty/base64/base64.h"
 #if MEDIAINFO_EVENTS
     #include "MediaInfo/MediaInfo_Events_Internal.h"
 #endif //MEDIAINFO_EVENTS
+using namespace std;
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -141,10 +149,15 @@ namespace Elements
     const int64u RawcookedBlock_BeforeData=0x01;
     const int64u RawcookedBlock_FileName=0x10;
     const int64u RawcookedBlock_FileHash=0x20;
+    const int64u RawcookedBlock_InData=0x05;
     const int64u RawcookedBlock_MaskAdditionAfterData=0x04;
     const int64u RawcookedBlock_MaskAdditionBeforeData=0x03;
     const int64u RawcookedBlock_MaskAdditionFileName=0x11;
+    const int64u RawcookedBlock_MaskAdditionInData=0x06;
     const int64u RawcookedSegment=0x7273;
+    const int64u RawcookedSegment_FileName=0x10;
+    const int64u RawcookedSegment_FileHash=0x20;
+    const int64u RawcookedSegment_InData=0x05;
     const int64u RawcookedSegment_LibraryName=0x70;
     const int64u RawcookedSegment_LibraryVersion=0x71;
     const int64u RawcookedTrack=0x7274;
@@ -152,9 +165,11 @@ namespace Elements
     const int64u RawcookedTrack_BeforeData=0x01;
     const int64u RawcookedTrack_FileName=0x10;
     const int64u RawcookedTrack_FileHash=0x20;
+    const int64u RawcookedTrack_InData=0x05;
     const int64u RawcookedTrack_MaskBaseAfterData=0x04;
     const int64u RawcookedTrack_MaskBaseBeforeData=0x03;
     const int64u RawcookedTrack_MaskBaseFileName=0x11;
+    const int64u RawcookedTrack_MaskBaseInData=0x06;
 
     //Segment
     const int64u Segment=0x8538067;
@@ -801,7 +816,7 @@ void File_Mk::Streams_Finish()
                     bool Tags_Verified=false;
                     {
                         Ztring Hutc = Retrieve(Stream_General, 0, "Encoded_Date");
-                        Hutc.FindAndReplace(__T("UTC "), Ztring());
+                        Hutc.FindAndReplace(__T(" UTC"), Ztring());
                         Hutc = Hutc.substr(0, Hutc.find(__T(" / "), 0)); // leave only the first date in a "UTC date1 / UTC date2" field
                         Ztring App, Utc;
                         Item2=Item->second.find(__T("_STATISTICS_WRITING_APP"));
@@ -1146,60 +1161,115 @@ void File_Mk::Streams_Finish()
             Fill(Stream_Video, StreamPos_Last, Video_FrameRate_Mode, IsVfr?"VFR":"CFR");
 
             //MasteringDisplay
-            Ztring MasteringDisplay_ColorPrimaries, MasteringDisplay_Luminance;
+            Ztring& MasteringDisplay_ColorPrimaries=HDR[Video_MasteringDisplay_ColorPrimaries][HdrFormat_SmpteSt2086];
+            Ztring& MasteringDisplay_Luminance=HDR[Video_MasteringDisplay_Luminance][HdrFormat_SmpteSt2086];
             Get_MasteringDisplayColorVolume(MasteringDisplay_ColorPrimaries, MasteringDisplay_Luminance, Temp->second.MasteringMetadata);
             if (!MasteringDisplay_ColorPrimaries.empty() || !MasteringDisplay_Luminance.empty())
             {
-                Fill(StreamKind_Last, StreamPos_Last, "HDR_Format", "SMPTE ST 2086");
-                Fill(StreamKind_Last, StreamPos_Last, "HDR_Format_Compatibility", "HDR10");
-                Fill(StreamKind_Last, StreamPos_Last, "MasteringDisplay_ColorPrimaries", MasteringDisplay_ColorPrimaries);
-                Fill(StreamKind_Last, StreamPos_Last, "MasteringDisplay_Luminance", MasteringDisplay_Luminance);
+                auto& HDR_Format=HDR[Video_HDR_Format][HdrFormat_SmpteSt2086];
+                if (HDR_Format.empty())
+                {
+                    HDR_Format=__T("SMPTE ST 2086");
+                    HDR[Video_HDR_Format_Compatibility][HdrFormat_SmpteSt2086]="HDR10";
+                }
+            }
+
+            //Merge info about different HDR formats
+            auto HDR_Format=HDR.find(Video_HDR_Format);
+            if (HDR_Format!=HDR.end())
+            {
+                bitset<HdrFormat_Max> HDR_Present;
+                size_t HDR_FirstFormatPos=(size_t)-1;
+                for (size_t i=0; i<HdrFormat_Max; i++)
+                    if (!HDR_Format->second[i].empty())
+                    {
+                        if (HDR_FirstFormatPos==(size_t)-1)
+                            HDR_FirstFormatPos=i;
+                        HDR_Present[i]=true;
+                    }
+                bool LegacyStreamDisplay=MediaInfoLib::Config.LegacyStreamDisplay_Get();
+                for (const auto& HDR_Item: HDR)
+                {
+                    size_t i=HDR_FirstFormatPos;
+                    size_t HDR_FirstFieldNonEmpty=(size_t)-1;
+                    if (HDR_Item.first>Video_HDR_Format_Compatibility)
+                    {
+                        for (; i<HdrFormat_Max; i++)
+                        {
+                            if (!HDR_Present[i])
+                                continue;
+                            if (HDR_FirstFieldNonEmpty==(size_t)-1 && !HDR_Item.second[i].empty())
+                                HDR_FirstFieldNonEmpty=i;
+                            if (!HDR_Item.second[i].empty() && HDR_Item.second[i]!=HDR_Item.second[HDR_FirstFieldNonEmpty])
+                                break;
+                        }
+                    }
+                    if (i==HdrFormat_Max && HDR_FirstFieldNonEmpty!=(size_t)-1)
+                        Fill(Stream_Video, 0, HDR_Item.first, HDR_Item.second[HDR_FirstFieldNonEmpty]);
+                    else
+                    {
+                        ZtringList Value;
+                        Value.Separator_Set(0, __T(" / "));
+                        if (i!=HdrFormat_Max)
+                            for (i=HDR_FirstFormatPos; i<HdrFormat_Max; i++)
+                            {
+                                if (!LegacyStreamDisplay && HDR_FirstFormatPos != HdrFormat_SmpteSt2086 && i >= HdrFormat_SmpteSt2086)
+                                    break;
+                                if (!HDR_Present[i])
+                                    continue;
+                                Value.push_back(HDR_Item.second[i]);
+                            }
+                        auto Value_Flat = Value.Read();
+                        if (!Value.empty() && Value_Flat.size() > (Value.size() - 1) * 3)
+                            Fill(Stream_Video, 0, HDR_Item.first, Value.Read());
+                    }
+                }
+            }
+        }
+
+        //Delay
+        if (Temp->second.TimeCode_Start!=(int64u)-1 && TimecodeScale)
+        {
+            //From TimeCode
+            float64 Delay=Temp->second.TimeCode_Start*int64u_float64(TimecodeScale)/1000000.0;
+
+            //From stream format
+            if (Temp->second.Parser && StreamKind_Last==Stream_Audio && Count_Get(Stream_Video)==1 && Temp->second.Parser->Count_Get(Stream_General)>0)
+            {
+                     if (Temp->second.Parser->Buffer_TotalBytes_FirstSynched==0)
+                    ;
+                else if (Temp->second.AvgBytesPerSec!=0)
+                    Delay+=((float64)Temp->second.Parser->Buffer_TotalBytes_FirstSynched)*1000/Temp->second.AvgBytesPerSec;
+                else
+                {
+                    int64u BitRate = Temp->second.Parser->Retrieve(Stream_Audio, 0, Audio_BitRate).To_int64u();
+                    if (BitRate == 0)
+                        BitRate = Temp->second.Parser->Retrieve(Stream_Audio, 0, Audio_BitRate_Nominal).To_int64u();
+                    if (BitRate)
+                        Delay += ((float64)Temp->second.Parser->Buffer_TotalBytes_FirstSynched) * 1000 / BitRate;
+                }
+            }
+
+            //Filling
+            Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Delay), Delay, 0, true);
+            Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Delay_Source), "Container");
+
+            const Ztring &DurationS=Retrieve(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Duration));
+            float64 Duration=DurationS.To_float64();
+            if (!HasStats && Duration && Duration>=Delay) //Not sure about when tats are present, so for the moment we remove delay from duration only if there is no stats, Duration looks like more lie timestamp of the end of the last frame with the example we got
+            {
+                Duration-=Delay;
+                size_t DotPos=DurationS.find(__T('.'));
+                if (DotPos == (size_t)-1)
+                    DotPos = DurationS.size();
+                else
+                    DotPos++;
+                Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Duration), Duration, DurationS.size()-DotPos, true);
             }
         }
 
         if (Temp->second.Parser)
         {
-            //Delay
-            if (Temp->second.TimeCode_Start!=(int64u)-1 && TimecodeScale)
-            {
-                //From TimeCode
-                float64 Delay=Temp->second.TimeCode_Start*int64u_float64(TimecodeScale)/1000000.0;
-
-                //From stream format
-                if (StreamKind_Last==Stream_Audio && Count_Get(Stream_Video)==1 && Temp->second.Parser->Count_Get(Stream_General)>0)
-                {
-                         if (Temp->second.Parser->Buffer_TotalBytes_FirstSynched==0)
-                        ;
-                    else if (Temp->second.AvgBytesPerSec!=0)
-                        Delay+=((float64)Temp->second.Parser->Buffer_TotalBytes_FirstSynched)*1000/Temp->second.AvgBytesPerSec;
-                    else
-                    {
-                        int64u BitRate = Temp->second.Parser->Retrieve(Stream_Audio, 0, Audio_BitRate).To_int64u();
-                        if (BitRate == 0)
-                            BitRate = Temp->second.Parser->Retrieve(Stream_Audio, 0, Audio_BitRate_Nominal).To_int64u();
-                        if (BitRate)
-                            Delay += ((float64)Temp->second.Parser->Buffer_TotalBytes_FirstSynched) * 1000 / BitRate;
-                    }
-                }
-
-                //Filling
-                Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Delay), Delay, 0, true);
-                Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Delay_Source), "Container");
-
-                const Ztring &DurationS=Retrieve(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Duration));
-                float64 Duration=DurationS.To_float64();
-                if (!HasStats && Duration && Duration>=Delay) //Not sure about when tats are present, so for the moment we remove delay from duration only if there is no stats, Duration looks like more lie timestamp of the end of the last frame with the example we got
-                {
-                    Duration-=Delay;
-                    size_t DotPos=DurationS.find(__T('.'));
-                    if (DotPos == (size_t)-1)
-                        DotPos = DurationS.size();
-                    else
-                        DotPos++;
-                    Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Duration), Duration, DurationS.size()-DotPos, true);
-                }
-            }
-
             Ztring Codec_Temp=Retrieve(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Codec)); //We want to keep the 4CC;
             //if (Duration_Temp.empty()) Duration_Temp=Retrieve(StreamKind_Last, Temp->second.StreamPos, Fill_Parameter(StreamKind_Last, Generic_Duration)); //Duration from stream is sometimes false
             //else Duration_Temp.clear();
@@ -1286,6 +1356,11 @@ void File_Mk::Streams_Finish()
                 Fill(Stream_Video, StreamPos_Last, Video_Height_Offset, Temp->second.PixelCropTop, 10, true);
             }
         }
+        for (auto BlockAddition : Temp->second.BlockAdditions)
+        {
+            Finish(BlockAddition.second);
+            Merge(*BlockAddition.second, StreamKind_Last, 0, StreamPos_Last);
+        }
 
         if (Temp->second.FrameRate!=0 && Retrieve(Stream_Video, StreamPos_Last, Video_FrameRate).empty())
             Fill(Stream_Video, StreamPos_Last, Video_FrameRate, Temp->second.FrameRate, 3);
@@ -1311,7 +1386,13 @@ void File_Mk::Streams_Finish()
                     {
                         Ztring PerLanguage;
                         if (!EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterDisplays[ChapterDisplays_Pos].ChapLanguage.empty())
-                            PerLanguage=MediaInfoLib::Config.Iso639_1_Get(EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterDisplays[ChapterDisplays_Pos].ChapLanguage)+__T(':');
+                        {
+                            PerLanguage=MediaInfoLib::Config.Iso639_1_Get(EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterDisplays[ChapterDisplays_Pos].ChapLanguage);
+                            if (PerLanguage.empty() && EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterDisplays[ChapterDisplays_Pos].ChapLanguage!=__T("und"))
+                                PerLanguage=EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterDisplays[ChapterDisplays_Pos].ChapLanguage;
+                            if (!PerLanguage.empty())
+                                PerLanguage+=__T(':');
+                        }
                         PerLanguage+=EditionEntries[EditionEntries_Pos].ChapterAtoms[ChapterAtoms_Pos].ChapterDisplays[ChapterDisplays_Pos].ChapString;
                         Text+=PerLanguage+__T(" - ");
                     }
@@ -1646,12 +1727,17 @@ void File_Mk::Data_Parse()
         ATO2(RawcookedBlock_BeforeData, "BeforeData")
         ATO2(RawcookedBlock_FileName, "FileName")
         ATO2(RawcookedBlock_FileHash, "FileHash")
+        ATO2(RawcookedBlock_InData, "InData")
         ATO2(RawcookedBlock_MaskAdditionBeforeData, "MaskAdditionBeforeData")
         ATO2(RawcookedBlock_MaskAdditionAfterData, "MaskAdditionAfterData")
         ATO2(RawcookedBlock_MaskAdditionFileName, "MaskAdditionFileName")
+        ATO2(RawcookedBlock_MaskAdditionInData, "MaskAdditionInData")
         ATOM_END_MK
     LIS2(RawcookedSegment, "RawcookedSegment")
         ATOM_BEGIN
+        ATO2(RawcookedSegment_FileName, "FileName")
+        ATO2(RawcookedSegment_FileHash, "FileHash")
+        ATO2(RawcookedSegment_InData, "InData")
         ATO2(RawcookedSegment_LibraryName, "LibraryName")
         ATO2(RawcookedSegment_LibraryVersion, "LibraryVersion")
         ATOM_END_MK
@@ -1661,9 +1747,11 @@ void File_Mk::Data_Parse()
         ATO2(RawcookedTrack_AfterData, "AfterData")
         ATO2(RawcookedTrack_FileName, "FileName")
         ATO2(RawcookedTrack_FileHash, "FileHash")
+        ATO2(RawcookedTrack_InData, "InData")
         ATO2(RawcookedTrack_MaskBaseAfterData, "MaskBaseAfterData")
         ATO2(RawcookedTrack_MaskBaseBeforeData, "MaskBaseBeforeData")
         ATO2(RawcookedTrack_MaskBaseFileName, "MaskBaseFileName")
+        ATO2(RawcookedTrack_MaskBaseInData, "MaskBaseInData")
         ATOM_END_MK
 #endif //MEDIAINFO_TRACE
     LIS2(Segment, "Segment")
@@ -2340,6 +2428,25 @@ void File_Mk::Rawcooked_FileName(bool HasMask, bool UseMask)
 
     Rawcooked_Compressed_End(HasMask?&RawcookedTrack_Data.MaskBaseFileName:NULL, UseMask);
 }
+
+//---------------------------------------------------------------------------
+void File_Mk::Rawcooked_InData()
+{
+    //Parsing
+    Skip_XX(Element_Size-Element_Offset,                        "Data");
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Rawcooked_InData(bool, bool UseMask)
+{
+    if (!Rawcooked_Compressed_Start(NULL, UseMask))
+        return;
+
+    Rawcooked_InData();
+
+    Rawcooked_Compressed_End(NULL, UseMask);
+}
+
 //---------------------------------------------------------------------------
 void File_Mk::RawcookedBlock()
 {
@@ -2465,7 +2572,7 @@ void File_Mk::Segment_Attachments_AttachedFile_FileData()
     bool Attachments_Demux=true;
 
     //Parsing
-    if ((Attachments_Demux || !CoverIsSetFromAttachment && CurrentAttachmentIsCover) && Element_Size<=16*1024*1024) //TODO: option for setting the acceptable maximum size of the attachment
+    if ((Attachments_Demux || !CoverIsSetFromAttachment && CurrentAttachmentIsCover) && Element_TotalSize_Get()<=16*1024*1024) //TODO: option for setting the acceptable maximum size of the attachment
     {
         if (!Element_IsComplete_Get())
         {
@@ -2519,9 +2626,7 @@ void File_Mk::Segment_Attachments_AttachedFile_FileData()
         #endif //MEDIAINFO_EVENTS
     }
     
-    Element_Offset=Element_Size;
-
-    Element_ThisIsAList();
+    Element_Offset=Element_TotalSize_Get();
 }
 
 //---------------------------------------------------------------------------
@@ -2616,7 +2721,7 @@ void File_Mk::Segment_Cluster()
             //Specific cases
             #ifdef MEDIAINFO_AAC_YES
                 if (Retrieve(Temp->second.StreamKind, Temp->second.StreamPos, Audio_CodecID).find(__T("A_AAC/"))==0)
-                    ((File_Aac*)Stream[Temp->first].Parser)->Mode=File_Aac::Mode_raw_data_block; //In case AudioSpecificConfig is not present
+                    ((File_Aac*)Stream[Temp->first].Parser)->Mode=File_Aac::Mode_payload; //In case AudioSpecificConfig is not present
             #endif //MEDIAINFO_AAC_YES
         }
     }
@@ -2922,6 +3027,48 @@ void File_Mk::Segment_Cluster_BlockGroup_Block_Lace()
 }
 
 //---------------------------------------------------------------------------
+void File_Mk::Segment_Cluster_BlockGroup_BlockAdditions_BlockMore()
+{
+    BlockAddIDValue=(int64u)-1;
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAddID()
+{
+    //Parsing
+    int64u Temp=UInteger_Get();
+
+    FILLING_BEGIN();
+        BlockAddIDValue=Temp;
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAdditional()
+{
+    if (BlockAddIDValue==(int64u)-1)
+    {
+        Skip_XX(Element_Size,                                   "Data");
+        return;
+    }
+
+    const auto& streamItem=Stream[TrackNumber];
+    const auto& BlockAdditions=streamItem.BlockAdditions;
+    auto Parser=BlockAdditions.find(BlockAddIDValue);
+    if (Parser!=BlockAdditions.end())
+    {
+        Open_Buffer_Continue(Parser->second);
+        return;
+    }
+
+    switch (BlockAddIDValue)
+    {
+        case 4 : sei_message_user_data_registered_itu_t_t35(); break;
+        default: {Skip_XX(Element_Size, "Data"); }
+    }
+}
+
+//---------------------------------------------------------------------------
 void File_Mk::Segment_Cluster_BlockGroup_BlockDuration()
 {
     //Parsing
@@ -2995,7 +3142,13 @@ void File_Mk::Segment_Info_DateUTC()
     FILLING_BEGIN();
         if (Segment_Info_Count>1)
             return; //First element has the priority
-        Fill(Stream_General, 0, "Encoded_Date", Ztring().Date_From_Seconds_1970((int32u)(Data/1000000000+978307200))); //978307200s between beginning of the millenium and 1970
+        Ztring Time=Ztring().Date_From_Seconds_1970((int32u)(Data/1000000000+978307200)); //978307200s between beginning of the millenium and 1970
+        if (!Time.empty())
+        {
+            Time.FindAndReplace(__T("UTC "), __T(""));
+            Time+=__T(" UTC");
+        }
+        Fill(Stream_General, 0, "Encoded_Date", Time);
     FILLING_END();
 }
 
@@ -3190,13 +3343,17 @@ void File_Mk::Segment_Tags_Tag_SimpleTag_TagString()
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("COMPATIBLE_BRANDS")) return; //QuickTime techinical info, useless
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("CONTENT_TYPE")) Segment_Tag_SimpleTag_TagNames[0]=__T("ContentType");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("COPYRIGHT")) Segment_Tag_SimpleTag_TagNames[0]=__T("Copyright");
-    if (Segment_Tag_SimpleTag_TagNames[0]==__T("CREATION_TIME")) {Segment_Tag_SimpleTag_TagNames[0]=__T("Encoded_Date"); TagString.insert(0, __T("UTC "));}
-    if (Segment_Tag_SimpleTag_TagNames[0]==__T("DATE_DIGITIZED")) {Segment_Tag_SimpleTag_TagNames[0]=__T("Mastered_Date"); TagString.insert(0, __T("UTC "));}
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("CREATION_TIME")) {Segment_Tag_SimpleTag_TagNames[0]=__T("Encoded_Date"); TagString+=__T(" UTC");}
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("DATE_DIGITIZED")) {Segment_Tag_SimpleTag_TagNames[0]=__T("Mastered_Date"); TagString+=__T(" UTC");}
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("DATE_ENCODED")) Segment_Tag_SimpleTag_TagNames[0]=__T("Encoded_Date");
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("DATE_RECORDED")) Segment_Tag_SimpleTag_TagNames[0]=__T("Recorded_Date");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("DATE_RELEASE")) Segment_Tag_SimpleTag_TagNames[0]=__T("Released_Date");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("DATE_RELEASED")) Segment_Tag_SimpleTag_TagNames[0]=__T("Released_Date");
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("DATE_TAGGED")) Segment_Tag_SimpleTag_TagNames[0]=__T("Tagged_Date");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("DESCRIPTION")) Segment_Tag_SimpleTag_TagNames[0]=__T("Description");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("ENCODED_BY")) Segment_Tag_SimpleTag_TagNames[0]=__T("EncodedBy");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("ENCODER")) Segment_Tag_SimpleTag_TagNames[0]=__T("Encoded_Library");
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("ENCODER_SETTINGS")) Segment_Tag_SimpleTag_TagNames[0]=__T("Encoded_Library_Settings");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("FPS")) return; //Useless
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("HANDLER_NAME"))
     {
@@ -3394,14 +3551,63 @@ void File_Mk::Segment_Tracks_TrackEntry_CodecID()
 }
 
 //---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_BlockAdditionMapping()
+{
+    BlockAddIDType=(int64u)-1;
+    BlockAddIDValue=(int64u)-1;
+}
+
+void File_Mk::Segment_Tracks_TrackEntry_BlockAdditionMapping_Manage()
+{
+    if (BlockAddIDType==(int64u)-1 || BlockAddIDValue==(int64u)-1)
+        return;
+
+    File__Analyze* Parser;
+    switch (BlockAddIDType)
+    {
+        #if defined(MEDIAINFO_TIMECODE_YES)
+        case 0x79:      //121
+        case 0x313231:  //121
+            {
+            auto Temp=new File_Gxf_TimeCode();
+            Temp->IsBigEndian=true;
+            Parser=Temp;
+            }
+            #endif
+        break;
+        default:
+            Parser=nullptr;
+    }
+
+    if (Parser)
+    {
+        Open_Buffer_Init(Parser);
+        stream& streamItem=Stream[TrackNumber];
+        streamItem.BlockAdditions[BlockAddIDValue]=Parser;
+    }
+}
+
+//---------------------------------------------------------------------------
 void File_Mk::Segment_Tracks_TrackEntry_BlockAdditionMapping_BlockAddIDType()
 {
     //Parsing
-    int32u Value;
-    Get_C4(Value,                                               "Value");
+    #if MEDIAINFO_TRACE
+        int64u Value;
+        if (Element_Size==4)
+        {
+            int32u Value32;
+            Get_C4(Value32,                                     "Value");
+            Value=Value32;
+        }
+        else
+            Value=UInteger_Get();
+    #else //MEDIAINFO_TRACE
+        int64u Value=UInteger_Get();
+    #endif //MEDIAINFO_TRACE
 
     FILLING_BEGIN();
         BlockAddIDType=Value;
+        Segment_Tracks_TrackEntry_BlockAdditionMapping_Manage();
     FILLING_END();
 }
 
@@ -3454,6 +3660,18 @@ void File_Mk::Segment_Tracks_TrackEntry_BlockAdditionMapping_BlockAddIDExtraData
                 break;
         default:;
     }
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_BlockAdditionMapping_BlockAddIDValue()
+{
+    //Parsing
+    int64u Value=UInteger_Get();
+
+    FILLING_BEGIN();
+        BlockAddIDValue=Value;
+        Segment_Tracks_TrackEntry_BlockAdditionMapping_Manage();
+    FILLING_END();
 }
 
 //---------------------------------------------------------------------------
@@ -4658,6 +4876,12 @@ void File_Mk::CodecID_Manage()
         streamItem.Parser=new File_Vp8;
     }
     #endif
+    #if defined(MEDIAINFO_VP8_YES)
+    else if (Format==__T("VP9"))
+    {
+        streamItem.Parser=new File_Vp9;
+    }
+    #endif
     #if defined(MEDIAINFO_OGG_YES)
     else if (Format==__T("Theora")  || Format==__T("Vorbis"))
     {
@@ -4983,8 +5207,14 @@ void File_Mk::CRC32_Check ()
             const size_t Offset = Buffer_Offset + (size_t)((Element_WantNextLevel && Element_Offset <= Element_Size) ? Element_Offset : Element_Size);
             if (Element_Offset > Element_Size)
             {
-                CRC32Compute_SkipUpTo = File_Offset + Element_Offset;
+                if (Config->ParseSpeed<1)
+                {
+                    CRC32Compute.clear();
+                    break;
+                }
+                CRC32Compute_SkipUpTo = File_Offset + Buffer_Offset + Element_Offset;
                 Element_Offset = Element_Size;
+                Element_ThisIsAList(); // Fake for forcing the parser to be called for the whole stream
             }
             
             Matroska_CRC32_Compute(CRC32Compute[i].Computed, Buffer + Buffer_Offset - (size_t)Header_Size, Buffer + Offset);
@@ -5046,6 +5276,188 @@ void File_Mk::CRC32_Check ()
                 CRC32Compute[i].UpTo=0;
             }
         }
+}
+
+//***************************************************************************
+// Extra
+//***************************************************************************
+
+//---------------------------------------------------------------------------
+// SEI - 4
+void File_Mk::sei_message_user_data_registered_itu_t_t35()
+{
+    Element_Info1("user_data_registered_itu_t_t35");
+
+    int8u itu_t_t35_country_code;
+    Get_B1(itu_t_t35_country_code,                              "itu_t_t35_country_code");
+
+    switch (itu_t_t35_country_code)
+    {
+        case 0xB5:  sei_message_user_data_registered_itu_t_t35_B5(); break; // USA
+    }
+}
+
+//---------------------------------------------------------------------------
+// SEI - 4 - USA
+void File_Mk::sei_message_user_data_registered_itu_t_t35_B5()
+{
+    int16u itu_t_t35_terminal_provider_code;
+    Get_B2 (itu_t_t35_terminal_provider_code,                   "itu_t_t35_terminal_provider_code");
+
+    switch (itu_t_t35_terminal_provider_code)
+    {
+        case 0x003C: sei_message_user_data_registered_itu_t_t35_B5_003C(); break;
+    }
+}
+
+//---------------------------------------------------------------------------
+// SEI - 4 - USA - 003C
+void File_Mk::sei_message_user_data_registered_itu_t_t35_B5_003C()
+{
+    int16u itu_t_t35_terminal_provider_oriented_code;
+    Get_B2 (itu_t_t35_terminal_provider_oriented_code,          "itu_t_t35_terminal_provider_oriented_code");
+
+    switch (itu_t_t35_terminal_provider_oriented_code)
+    {
+        case 0x0001: sei_message_user_data_registered_itu_t_t35_B5_003C_0001(); break;
+    }
+}
+
+//---------------------------------------------------------------------------
+// SEI - 4 - USA - 003C - 0001
+void File_Mk::sei_message_user_data_registered_itu_t_t35_B5_003C_0001()
+{
+    int8u application_identifier;
+    Get_B1 (application_identifier,                             "application_identifier");
+
+    switch (application_identifier)
+    {
+        case 0x04: sei_message_user_data_registered_itu_t_t35_B5_003C_0001_04(); break;
+    }
+}
+
+//---------------------------------------------------------------------------
+// SEI - 4 - USA - 003C - 0001 - SMPTE ST 2094-40 (HDR10+)
+void File_Mk::sei_message_user_data_registered_itu_t_t35_B5_003C_0001_04()
+{
+    Element_Info1("SMPTE ST 2094 App 4");
+    int8u application_version;
+    bool IsHDRplus=false, tone_mapping_flag;
+    Get_B1 (application_version,                                "application_version");
+    if (application_version<=1)
+    {
+        int32u targeted_system_display_maximum_luminance, maxscl[4], distribution_maxrgb_percentiles[16];
+        int16u fraction_bright_pixels;
+        int8u num_distribution_maxrgb_percentiles, distribution_maxrgb_percentages[16], num_windows, num_bezier_curve_anchors;
+        bool targeted_system_display_actual_peak_luminance_flag, mastering_display_actual_peak_luminance_flag, color_saturation_mapping_flag;
+        BS_Begin();
+        Get_S1 ( 2, num_windows,                                "num_windows");
+
+        for (int8u w=1; w<num_windows; w++)
+        {
+            Element_Begin1("window");
+            Skip_S2(16,                                         "window_upper_left_corner_x");
+            Skip_S2(16,                                         "window_upper_left_corner_y");
+            Skip_S2(16,                                         "window_lower_right_corner_x");
+            Skip_S2(16,                                         "window_lower_right_corner_y");
+            Skip_S2(16,                                         "center_of_ellipse_x");
+            Skip_S2(16,                                         "center_of_ellipse_y");
+            Skip_S1( 8,                                         "rotation_angle");
+            Skip_S2(16,                                         "semimajor_axis_internal_ellipse");
+            Skip_S2(16,                                         "semimajor_axis_external_ellipse");
+            Skip_S2(16,                                         "semiminor_axis_external_ellipse");
+            Skip_SB(                                            "overlap_process_option");
+            Element_End0();
+        }
+
+        Get_S4 (27, targeted_system_display_maximum_luminance,  "targeted_system_display_maximum_luminance");
+        TEST_SB_GET (targeted_system_display_actual_peak_luminance_flag, "targeted_system_display_actual_peak_luminance_flag");
+            int8u num_rows_targeted_system_display_actual_peak_luminance, num_cols_targeted_system_display_actual_peak_luminance;
+            Get_S1(5, num_rows_targeted_system_display_actual_peak_luminance, "num_rows_targeted_system_display_actual_peak_luminance");
+            Get_S1(5, num_cols_targeted_system_display_actual_peak_luminance, "num_cols_targeted_system_display_actual_peak_luminance");
+            for(int8u i=0; i<num_rows_targeted_system_display_actual_peak_luminance; i++)
+                for(int8u j=0; j<num_cols_targeted_system_display_actual_peak_luminance; j++)
+                    Skip_S1(4,                                   "targeted_system_display_actual_peak_luminance");
+        TEST_SB_END();
+
+        for (int8u w=0; w<num_windows; w++)
+        {
+            Element_Begin1("window");
+            for(int8u i=0; i<3; i++)
+            {
+                Get_S3 (17, maxscl[i],                          "maxscl"); Param_Info2(Ztring::ToZtring(((float)maxscl[i])/100000, 5), " cd/m2");
+            }
+            Get_S3 (17, maxscl[3],                              "average_maxrgb");   Param_Info2(Ztring::ToZtring(((float)maxscl[3])/100000, 5), " cd/m2");
+
+            Get_S1(4, num_distribution_maxrgb_percentiles,      "num_distribution_maxrgb_percentiles");
+            for (int8u i=0; i< num_distribution_maxrgb_percentiles; i++)
+            {
+                Element_Begin1(                                 "distribution_maxrgb");
+                Get_S1 ( 7, distribution_maxrgb_percentages[i], "distribution_maxrgb_percentages");
+                Get_S3 (17, distribution_maxrgb_percentiles[i], "distribution_maxrgb_percentiles");
+                Element_Info1(distribution_maxrgb_percentages[i]);
+                Element_Info1(distribution_maxrgb_percentiles[i]);
+                Element_End0();
+            }
+            Get_S2 (10, fraction_bright_pixels,                 "fraction_bright_pixels");
+            Element_End0();
+        }
+
+        TEST_SB_GET (mastering_display_actual_peak_luminance_flag, "mastering_display_actual_peak_luminance_flag");
+            int8u num_rows_mastering_display_actual_peak_luminance, num_cols_mastering_display_actual_peak_luminance;
+            Get_S1(5, num_rows_mastering_display_actual_peak_luminance, "num_rows_mastering_display_actual_peak_luminance");
+            Get_S1(5, num_cols_mastering_display_actual_peak_luminance, "num_cols_mastering_display_actual_peak_luminance");
+            for(int8u i=0; i< num_rows_mastering_display_actual_peak_luminance; i++)
+                for(int8u j=0; j< num_cols_mastering_display_actual_peak_luminance; j++)
+                    Skip_S1(4,                                   "mastering_display_actual_peak_luminance");
+        TEST_SB_END();
+
+        for (int8u w=0; w<num_windows; w++)
+        {
+            Element_Begin1("window");
+            TEST_SB_GET (tone_mapping_flag,                     "tone_mapping_flag");
+                Skip_S2(12,                                     "knee_point_x");
+                Skip_S2(12,                                     "knee_point_y");
+                Get_S1(4, num_bezier_curve_anchors,             "num_bezier_curve_anchors");
+                for (int8u i = 0; i < num_bezier_curve_anchors; i++)
+                    Skip_S2(10,                                 "bezier_curve_anchor");
+            TEST_SB_END();
+            Element_End0();
+        }
+        TEST_SB_GET (color_saturation_mapping_flag,             "color_saturation_mapping_flag");
+            Info_S1(6, color_saturation_weight,                 "color_saturation_weight"); Param_Info1(((float)color_saturation_weight)/8);
+        TEST_SB_END();
+        BS_End();
+
+        FILLING_BEGIN();
+            IsHDRplus=true;
+            if (num_windows!=1 || targeted_system_display_actual_peak_luminance_flag || num_distribution_maxrgb_percentiles!=9 || fraction_bright_pixels || mastering_display_actual_peak_luminance_flag || (distribution_maxrgb_percentages[2]>100 && distribution_maxrgb_percentages[2]!=0xFF) || (!tone_mapping_flag && targeted_system_display_maximum_luminance) || (tone_mapping_flag && num_bezier_curve_anchors>9) || color_saturation_mapping_flag)
+                IsHDRplus=false;
+            for(int8u i=0; i<4; i++)
+                if (maxscl[i]>100000)
+                    IsHDRplus=false;
+            if (IsHDRplus)
+                for(int8u i=0; i<9; i++)
+                {
+                    static const int8u distribution_maxrgb_percentages_List[9]={1, 5, 10, 25, 50, 75, 90, 95, 99};
+                    if (distribution_maxrgb_percentages[i]!=distribution_maxrgb_percentages_List[i])
+                        IsHDRplus=false;
+                    if (distribution_maxrgb_percentiles[i]>100000)
+                        IsHDRplus=false;
+                }
+        FILLING_END();
+    }
+
+    FILLING_BEGIN();
+        auto& HDR_Format=HDR[Video_HDR_Format][HdrFormat_SmpteSt209440];
+        if (HDR_Format.empty())
+        {
+            HDR_Format=__T("SMPTE ST 2094 App 4");
+            HDR[Video_HDR_Format_Version][HdrFormat_SmpteSt209440].From_Number(application_version);
+            if (IsHDRplus)
+                HDR[Video_HDR_Format_Compatibility][HdrFormat_SmpteSt209440]=tone_mapping_flag?__T("HDR10+ Profile B"):__T("HDR10+ Profile A");
+        }
+    FILLING_END();
 }
 
 } //NameSpace

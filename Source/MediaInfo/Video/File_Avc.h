@@ -52,7 +52,7 @@ public :
         {}
     };
     static avcintra_header AVC_Intra_Headers_Data(int32u CodecID);
-    static int32u AVC_Intra_CodecID_FromMeta(int32u Height, int32u Fields, int32u SampleDuration, int32u TimeScale, int32u SizePerFrame);
+    static int32u AVC_Intra_CodecID_FromMeta(int32u Width, int32u Height, int32u Fields, int32u SampleDuration, int32u TimeScale, int32u SizePerFrame);
 
 private :
     File_Avc(const File_Avc &File_Avc); //No copy
@@ -235,7 +235,7 @@ private :
         int8u   log2_max_pic_order_cnt_lsb_minus4;
         int8u   max_num_ref_frames;
         int8u   pic_struct_FirstDetected; //For stats only
-        bool    constraint_set3_flag;
+        int8u   constraint_set_flags;
         bool    separate_colour_plane_flag;
         bool    delta_pic_order_always_zero_flag;
         bool    frame_mbs_only_flag;
@@ -248,7 +248,7 @@ private :
         int8u   ChromaArrayType() {return separate_colour_plane_flag?0:chroma_format_idc;}
 
         //Constructor/Destructor
-        seq_parameter_set_struct(vui_parameters_struct* vui_parameters_, int32u pic_width_in_mbs_minus1_, int32u pic_height_in_map_units_minus1_, int32u frame_crop_left_offset_, int32u frame_crop_right_offset_, int32u frame_crop_top_offset_, int32u frame_crop_bottom_offset_, int8u chroma_format_idc_, int8u profile_idc_, int8u level_idc_, int8u bit_depth_luma_minus8_, int8u bit_depth_chroma_minus8_, int8u log2_max_frame_num_minus4_, int8u pic_order_cnt_type_, int8u log2_max_pic_order_cnt_lsb_minus4_, int8u max_num_ref_frames_, bool constraint_set3_flag_, bool separate_colour_plane_flag_, bool delta_pic_order_always_zero_flag_, bool frame_mbs_only_flag_, bool mb_adaptive_frame_field_flag_)
+        seq_parameter_set_struct(vui_parameters_struct* vui_parameters_, int32u pic_width_in_mbs_minus1_, int32u pic_height_in_map_units_minus1_, int32u frame_crop_left_offset_, int32u frame_crop_right_offset_, int32u frame_crop_top_offset_, int32u frame_crop_bottom_offset_, int8u chroma_format_idc_, int8u profile_idc_, int8u level_idc_, int8u bit_depth_luma_minus8_, int8u bit_depth_chroma_minus8_, int8u log2_max_frame_num_minus4_, int8u pic_order_cnt_type_, int8u log2_max_pic_order_cnt_lsb_minus4_, int8u max_num_ref_frames_, int8u constraint_set_flags_, bool separate_colour_plane_flag_, bool delta_pic_order_always_zero_flag_, bool frame_mbs_only_flag_, bool mb_adaptive_frame_field_flag_)
             :
             vui_parameters(vui_parameters_),
             pic_width_in_mbs_minus1(pic_width_in_mbs_minus1_),
@@ -268,7 +268,7 @@ private :
             log2_max_pic_order_cnt_lsb_minus4(log2_max_pic_order_cnt_lsb_minus4_),
             max_num_ref_frames(max_num_ref_frames_),
             pic_struct_FirstDetected((int8u)-1), //For stats only, init
-            constraint_set3_flag(constraint_set3_flag_),
+            constraint_set_flags(constraint_set_flags_),
             separate_colour_plane_flag(separate_colour_plane_flag_),
             delta_pic_order_always_zero_flag(delta_pic_order_always_zero_flag_),
             frame_mbs_only_flag(frame_mbs_only_flag_),
@@ -423,8 +423,8 @@ private :
     hdr                                 HDR;
 
 
-    int16u  maximum_content_light_level;
-    int16u  maximum_frame_average_light_level;
+    Ztring  maximum_content_light_level;
+    Ztring  maximum_frame_average_light_level;
 
     void consumer_camera_1();
     void consumer_camera_2();
@@ -552,6 +552,8 @@ private :
     Ztring                              MuxingMode;
     string                              PictureTypes_PreviousFrames;
     int64u                              tc;
+    int64s                              pic_order_cnt_Delta;
+    int64s                              pic_order_cnt_Displayed;
     int32u                              Firstpic_order_cnt_lsbInBlock;
     int8u                               nal_ref_idc;
     int8u                               FrameRate_Divider;

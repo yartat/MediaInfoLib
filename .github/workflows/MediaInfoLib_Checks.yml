@@ -6,14 +6,20 @@ jobs:
   Unix:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-11, macos-10.15 ]
-        environement: [normal, minimal-with-xml]
+        os: [ubuntu-latest, macos-latest]
+        environement: [normal, minified, minimal, minimal-with-xml]
         include:
           - environement: normal
             CXXFLAGS: ""
             RUN_TESTS: "all"
+          - environement: minified
+            CXXFLAGS: "-DMEDIAINFO_ADVANCED_NO -DMEDIAINFO_ARCHIVE_NO -DMEDIAINFO_DEMUX_NO -DMEDIAINFO_DVDIF_ANALYZE_NO -DMEDIAINFO_EVENTS_NO -DMEDIAINFO_LIBCURL_NO -DMEDIAINFO_LIBMMS_NO -DMEDIAINFO_MD5_NO -DMEDIAINFO_MINIMAL_YES -DMEDIAINFO_MPEGTS_DUPLICATE_NO -DMEDIAINFO_N19_NO -DMEDIAINFO_OTHERTEXT_NO -DMEDIAINFO_TRACE_NO -DMEDIAINFO_READTHREAD_NO -DMEDIAINFO_EXPORT_NO -DMEDIAINFO_TEXT_YES"
+            RUN_TESTS: "no"
+          - environement: minimal
+            CXXFLAGS: "-DMEDIAINFO_ADVANCED_NO -DMEDIAINFO_CONFORMANCE_NO -DMEDIAINFO_REFERENCES_NO -DMEDIAINFO_FILTER_NO -DMEDIAINFO_DUPLICATE_NO -DMEDIAINFO_MACROBLOCKS_NO -DMEDIAINFO_TRACE_NO -DMEDIAINFO_TRACE_FFV1CONTENT_NO -DMEDIAINFO_IBI_NO -DMEDIAINFO_DIRECTORY_NO -DMEDIAINFO_LIBCURL_NO -DMEDIAINFO_LIBMMS_NO -DMEDIAINFO_DVDIF_ANALYZE_NO -DMEDIAINFO_MPEGTS_DUPLICATE_NO -DMEDIAINFO_READTHREAD_NO -DMEDIAINFO_MD5_NO -DMEDIAINFO_SHA1_NO -DMEDIAINFO_SHA2_NO -DMEDIAINFO_EVENTS_NO -DMEDIAINFO_DEMUX_NO -DMEDIAINFO_AES_NO -DMEDIAINFO_FIXITY_NO -DMEDIAINFO_READER_NO -DMEDIAINFO_NEXTPACKET_NO"
+            RUN_TESTS: "no"
           - environement: minimal-with-xml
-            CXXFLAGS: "-DMEDIAINFO_ADVANCED_NO -DMEDIAINFO_REFERENCES_NO -DMEDIAINFO_FILTER_NO -DMEDIAINFO_DUPLICATE_NO -DMEDIAINFO_MACROBLOCKS_NO -DMEDIAINFO_TRACE_NO -DMEDIAINFO_TRACE_FFV1CONTENT_NO -DMEDIAINFO_IBI_NO -DMEDIAINFO_DIRECTORY_NO -DMEDIAINFO_LIBCURL_NO -DMEDIAINFO_LIBMMS_NO -DMEDIAINFO_DVDIF_ANALYZE_NO -DMEDIAINFO_MPEGTS_DUPLICATE_NO -DMEDIAINFO_READTHREAD_NO -DMEDIAINFO_MD5_NO -DMEDIAINFO_SHA1_NO -DMEDIAINFO_SHA2_NO -DMEDIAINFO_EVENTS_NO -DMEDIAINFO_DEMUX_NO -DMEDIAINFO_AES_NO -DMEDIAINFO_FIXITY_NO -DMEDIAINFO_NEXTPACKET_NO -DMEDIAINFO_ALL_NO -DMEDIAINFO_MIXML_YES"
+            CXXFLAGS: "-DMEDIAINFO_ADVANCED_NO -DMEDIAINFO_CONFORMANCE_NO -DMEDIAINFO_REFERENCES_NO -DMEDIAINFO_FILTER_NO -DMEDIAINFO_DUPLICATE_NO -DMEDIAINFO_MACROBLOCKS_NO -DMEDIAINFO_TRACE_NO -DMEDIAINFO_TRACE_FFV1CONTENT_NO -DMEDIAINFO_IBI_NO -DMEDIAINFO_DIRECTORY_NO -DMEDIAINFO_LIBCURL_NO -DMEDIAINFO_LIBMMS_NO -DMEDIAINFO_DVDIF_ANALYZE_NO -DMEDIAINFO_MPEGTS_DUPLICATE_NO -DMEDIAINFO_READTHREAD_NO -DMEDIAINFO_MD5_NO -DMEDIAINFO_SHA1_NO -DMEDIAINFO_SHA2_NO -DMEDIAINFO_EVENTS_NO -DMEDIAINFO_DEMUX_NO -DMEDIAINFO_AES_NO -DMEDIAINFO_FIXITY_NO -DMEDIAINFO_NEXTPACKET_NO -DMEDIAINFO_ALL_NO -DMEDIAINFO_MIXML_YES"
             RUN_TESTS: "mixml"
       fail-fast: false
     runs-on: ${{ matrix.os }}
@@ -22,20 +28,19 @@ jobs:
       S3_PASS: ${{ secrets.S3_PASS }}
       CXXFLAGS: ${{ matrix.CXXFLAGS }}
       RUN_TESTS: ${{ matrix.RUN_TESTS }}
-      BUILD_ENV: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 1
       - name: Dependencies
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get update -y
-            sudo apt-get install -y libxml2-utils zlib1g-dev libcurl4-gnutls-dev libmms-dev zip
+            sudo apt-get install -y libxml2-utils zlib1g-dev libcurl4-gnutls-dev libmms-dev
           fi
           if [ "$RUNNER_OS" == "macOS" ]; then
-            brew install automake zip
+            brew install automake pkg-config
           fi
           sudo npm install -g jsonlint
       - name: ZenLib
@@ -50,7 +55,7 @@ jobs:
         run: |
           cd Project/GNU/Library
           autoreconf -if
-          ./configure --with-libcurl
+          ./configure --with-libcurl=runtime
       - name: Build
         run: |
           cd Project/GNU/Library
@@ -70,16 +75,3 @@ jobs:
           cd Project/CMake/Build
           cmake -DBUILD_ZENLIB=1 ..
           make
-          if [ "$RUNNER_OS" == "Linux" ]; then
-          	zip ubuntu.zip libmediainfo.*
-          fi
-          if [ "$RUNNER_OS" == "macOS" ]; then
-          	zip $BUILD_ENV.zip libmediainfo.*
-          fi
-      - name: 'Upload Artifact'
-        if: ${{ matrix.environement == 'normal' }}
-        uses: actions/upload-artifact@v2
-        with:
-          name: CMake artifacts
-          path: Project/CMake/Build/*.zip
-          retention-days: 3

@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 2.8.11)
+cmake_minimum_required(VERSION 3.1.0)
 
 project(MediaInfoLib)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
 
-set(MediaInfoLib_MAJOR_VERSION 21)
-set(MediaInfoLib_MINOR_VERSION 09)
+set(MediaInfoLib_MAJOR_VERSION 23)
+set(MediaInfoLib_MINOR_VERSION 07)
 set(MediaInfoLib_PATCH_VERSION 0)
 set(MediaInfoLib_VERSION ${MediaInfoLib_MAJOR_VERSION}.${MediaInfoLib_MINOR_VERSION})
 
@@ -56,10 +56,8 @@ if (NOT BUILD_ZLIB)
   find_package(ZLIB REQUIRED)
 else()
   add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib)
-  get_target_property(ZLIB_LIBRARIES zlibstatic LOCATION)
   if(NOT BUILD_SHARED_LIBS)
-    get_filename_component(ZLIB_LIBRARIES ${ZLIB_LIBRARIES} NAME)
-    set(ZLIB_LIBRARIES "${LIB_INSTALL_DIR}/${ZLIB_LIBRARIES}")
+    set(ZLIB_LIBRARIES "${LIB_INSTALL_DIR}/$<TARGET_LINKER_FILE_NAME:zlibstatic>")
   endif()
   if(UNIX AND BUILD_SHARED_LIBS)
     target_compile_options(zlibstatic PRIVATE -fPIC)
@@ -167,6 +165,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Amr.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Amv.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Ape.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Aptx100.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Au.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Caf.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Celt.cpp
@@ -182,6 +181,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Iab.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_ImpulseTracker.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_La.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Mga.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Midi.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Module.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Audio/File_Mpc.cpp
@@ -250,10 +250,9 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Dxw.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Flv.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Gxf.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Gxf_TimeCode.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_HdsF4m.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Hls.cpp
-  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Gxf.cpp
-  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Gxf_TimeCode.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Ibi.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Ibi_Creation.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Ism.cpp
@@ -271,6 +270,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_MpegTs.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_MpegTs_Duplicate.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Mxf.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Nsv.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Nut.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Ogg.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Multiple/File_Ogg_SubElement.cpp
@@ -345,6 +345,7 @@ set(MediaInfoLib_SRCS
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Vc1.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Vc3.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Vp8.cpp
+  ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Vp9.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/Video/File_Y4m.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/XmlUtils.cpp
   ${MediaInfoLib_SOURCES_PATH}/MediaInfo/OutputHelpers.cpp
@@ -405,13 +406,7 @@ endif()
 target_link_libraries(mediainfo ${ZenLib_LIBRARY} ${ZLIB_LIBRARIES})
 
 if(MSVC AND BUILD_SHARED_LIBS)
-  get_target_property(LOCATION mediainfo LOCATION_DEBUG)
-  string(REGEX REPLACE "\\.[^.]*$" ".pdb" LOCATION "${LOCATION}")
-  install(FILES ${LOCATION} DESTINATION ${BIN_INSTALL_DIR} CONFIGURATIONS Debug)
-
-  get_target_property(LOCATION mediainfo LOCATION_RELWITHDEBINFO)
-  string(REGEX REPLACE "\\.[^.]*$" ".pdb" LOCATION "${LOCATION}")
-  install(FILES ${LOCATION} DESTINATION ${BIN_INSTALL_DIR} CONFIGURATIONS RelWithDebInfo)
+  install(FILES $<TARGET_PDB_FILE:mediainfo> DESTINATION ${BIN_INSTALL_DIR} OPTIONAL)
 endif()
 
 if (APPLE)
@@ -423,6 +418,12 @@ else()
     VERSION "${MediaInfoLib_SOVERSION}.${MediaInfoLib_MAJOR_VERSION}${MediaInfoLib_MINOR_VERSION}.${MediaInfoLib_PATCH_VERSION}"
     SOVERSION ${MediaInfoLib_SOVERSION})
 endif()
+
+set_target_properties(mediainfo PROPERTIES
+  CXX_STANDARD 11
+  CXX_EXTENSIONS NO
+  CXX_STANDARD_REQUIRED YES
+)
 
 install(TARGETS mediainfo EXPORT mediainfo-export
   RUNTIME DESTINATION ${BIN_INSTALL_DIR}

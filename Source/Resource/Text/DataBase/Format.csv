@@ -71,6 +71,7 @@ AMR;;;A;Amr;Adaptive Multi-Rate;amr;audio/AMR;http://www.apple.com/quicktime/dow
 Atrac;;;A;;Adaptive Transform Acoustic Coding;;audio/ATRAC;;Lossy
 Atrac3;;;A;;Adaptive Transform Acoustic Coding 3;;audio/ATRAC3;;Lossy
 Atrac9;;;A;;Adaptive Transform Acoustic Coding 9;;audio/ATRAC9;https://en.wikipedia.org/wiki/Adaptive_Transform_Acoustic_Coding;Lossy
+APT-X100;;;A;Aptx100;;AUD AUE aud aue;;;Lossy
 AU;;;A;Au;uLaw/AU Audio File;au;audio/basic;;
 CAF;;;A;Caf;Core Audio Format;caf;audio/x-caf;https://developer.apple.com/library/content/documentation/MusicAudio/Reference/CAFSpec/CAF_overview/CAF_overview.html;
 DolbyE;;;A;Aes3;;dde
@@ -78,8 +79,9 @@ DSDIFF;;;A;Dsdiff;Direct Stream Digital Interchange File Format;dff;;;Lossy
 DSD;;;A;;Direct Stream Digital;;;;Lossless
 DSF;;;A;Dsf;Direct Stream Digital Stream File;dsf;;;
 DST;;;A;;Direct Stream Transfer;;;;Lossless
-DTS;;;A;Dts;Digital Theater Systems;dts dtshd;;https://en.wikipedia.org/wiki/DTS_(sound_system);
-DTS-HD;;;A;Dts;Digital Theater Systems;dts dtshd;;;Lossy
+DTS;;;A;Dts;Digital Theater Systems;dts dtshd dtshdma;;https://en.wikipedia.org/wiki/DTS_(sound_system);
+DTS-HD;;;A;Dts;Digital Theater Systems;dts dtshd dtshdma;;;Lossy
+DTS-UHD;;;A;Dts;;;;;
 E-AC-3;;;A;Ac3;Enhanced AC-3;dd+ ec3 eac3;audio/eac3;https://en.wikipedia.org/wiki/Dolby_Digital_Plus;Lossy
 Extended Module;;;A;ExtendedModule;;xm;;;
 FLAC;;;A;Flac;Free Lossless Audio Codec;fla flac;audio/x-flac;https://xiph.org/flac/;Lossless
