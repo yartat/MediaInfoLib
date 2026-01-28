@@ -114,8 +114,8 @@ const char* Iab_Channel(int32u Code)
     };
     if (Code<0x18)
         return Iab_Channel_Values[Code];
-    if (Code>=0x80 && Code<sizeof(Iab_Channel_Values)/sizeof(const char*)-0x18)
-        return Iab_Channel_Values[Code-0x18];
+    if (Code>=0x80 && Code<sizeof(Iab_Channel_Values)/sizeof(const char*)+0x68)
+        return Iab_Channel_Values[Code-0x68];
     return "";
 }
 //***************************************************************************
@@ -476,6 +476,18 @@ void File_Iab::Streams_Fill()
         Fill(Stream_Audio, 0, Audio_FrameRate, Iab_FrameRate[FrameRate]);
 }
 
+
+//***************************************************************************
+// Buffer - Global
+//***************************************************************************
+
+//---------------------------------------------------------------------------
+void File_Iab::Read_Buffer_Continue()
+{
+    if (Frame_Count)
+        Skip_XX(Element_Size,                                   "Data"); // TODO: management of frame wrapped IAB
+}
+
 //***************************************************************************
 // Buffer - Per element
 //***************************************************************************
@@ -537,7 +549,7 @@ void File_Iab::Data_Parse()
 
     if ((Element_Code!=0x00000008 || Element_Offset==Element_Size) && Element_Size>=Element_TotalSize_Get(Element_Level-1))
     {
-        Frame.Objects=move(F.Objects);
+        Frame.Objects=std::move(F.Objects);
         Frame_Count++;
         if (!Status[IsFilled] && Frame_Count>=Frame_Count_Valid)
             Finish();
@@ -560,7 +572,7 @@ void File_Iab::IAFrame()
         Get_Plex8 (MaxRendered,                                     "MaxRendered");
         Get_Plex8 (SubElementCount,                                 "SubElementCount");
         Element_ThisIsAList();
-        Frame.Objects=move(F.Objects);
+        Frame.Objects=std::move(F.Objects);
     }
     else
         Skip_XX(Element_Size-Element_Offset,                        "Unknown");
@@ -719,7 +731,7 @@ void File_Iab::ObjectDefinition()
         Skip_XX(Pos-Element_Offset,                             "AudioDescriptionText");
     }
     Skip_B1(                                                    "SubElementCount");
-    Element_ThisIsAList();
+    //Element_ThisIsAList(); // TODO: handle SubElements here
 }
 
 //---------------------------------------------------------------------------

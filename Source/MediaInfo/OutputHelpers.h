@@ -35,6 +35,7 @@ struct Node
     std::string XmlCommentOut; //If set, comment out the whole node in the xml output with the string as comment
     std::string RawContent; //If set, replace the whole node by the string
     bool Multiple;
+    bool AlreadyCommented=false;
 
     //Constructors
     Node()
@@ -150,7 +151,6 @@ struct Node
         {
             Node* Child=Add_Child(Name, std::string(), Multiple);
             return Child->Add_Child(Name2, Value.To_UTF8(), Multiple2);
-            return Child;
         }
         return NULL;
     }

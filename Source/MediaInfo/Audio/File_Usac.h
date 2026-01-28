@@ -51,6 +51,9 @@ public :
     File_Usac();
     ~File_Usac();
 
+    //Buffer - Global
+    void Read_Buffer_Init();
+
     // Temp
     void   hcod_sf(const char* Name);
     int32u arith_decode(int16u& low, int16u& high, int16u& value, const int16u* cf, int32u cfl, size_t* TooMuch);
@@ -259,16 +262,16 @@ public :
     bool CheckIf(const bitset8 Flags) { return !Flags || (ConformanceFlags & Flags); }
     void SetProfileLevel(int8u AudioProfileLevelIndication);
     void Fill_Conformance(const char* Field, const char* Value, bitset8 Flags={}, conformance_level Level=Error);
-    void Fill_Conformance(const char* Field, const string Value, bitset8 Flags={}, conformance_level Level=Error) { Fill_Conformance(Field, Value.c_str(), Flags, Level); }
+    void Fill_Conformance(const char* Field, const string& Value, bitset8 Flags={}, conformance_level Level=Error) { Fill_Conformance(Field, Value.c_str(), Flags, Level); }
     void Fill_Conformance(const char* Field, const char* Value, conformance_flags Flag, conformance_level Level=Error) { Fill_Conformance(Field, Value, bitset8().set(Flag)); }
-    void Fill_Conformance(const char* Field, const string Value, conformance_flags Flag, conformance_level Level=Error) { Fill_Conformance(Field, Value.c_str(), Flag, Level); }
+    void Fill_Conformance(const char* Field, const string& Value, conformance_flags Flag, conformance_level Level=Error) { Fill_Conformance(Field, Value.c_str(), Flag, Level); }
     void Clear_Conformance();
     void Merge_Conformance(bool FromConfig=false);
     void Streams_Finish_Conformance();
     struct usac_config;
     struct usac_frame;
     void Streams_Finish_Conformance_Profile(usac_config& CurrentConf);
-    void numPreRollFrames_Check(usac_config& CurrentConf, int32u numPreRollFrames, const string numPreRollFramesConchString);
+    void numPreRollFrames_Check(usac_config& CurrentConf, int32u numPreRollFrames, const string& numPreRollFramesConchString);
     #else
     inline void Streams_Finish_Conformance() {}
     #endif
@@ -400,29 +403,29 @@ public :
         drc_infos                   drcInstructionsUniDrc_Data;
         gain_sets                   gainSets;
         #if MEDIAINFO_CONFORMANCE
-        size_t                      loudnessInfoSet_Present[2];
-        bool                        loudnessInfoSet_HasContent[2];
+        size_t                      loudnessInfoSet_Present[2]={};
+        bool                        loudnessInfoSet_HasContent[2]={};
         vector<size_t>              numOutChannels_Lfe;
         #endif
-        int32u                      numOutChannels;
-        int32u                      sampling_frequency;
-        int8u                       channelConfigurationIndex;
-        int8u                       sampling_frequency_index;
-        int8u                       coreSbrFrameLengthIndex;
-        int8u                       baseChannelCount;
-        int8u                       stereoConfigIndex;
+        int32u                      numOutChannels={};
+        int32u                      sampling_frequency={};
+        int8u                       channelConfigurationIndex={};
+        int8u                       sampling_frequency_index={};
+        int8u                       coreSbrFrameLengthIndex={};
+        int8u                       baseChannelCount={};
+        int8u                       stereoConfigIndex={};
         #if MEDIAINFO_CONFORMANCE
-        int8u                       drcSetEffect;
-        bool                        LoudnessInfoIsNotValid;
+        int8u                       drcSetEffect={};
+        bool                        LoudnessInfoIsNotValid={};
         #endif
-        bool                        WaitForNextIndependantFrame;
-        bool                        harmonicSBR;
-        bool                        bs_interTes;
-        bool                        bs_pvc;
-        bool                        noiseFilling;
-        bool                        common_window;
-        bool                        common_tw;
-        bool                        tw_mdct;
+        bool                        IFrameParsed={};
+        bool                        harmonicSBR={};
+        bool                        bs_interTes={};
+        bool                        bs_pvc={};
+        bool                        noiseFilling={};
+        bool                        common_window={};
+        bool                        common_tw={};
+        bool                        tw_mdct={};
         arith_context               arithContext[2];
         sbr_handler                 sbrHandler;
         usac_dlft_handler           dlftHandler;

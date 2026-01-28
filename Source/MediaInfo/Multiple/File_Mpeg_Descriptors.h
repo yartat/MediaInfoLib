@@ -247,6 +247,8 @@ struct complete_stream
         programs Programs; //Key is program_number
         std::vector<int16u> programs_List;
         size_t   Programs_NotParsedCount;
+        std::map<int8u, std::map<int32u, Ztring> > message_ids; //Key is message_id, langauge
+
 
         //Per IOD
         struct iod_es
@@ -746,6 +748,7 @@ private :
     void Descriptor_36() {Skip_XX(Element_Size, "Data");};
     void Descriptor_37() {Skip_XX(Element_Size, "Data");};
     void Descriptor_38();
+    void Descriptor_39();
     void Descriptor_3F();
     void Descriptor_3F_00() {Skip_XX(Element_Size-Element_Offset, "Data");};
     void Descriptor_3F_01() {Skip_XX(Element_Size-Element_Offset, "Data");};
@@ -784,6 +787,7 @@ private :
     void Descriptor_4D();
     void Descriptor_4E() {Skip_XX(Element_Size, "Data");};
     void Descriptor_4F() {Skip_XX(Element_Size, "Data");};
+    void NGA_component();
     void Descriptor_50();
     void Descriptor_51() {Skip_XX(Element_Size, "Data");};
     void Descriptor_52();
@@ -833,6 +837,7 @@ private :
     void Descriptor_7E() {Skip_XX(Element_Size, "Data");};
     void Descriptor_7F();
     void Descriptor_7F_06();
+    void Descriptor_7F_08();
     void Descriptor_7F_0F();
     void Descriptor_7F_15();
     void Descriptor_7F_19();
@@ -864,8 +869,8 @@ private :
 
     //Helpers
     void ATSC_multiple_string_structure(Ztring &Value, const char* Info);
-    void Get_DVB_Text(int64u Size, Ztring &Value, const char* Info);
-    void Skip_DVB_Text(int64u Size, const char* Info) {Ztring Temp; Get_DVB_Text(Size, Temp, Info);};
+    void Get_DVB_Text(int64u Size, int32u LanguageCode, Ztring &Value, const char* Info);
+    void Skip_DVB_Text(int64u Size, int32u LanguageCode, const char* Info) {Ztring Temp; Get_DVB_Text(Size, LanguageCode, Temp, Info);};
     static Ztring TimeHHMM_BCD(int16u Time);
     static Ztring Frequency_DVB__BCD(int32u Frequency);
     static Ztring OrbitalPosition_DVB__BCD(int32u OrbitalPosition);

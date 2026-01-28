@@ -61,6 +61,7 @@ std::string URL_Encoded_Encode(const std::string& URL)
 //#if defined(__APPLE__) && defined(__MACH__) // URL is rejected by API on macOS, not considered as URL by Thunderbird
          || Char=='{'
          || Char=='}'
+         || Char=='\\'
 //#endif
         )
         {
@@ -196,7 +197,9 @@ File__ReferenceFilesHelper::File__ReferenceFilesHelper(File__Analyze* MI_, Media
     Duration=0;
     #if MEDIAINFO_DEMUX
         Demux_Interleave=false;
+    #if MEDIAINFO_NEXTPACKET
         DTS_Minimal=(int64u)-1;
+	#endif
     #endif //MEDIAINFO_DEMUX
     #if MEDIAINFO_EVENTS
         StreamID_Previous=(int64u)-1;
@@ -564,6 +567,8 @@ void File__ReferenceFilesHelper::ParseReferences()
                         EditRate_Count++;
                     }
                 }
+        /*
+        //It was used for demux with seek, not used in practice in the open source version, and it has bad side effects so currently disabled, we should find a better way to do that
         if (EditRate_Count>1)
             //Multiple rates, using only one rate
             for (Sequences_Current=0; Sequences_Current<Sequences.size(); Sequences_Current++)
@@ -593,6 +598,7 @@ void File__ReferenceFilesHelper::ParseReferences()
                         }
                         Sequences[Sequences_Current]->Resources[Pos]->EditRate=EditRate;
                     }
+        */
 
         //Testing IDs
         std::set<int64u> StreamList;
@@ -1047,7 +1053,7 @@ bool File__ReferenceFilesHelper::ParseReference_Init()
         {
             if (Sequences[Sequences_Current]->Resources[0]->EditRate)
             {
-                #if MEDIAINFO_DEMUX
+                #if MEDIAINFO_DEMUX && MEDIAINFO_NEXTPACKET
                     if (Pos==0)
                     {
                         Sequences[Sequences_Current]->Resources[0]->Demux_Offset_DTS=0;
@@ -1074,7 +1080,7 @@ bool File__ReferenceFilesHelper::ParseReference_Init()
                 MI2.Option(__T("Demux"), Demux_Save); //This is a global value, need to reset it. TODO: local value
                 if (MiOpenResult)
                 {
-                    #if MEDIAINFO_DEMUX
+                    #if MEDIAINFO_DEMUX && MEDIAINFO_NEXTPACKET
                         int64u Duration=MI2.Get(Sequences[Sequences_Current]->StreamKind, 0, __T("Duration")).To_int64u()*1000000;
                         int64u FrameCount=MI2.Get(Sequences[Sequences_Current]->StreamKind, 0, __T("FrameCount")).To_int64u();
                         if (Pos==0)
@@ -1105,7 +1111,7 @@ bool File__ReferenceFilesHelper::ParseReference_Init()
                 else
                     Sequences[Sequences_Current]->Resources[Pos]->MI->Config.File_IgnoreEditsAfter=Sequences[Sequences_Current]->Resources[Pos]->IgnoreEditsAfter;
                 Sequences[Sequences_Current]->Resources[Pos]->MI->Config.File_EditRate=Sequences[Sequences_Current]->Resources[Pos]->EditRate;
-                #if MEDIAINFO_DEMUX
+                #if MEDIAINFO_DEMUX && MEDIAINFO_NEXTPACKET
                     Sequences[Sequences_Current]->Resources[Pos]->MI->Config.Demux_Offset_Frame=Sequences[Sequences_Current]->Resources[Pos]->Demux_Offset_Frame;
                     Sequences[Sequences_Current]->Resources[Pos]->MI->Config.Demux_Offset_DTS=Sequences[Sequences_Current]->Resources[Pos]->Demux_Offset_DTS;
                 #endif //MEDIAINFO_DEMUX
@@ -1119,7 +1125,7 @@ bool File__ReferenceFilesHelper::ParseReference_Init()
             else
                 Sequences[Sequences_Current]->MI->Config.File_IgnoreEditsAfter=Sequences[Sequences_Current]->Resources[0]->IgnoreEditsAfter;
             Sequences[Sequences_Current]->MI->Config.File_EditRate=Sequences[Sequences_Current]->Resources[0]->EditRate;
-            #if MEDIAINFO_DEMUX
+            #if MEDIAINFO_DEMUX && MEDIAINFO_NEXTPACKET
                 Sequences[Sequences_Current]->MI->Config.Demux_Offset_Frame=Sequences[Sequences_Current]->Resources[0]->Demux_Offset_Frame;
                 Sequences[Sequences_Current]->MI->Config.Demux_Offset_DTS=Sequences[Sequences_Current]->Resources[0]->Demux_Offset_DTS;
             #endif //MEDIAINFO_DEMUX
@@ -1214,7 +1220,8 @@ void File__ReferenceFilesHelper::ParseReference()
                     }
                 #endif //MEDIAINFO_DEMUX
 
-                DTS_Temp+=Sequences[Sequences_Current]->Resources[Sequences[Sequences_Current]->Resources_Current]->Demux_Offset_DTS;
+                if (!Sequences[Sequences_Current]->Resources.empty())
+                    DTS_Temp+=Sequences[Sequences_Current]->Resources[Sequences[Sequences_Current]->Resources_Current]->Demux_Offset_DTS;
                 if (!Sequences[Sequences_Current]->Resources.empty() && Sequences[Sequences_Current]->Resources_Current<Sequences[Sequences_Current]->Resources.size() && Sequences[Sequences_Current]->Resources[Sequences[Sequences_Current]->Resources_Current]->EditRate && Sequences[Sequences_Current]->Resources[Sequences[Sequences_Current]->Resources_Current]->IgnoreEditsBefore)
                 {
                     int64u TimeOffset=float64_int64s(((float64)Sequences[Sequences_Current]->Resources[Sequences[Sequences_Current]->Resources_Current]->IgnoreEditsBefore)/Sequences[Sequences_Current]->Resources[Sequences[Sequences_Current]->Resources_Current]->EditRate*1000000000);
@@ -1435,7 +1442,11 @@ void File__ReferenceFilesHelper::ParseReference_Finalize_PerStream ()
                 MI2.Config.File_IgnoreEditsAfter=Sequences[Sequences_Current]->Resources[Pos]->IgnoreEditsAfter;
             MI2.Config.File_EditRate=Sequences[Sequences_Current]->Resources[Pos]->EditRate;
             Sequences[Sequences_Current]->Resources[Pos]->FileNames.Separator_Set(0, ",");
-            size_t MiOpenResult=MI2.Open(Sequences[Sequences_Current]->Resources[Pos]->FileNames.Read());
+            if (FrameRate)
+                MI2.Option(__T("File_Demux_Rate"), Ztring::ToZtring(FrameRate));
+            else if (!Sequences[Sequences_Current]->Resources.empty() && Sequences[Sequences_Current]->Resources[0]->EditRate) //TODO: per Pos
+                MI2.Option(__T("File_Demux_Rate"), Ztring::ToZtring(Sequences[Sequences_Current]->Resources[0]->EditRate));
+            size_t MiOpenResult = (!Sequences[Sequences_Current]->Resources.empty()) ? MI2.Open(Sequences[Sequences_Current]->Resources[Pos]->FileNames.Read()) : 0;
             MI2.Option(__T("ParseSpeed"), ParseSpeed_Save); //This is a global value, need to reset it. TODO: local value
             MI2.Option(__T("Demux"), Demux_Save); //This is a global value, need to reset it. TODO: local value
             if (MiOpenResult)
@@ -1845,6 +1856,10 @@ MediaInfo_Internal* File__ReferenceFilesHelper::MI_Create()
             MI_Temp->Option(__T("File_SubFile_IDs_Set"), SubFile_IDs.Read());
         }
     #endif //MEDIAINFO_EVENTS
+    if (FrameRate)
+        MI_Temp->Option(__T("File_Demux_Rate"), Ztring::ToZtring(FrameRate));
+    else if (!Sequences[Sequences_Current]->Resources.empty() && Sequences[Sequences_Current]->Resources[0]->EditRate) //TODO: per Pos
+        MI_Temp->Option(__T("File_Demux_Rate"), Ztring::ToZtring(Sequences[Sequences_Current]->Resources[0]->EditRate));
     #if MEDIAINFO_DEMUX
         if (Config->Demux_Unpacketize_Get())
             MI_Temp->Option(__T("File_Demux_Unpacketize"), __T("1"));
@@ -1852,10 +1867,6 @@ MediaInfo_Internal* File__ReferenceFilesHelper::MI_Create()
             MI_Temp->Option(__T("File_Demux_Avc_Transcode_Iso14496_15_to_Iso14496_10"), __T("1"));
         if (Config->Demux_Hevc_Transcode_Iso14496_15_to_AnnexB_Get())
             MI_Temp->Option(__T("File_Demux_Hevc_Transcode_Iso14496_15_to_AnnexB"), __T("1"));
-        if (FrameRate)
-            MI_Temp->Option(__T("File_Demux_Rate"), Ztring::ToZtring(FrameRate));
-        else if (!Sequences[Sequences_Current]->Resources.empty() && Sequences[Sequences_Current]->Resources[0]->EditRate) //TODO: per Pos
-            MI_Temp->Option(__T("File_Demux_Rate"), Ztring::ToZtring(Sequences[Sequences_Current]->Resources[0]->EditRate));
         switch (Config->Demux_InitData_Get())
         {
             case 0 : MI_Temp->Option(__T("File_Demux_InitData"), __T("Event")); break;
@@ -1889,7 +1900,9 @@ void File__ReferenceFilesHelper::Read_Buffer_Unsynched()
             Sequences[Sequences_Pos]->MI->Open_Buffer_Unsynch();
 
     #if MEDIAINFO_DEMUX
+	#if MEDIAINFO_NEXTPACKET
         DTS_Minimal=(int64u)-1;
+	#endif
         Config->Demux_EventWasSent=true; //We want not try to read new data from the file
     #endif //MEDIAINFO_DEMUX
 

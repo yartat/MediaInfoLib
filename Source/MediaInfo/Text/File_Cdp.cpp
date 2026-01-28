@@ -354,7 +354,8 @@ void File_Cdp::Data_Parse()
     }
 
     FILLING_BEGIN();
-        Frame_Count++;
+        if (!Status[IsFilled] && Frame_Count>=1024 && Config->ParseSpeed<1.0)
+            Fill();
         if (!IsSub && Config->ParseSpeed<1.0 && Frame_Count>=300)
             Finish();
     FILLING_END();
@@ -376,6 +377,7 @@ void File_Cdp::Read_Buffer_Continue()
             if (Magic!=0x63636470)
             {
                 Reject("CDP");
+                Skip_XX(Element_Size-Element_Offset,            "Junk");
                 return;
             }
         FILLING_END();
@@ -470,7 +472,7 @@ void File_Cdp::ccdata_section()
         BS_End();
 
         #if MEDIAINFO_ADVANCED
-            if (cc_type>=2 && !Streams[2] && Config->File_Eia708_DisplayEmptyStream_Get())
+            if (cc_type>=2 && !Streams[2] && Config->File_DisplayCaptions_Get()==DisplayCaptions_Stream)
                 CreateStream(2);
         #endif //MEDIAINFO_ADVANCED
 

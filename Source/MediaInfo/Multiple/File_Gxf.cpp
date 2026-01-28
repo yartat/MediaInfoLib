@@ -32,8 +32,14 @@
 #if defined(MEDIAINFO_GXF_YES)
     #include "MediaInfo/Multiple/File_Umf.h"
 #endif
+#if defined(MEDIAINFO_AVC_YES)
+    #include "MediaInfo/Video/File_Avc.h"
+#endif
 #if defined(MEDIAINFO_MPEGV_YES)
     #include "MediaInfo/Video/File_Mpegv.h"
+#endif
+#if defined(MEDIAINFO_VC3_YES)
+    #include "MediaInfo/Video/File_Vc3.h"
 #endif
 #if defined(MEDIAINFO_AC3_YES)
     #include "MediaInfo/Audio/File_Ac3.h"
@@ -112,6 +118,9 @@ static const char* Gxf_MediaTypes(int8u Type)
         case 23 : return "MPEG-1 Video"; //625 lines
         case 24 : return "SMPTE 12M"; //HD
         case 25 : return "DV"; //DVCPRO HD
+        case 26 : return "AVC";
+        case 29 : return "AVC";
+        case 30 : return "VC-3";
         default : return "";
     }
 }
@@ -142,6 +151,9 @@ static stream_t Gxf_MediaTypes_StreamKind(int8u Type)
         case 23 : return Stream_Video;
         case 24 : return Stream_Max;
         case 25 : return Stream_Video;
+        case 26 : return Stream_Video;
+        case 29 : return Stream_Video;
+        case 30 : return Stream_Video;
         default : return Stream_Max;
     }
 }
@@ -205,7 +217,6 @@ File_Gxf::File_Gxf()
         Demux_Level=2; //Container
     #endif //MEDIAINFO_DEMUX
     MustSynchronize=true;
-    Buffer_TotalBytes_FirstSynched_Max=64*1024;
     Buffer_TotalBytes_Fill_Max=(int64u)-1; //Disabling this feature for this format, this is done in the parser
     #if MEDIAINFO_DEMUX
         Demux_EventWasSent_Accept_Specific=true;
@@ -702,7 +713,7 @@ size_t File_Gxf::Read_Buffer_Seek (size_t Method, int64u Value, int64u)
                         else
                             Value=float64_int64s(((float64)(Value-Delay))/1000000000*Gxf_FrameRate(Streams[0x00].FrameRate_Code));
                     }
-                    //No break;
+                    [[fallthrough]];
         case 3  :   //FrameNumber
                     {
                     if (Seeks.empty())
@@ -790,8 +801,10 @@ void File_Gxf::Header_Parse()
         {
             if (PacketType==0xBF) //media
             {
+	#if MEDIAINFO_NEXTPACKET
                 if (Config->NextPacket_Get() && Config->Event_CallBackFunction_IsSet())
                     Config->Demux_EventWasSent=true; //First set is to indicate the user that header is parsed
+	#endif
                 Demux_HeaderParsed=true;
             }
         }
@@ -1077,6 +1090,27 @@ void File_Gxf::map()
                                         if (SizeToAnalyze<8*16*1024*1024)
                                             SizeToAnalyze*=8; //10x more, to be sure to find captions
                                         #endif //MEDIAINFO_RIFF_YES
+                                    }
+                                    break;
+                        case 26 :
+                        case 29 :   //AVC
+                                    {
+                                        File__Analyze* Parser=new File_Avc();
+                                        Open_Buffer_Init(Parser);
+                                        Streams[TrackID].Parsers.push_back(Parser);
+
+                                        Parsers_Count++;
+                                        Streams[TrackID].Searching_Payload=true;
+                                    }
+                                    break;
+                        case 30 :   //VC-3
+                                    {
+                                        File__Analyze* Parser=new File_Vc3();
+                                        Open_Buffer_Init(Parser);
+                                        Streams[TrackID].Parsers.push_back(Parser);
+
+                                        Parsers_Count++;
+                                        Streams[TrackID].Searching_Payload=true;
                                     }
                                     break;
                         default :   ;
@@ -1448,7 +1482,7 @@ void File_Gxf::media()
         {
             if (!Streams[TrackNumber].Parsers[Pos]->Status[IsAccepted] && Streams[TrackNumber].Parsers[Pos]->Status[IsFinished])
             {
-                delete *(Streams[TrackNumber].Parsers.begin()+Pos);
+                delete static_cast<MediaInfoLib::File__Analyze*>(*(Streams[TrackNumber].Parsers.begin()+Pos));
                 Streams[TrackNumber].Parsers.erase(Streams[TrackNumber].Parsers.begin()+Pos);
                 Pos--;
             }
@@ -1458,7 +1492,7 @@ void File_Gxf::media()
                 for (size_t Pos2=0; Pos2<Streams[TrackNumber].Parsers.size(); Pos2++)
                 {
                     if (Pos2!=Pos)
-                        delete *(Streams[TrackNumber].Parsers.begin()+Pos2);
+                        delete static_cast<MediaInfoLib::File__Analyze*>(*(Streams[TrackNumber].Parsers.begin()+Pos2));
                 }
                 Streams[TrackNumber].Parsers.clear();
                 Streams[TrackNumber].Parsers.push_back(Parser);

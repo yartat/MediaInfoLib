@@ -233,12 +233,12 @@ private :
     void Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_WhitePointChromaticityY() {Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_Primary(3*2+1);};
     void Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_LuminanceMax()            {Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_Luminance(1);};
     void Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_LuminanceMin()            {Segment_Tracks_TrackEntry_Video_Colour_MasteringMetadata_Luminance(0);};
-    void Segment_Tracks_TrackEntry_Video_Projection(){};
-    void Segment_Tracks_TrackEntry_Video_Projection_ProjectionType(){UInteger_Info();};
+    void Segment_Tracks_TrackEntry_Video_Projection();
+    void Segment_Tracks_TrackEntry_Video_Projection_ProjectionType();
     void Segment_Tracks_TrackEntry_Video_Projection_ProjectionPrivate(){Skip_XX(Element_Size, "Data");};
-    void Segment_Tracks_TrackEntry_Video_Projection_ProjectionPoseYaw(){Float_Info();};
-    void Segment_Tracks_TrackEntry_Video_Projection_ProjectionPosePitch(){Float_Info();};
-    void Segment_Tracks_TrackEntry_Video_Projection_ProjectionPoseRoll(){Float_Info();};
+    void Segment_Tracks_TrackEntry_Video_Projection_ProjectionPoseYaw();
+    void Segment_Tracks_TrackEntry_Video_Projection_ProjectionPosePitch();
+    void Segment_Tracks_TrackEntry_Video_Projection_ProjectionPoseRoll();
     void Segment_Tracks_TrackEntry_Audio();
     void Segment_Tracks_TrackEntry_Audio_SamplingFrequency();
     void Segment_Tracks_TrackEntry_Audio_OutputSamplingFrequency();
@@ -334,25 +334,29 @@ private :
     void Segment_Chapters_EditionEntry_ChapterAtom_ChapProcess_ChapProcessCommand_ChapProcessData(){Skip_XX(Element_Size, "Data");};
     void Segment_Tags();
     void Segment_Tags_Tag();
-    void Segment_Tags_Tag_Targets(){};
+    void Segment_Tags_Tag_Targets();
+    void Segment_Tags_Tag_Targets_Remap();
     void Segment_Tags_Tag_Targets_TargetTypeValue(){UInteger_Info();};
     void Segment_Tags_Tag_Targets_TargetType(){String_Info();};
     void Segment_Tags_Tag_Targets_TagTrackUID();
     void Segment_Tags_Tag_Targets_TagEditionUID(){UInteger_Info();};
     void Segment_Tags_Tag_Targets_TagChapterUID(){UInteger_Info();};
     void Segment_Tags_Tag_Targets_TagAttachmentUID(){UInteger_Info();};
-    void Segment_Tags_Tag_SimpleTag(){};
+    void Segment_Tags_Tag_Targets_TagBlockAddIDValue();
+    void Segment_Tags_Tag_SimpleTag();
     void Segment_Tags_Tag_SimpleTag_TagName();
     void Segment_Tags_Tag_SimpleTag_TagLanguage();
     void Segment_Tags_Tag_SimpleTag_TagLanguageIETF(){Segment_Tags_Tag_SimpleTag_TagLanguage();};
     void Segment_Tags_Tag_SimpleTag_TagDefault(){UInteger_Info();};
     void Segment_Tags_Tag_SimpleTag_TagString();
     void Segment_Tags_Tag_SimpleTag_TagBinary(){Skip_XX(Element_Size, "Data");};
+    void Segment_Tags_Tag_SimpleTag_Assign();
 
     // Extra
     enum hdr_format
     {
         HdrFormat_SmpteSt209440,
+        HdrFormat_T_UWA005,
         HdrFormat_SmpteSt2086,
         HdrFormat_Max,
     };
@@ -363,6 +367,10 @@ private :
     void sei_message_user_data_registered_itu_t_t35_B5_003C();
     void sei_message_user_data_registered_itu_t_t35_B5_003C_0001();
     void sei_message_user_data_registered_itu_t_t35_B5_003C_0001_04();
+
+    void sei_message_user_data_registered_itu_t_t35_26();
+    void sei_message_user_data_registered_itu_t_t35_26_0004();
+    void sei_message_user_data_registered_itu_t_t35_26_0004_0005();
 
     struct stream
     {
@@ -392,7 +400,11 @@ private :
         int64u                  PixelCropRight;
         int64u                  PixelCropTop;
         mastering_metadata_2086      MasteringMetadata;
-        std::map<int64u, File__Analyze*> BlockAdditions;
+        struct block_addition {
+            Ztring Title;
+            File__Analyze* Parser = nullptr;
+        };
+        std::map<int64u, block_addition> BlockAdditions;
         #if MEDIAINFO_TRACE
             size_t Trace_Segment_Cluster_Block_Count;
         #endif // MEDIAINFO_TRACE
@@ -432,7 +444,7 @@ private :
             delete Parser; //Parser=NULL;
             delete[] ContentCompSettings_Buffer; //ContentCompSettings_Buffer=NULL;
             for (auto BlockAddition : BlockAdditions)
-                delete BlockAddition.second;
+                delete BlockAddition.second.Parser;
         }
     };
     std::map<int64u, stream> Stream;
@@ -454,38 +466,62 @@ private :
 
     //Temp - TrackEntry
     int8u*   CodecPrivate;
-    size_t   CodecPrivate_Size;
+    size_t   CodecPrivate_Size{};
     void     CodecPrivate_Manage();
     void     Audio_Manage();
     Ztring   CodecID;
-    infocodecid_format_t InfoCodecID_Format_Type;
+    infocodecid_format_t InfoCodecID_Format_Type{};
     void     CodecID_Manage();
-    int64u   TrackType;
-    int64u   AudioBitDepth;
+    int64u   TrackType{};
+    int64u   AudioBitDepth{};
 
     //Temp - BlockAddition
     int64u  BlockAddIDType;
-    int64u  BlockAddIDValue;
+    int64u  BlockAddIDValue{};
 
     //Temp
     int8u   InvalidByteMax;
     int64u  Format_Version;
     int64u  TimecodeScale;
     float64 Duration;
-    int64u  TrackNumber;
-    int64u  TrackVideoDisplayWidth;
-    int64u  TrackVideoDisplayHeight;
-    int32u  AvgBytesPerSec;
-    int64u  Segment_Cluster_TimeCode_Value;
+    int64u  TrackNumber{};
+    int64u  TrackVideoDisplayWidth{};
+    int64u  TrackVideoDisplayHeight{};
+    int32u  AvgBytesPerSec{};
+    int64u  Segment_Cluster_TimeCode_Value{};
     size_t  Segment_Info_Count;
     size_t  Segment_Tracks_Count;
     size_t  Segment_Cluster_Count;
+    struct tagid {
+        int64u TagTrackUID{};
+        int64u TagBlockAddIDValue{};
+
+        tagid() = default;
+        tagid(int64u TagTrackUID_, int64u TagBlockAddIDValue_)
+            : TagTrackUID(TagTrackUID_), TagBlockAddIDValue(TagBlockAddIDValue_)
+        {
+        }
+
+        constexpr bool operator==(const tagid& c) const noexcept {
+            return TagTrackUID == c.TagTrackUID
+                && TagBlockAddIDValue == c.TagBlockAddIDValue;
+        }
+
+        constexpr bool operator!=(const tagid& c) const noexcept {
+            return !(*this == c);
+        }
+
+        constexpr bool operator<(const tagid& c) const noexcept {
+            return (TagTrackUID < c.TagTrackUID) ||
+                (TagTrackUID == c.TagTrackUID &&
+                    TagBlockAddIDValue < c.TagBlockAddIDValue);
+        }
+    };
     typedef std::map<Ztring, Ztring> tagspertrack;
-    typedef std::map<int64u, tagspertrack> tags;
+    typedef std::map<tagid, tagspertrack> tags;
     tags    Segment_Tags_Tag_Items;
-    int64u  Segment_Tags_Tag_Targets_TagTrackUID_Value;
-    bool    CurrentAttachmentIsCover;
-    bool    CoverIsSetFromAttachment;
+    tagid   Segment_Tags_Tag_Target_Value{};
+    Ztring  Segment_Tags_Tag_SimpleTag_TagString_Value;
     string  AttachedFile_FileName;
     string  AttachedFile_FileMimeType;
     string  AttachedFile_FileDescription;
@@ -521,11 +557,11 @@ private :
         std::vector<chapteratom> ChapterAtoms;
     };
     std::vector<editionentry> EditionEntries;
-    size_t EditionEntries_Pos;
-    size_t ChapterAtoms_Pos;
-    size_t ChapterDisplays_Pos;
-    int64u              Segment_Offset_Begin;
-    int64u              Segment_Offset_End;
+    size_t EditionEntries_Pos{};
+    size_t ChapterAtoms_Pos{};
+    size_t ChapterDisplays_Pos{};
+    int64u              Segment_Offset_Begin{};
+    int64u              Segment_Offset_End{};
     int64u              IsParsingSegmentTrack_SeekBackTo;
     int64u              SegmentTrack_Offset_End;
     struct seek
@@ -544,10 +580,10 @@ private :
         }
     };
     std::vector<seek>   Segment_Seeks;
-    size_t              Segment_Seeks_Pos;
+    size_t              Segment_Seeks_Pos{};
     std::vector<Ztring> Segment_Tag_SimpleTag_TagNames;
-    int64u Segment_Cluster_BlockGroup_BlockDuration_Value;
-    int64u Segment_Cluster_BlockGroup_BlockDuration_TrackNumber;
+    int64u Segment_Cluster_BlockGroup_BlockDuration_Value{};
+    int64u Segment_Cluster_BlockGroup_BlockDuration_TrackNumber{};
     std::vector<int64u> Laces;
     size_t              Laces_Pos;
     #if MEDIAINFO_DEMUX
@@ -578,10 +614,10 @@ private :
         }
     };
     rawcookedtrack RawcookedTrack_Data;
-    const int8u* Rawcooked_Compressed_Save_Buffer;
-    size_t Rawcooked_Compressed_Save_Buffer_Offset;
-    int64u Rawcooked_Compressed_Save_Element_Offset;
-    int64u Rawcooked_Compressed_Save_Element_Size;
+    const int8u* Rawcooked_Compressed_Save_Buffer{};
+    size_t Rawcooked_Compressed_Save_Buffer_Offset{};
+    int64u Rawcooked_Compressed_Save_Element_Offset{};
+    int64u Rawcooked_Compressed_Save_Element_Size{};
     bool   Trace_Activated_Save;
     bool Rawcooked_Compressed_Start(rawcookedtrack::mask* Mask=NULL, bool UseMask=false);
     void Rawcooked_Compressed_End(rawcookedtrack::mask* Mask=NULL, bool UseMask=false);
@@ -601,9 +637,9 @@ private :
     void CRC32_Check();
     #if MEDIAINFO_TRACE
         bool CRC32_Check_In_Node(const std::string& ToSearchInInfo, const std::string& info, element_details::Element_Node *node);
-        size_t Trace_Segment_Cluster_Count;
-        size_t Trace_Segment_Cues_CuePoint_Count;
-        size_t Trace_Segment_SeekHead_Seek_Count;
+        size_t Trace_Segment_Cluster_Count{};
+        size_t Trace_Segment_Cues_CuePoint_Count{};
+        size_t Trace_Segment_SeekHead_Seek_Count{};
     #endif // MEDIAINFO_TRACE
 };
 

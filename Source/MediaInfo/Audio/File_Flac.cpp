@@ -23,7 +23,6 @@
 //---------------------------------------------------------------------------
 #include "MediaInfo/Audio/File_Flac.h"
 #include "MediaInfo/Tag/File_VorbisCom.h"
-#include "ThirdParty/base64/base64.h"
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -34,10 +33,28 @@ namespace MediaInfoLib
 //***************************************************************************
 
 //---------------------------------------------------------------------------
-extern const char* Id3v2_PictureType(int8u Type); //In Tag/File_Id3v2.cpp
+extern std::string Id3v2_PictureType(int8u Type);
 extern std::string ExtensibleWave_ChannelMask (int32u ChannelMask); //In Multiple/File_Riff_Elements.cpp
 extern std::string ExtensibleWave_ChannelMask2 (int32u ChannelMask); //In Multiple/File_Riff_Elements.cpp
 extern std::string ExtensibleWave_ChannelMask_ChannelLayout(int32u ChannelMask); //In Multiple/File_Riff_Elements.cpp
+
+#if MEDIAINFO_TRACE
+static void CRC16_Init(int16u* Table, int16u Polynomial)
+{
+    for (size_t Pos = 0; Pos < 256; ++Pos)
+    {
+        Table[Pos] = static_cast<int16u>(Pos) << 8;
+
+        for (int8u bit = 0; bit < 8; ++bit)
+        {
+            if (Table[Pos] & 0x8000)
+                Table[Pos] = (Table[Pos] << 1) ^ Polynomial;
+            else
+                Table[Pos] <<= 1;
+        }
+    }
+}
+#endif // MEDIAINFO_TRACE
 
 //***************************************************************************
 // Constructor/Destructor
@@ -53,8 +70,10 @@ File_Flac::File_Flac()
     //In
     NoFileHeader=false;
     VorbisHeader=false;
+    FromIamf=false;
 
     //Temp
+    Last_metadata_block=false;
     IsAudioFrames=false;
 }
 
@@ -68,7 +87,7 @@ bool File_Flac::FileHeader_Begin()
     if (NoFileHeader)
         return true;
 
-    if (NoFileHeader || !File__Tags_Helper::FileHeader_Begin())
+    if (!File__Tags_Helper::FileHeader_Begin())
         return false;
 
     //Element_Size
@@ -118,15 +137,52 @@ void File_Flac::Header_Parse()
         BLOCK_TYPE=(int8u)-1;
         int16u sync;
         bool blocking_strategy;
+        int8u blocksizebits, sampleratebits, crc;
         Get_S2 (15, sync,                                       "0b111111111111100");
-        Get_SB (    blocking_strategy,                          "blocking strategy");
-        Skip_S1( 4,                                             "Blocksize");
-        Skip_S1( 4,                                             "Sample rate");
-        Skip_S1( 4,                                             "Channels");
-        Skip_S1( 3,                                             "Bit depth");
-        Skip_SB(                                                "Reserved");
+        Get_SB (    blocking_strategy,                          "blocking strategy bit"); Param_Info1(blocking_strategy ? "variable block size" : "fixed block size");
+        Get_S1 ( 4, blocksizebits,                              "Block Size Bits");
+        Get_S1 ( 4, sampleratebits,                             "Sample Rate Bits");
+        Skip_S1( 4,                                             "Channels Bits");
+        Skip_S1( 3,                                             "Bit Depth Bits");
+        Skip_S1( 1,                                             "Reserved");
         BS_End();
-        Skip_B1(                                                "Frame header CRC");
+        int8u peek;
+        int8u coded_size{};
+        Peek_B1(peek);
+        for (int8u i = 8; i > 0; --i) {
+            if ((peek >> (i - 1) & 1) == 0)
+                break;
+            ++coded_size;
+        }
+        if (coded_size == 0)
+            coded_size = 1;
+        Skip_XX(coded_size,                                     "Coded Number");
+        if (blocksizebits == 0b0110)
+            Skip_B1(                                            "Uncommon Block Size");
+        else if (blocksizebits == 0b0111)
+            Skip_B2(                                            "Uncommon Block Size");
+        if (sampleratebits == 0b1100)
+            Skip_B1(                                            "Uncommon Sample Rate");
+        else if (sampleratebits == 0b1101 || sampleratebits == 0b1110)
+            Skip_B2(                                            "Uncommon Sample Rate");
+        Get_B1(crc,                                             "Frame Header CRC");
+        #if MEDIAINFO_TRACE
+        if (Trace_Activated) {
+            int8u CRC_8 = 0;
+            const int8u polynomial = 0x07; // x^8 + x^2 + x^1 + x^0
+            const int8u* CRC_8_Buffer = Buffer + Buffer_Offset;
+            while (CRC_8_Buffer < Buffer + Buffer_Offset + Element_Offset - 1) {
+                CRC_8 ^= *CRC_8_Buffer++;
+                for (int8u i = 0; i < 8; ++i) {
+                    if (CRC_8 & 0x80)
+                        CRC_8 = (CRC_8 << 1) ^ polynomial;
+                    else
+                        CRC_8 <<= 1;
+                }
+            }
+            Param_Info1(CRC_8 == crc ? "OK" : "NOK");
+        }
+        #endif // MEDIAINFO_TRACE
         Length=IsSub?(Element_Size-Element_Offset):0; // Unknown if raw, else full frame
     }
     else
@@ -158,22 +214,44 @@ void File_Flac::Data_Parse()
         CASE_INFO(VORBIS_COMMENT);
         CASE_INFO(CUESHEET);
         CASE_INFO(PICTURE);
-        case (int8u)-1: Element_Name("Frame");
-                // Fallthrough
+        case (int8u)-1: Element_Name("Frame"); break;
         default : Skip_XX(Element_Size,                         "Data");
     }
 
     if (Element_Code==(int8u)-1)
     {
+        if (IsSub && Element_Size > 2) {
+            Skip_XX(Element_Size - 2,                           "Subframes");
+            Element_Begin1("Frame Footer");
+            int16u crc;
+            Get_B2(crc,                                         "CRC");
+            #if MEDIAINFO_TRACE
+            if (Trace_Activated) {
+                if (!CRC_16_Table) {
+                    CRC_16_Table.reset(new int16u[256]);
+                    CRC16_Init(CRC_16_Table.get(), 0x8005); // x^16 + x^15 + x^2 + x^0
+                }
+                int16u CRC_16 = 0x0000;
+                const int8u* CRC_16_Buffer = Buffer;
+                while (CRC_16_Buffer < Buffer + Buffer_Offset + Element_Offset - 2) {
+                    CRC_16 = (CRC_16 << 8) ^ CRC_16_Table[(CRC_16 >> 8) ^ (*CRC_16_Buffer++)];
+                }
+                Param_Info1(CRC_16 == crc ? "OK" : "NOK");
+            }
+            #endif // MEDIAINFO_TRACE
+            Element_End0();
+        }
+
         //No more need data
-        File__Tags_Helper::Finish("Flac");
+        if (!FromIamf)
+            File__Tags_Helper::Finish("Flac");
     }
     else if (Last_metadata_block)
     {
         if (!IsSub)
             Fill(Stream_Audio, 0, Audio_StreamSize, File_Size-(File_Offset+Buffer_Offset+Element_Size));
 
-    if (Retrieve(Stream_Audio, 0, Audio_ChannelPositions).empty() && Retrieve(Stream_Audio, 0, Audio_ChannelPositions_String2).empty())
+    if (Retrieve(Stream_Audio, 0, Audio_ChannelPositions).empty() && Retrieve(Stream_Audio, 0, Audio_ChannelPositions_String2).empty() && !FromIamf)
     {
         int32u t = 0;
         int32s c = Retrieve(Stream_Audio, 0, Audio_Channel_s_).To_int32s();
@@ -225,8 +303,6 @@ void File_Flac::STREAMINFO()
             return;
         File__Tags_Helper::Accept("FLAC");
 
-        File__Tags_Helper::Streams_Fill();
-
         File__Tags_Helper::Stream_Prepare(Stream_Audio);
         Fill(Stream_Audio, 0, Audio_Format, "FLAC");
         Fill(Stream_Audio, 0, Audio_Codec, "FLAC");
@@ -235,15 +311,21 @@ void File_Flac::STREAMINFO()
          else
             Fill(Stream_Audio, 0, Audio_BitRate_Mode, "VBR");
         Fill(Stream_Audio, 0, Audio_SamplingRate, SampleRate);
-        Fill(Stream_Audio, 0, Audio_Channel_s_, Channels+1);
+        if (!FromIamf)
+            Fill(Stream_Audio, 0, Audio_Channel_s_, Channels+1);
         Fill(Stream_Audio, 0, Audio_BitDepth, BitPerSample+1);
         if (!IsSub && Samples)
             Fill(Stream_Audio, 0, Audio_SamplingCount, Samples);
-        Ztring MD5_PerItem;
-        MD5_PerItem.From_UTF8(uint128toString(MD5Stored, 16));
-        while (MD5_PerItem.size()<32)
-            MD5_PerItem.insert(MD5_PerItem.begin(), '0'); //Padding with 0, this must be a 32-byte string
-        Fill(Stream_Audio, 0, "MD5_Unencoded", MD5_PerItem);
+        if (!FromIamf || MD5Stored)
+        {
+            Ztring MD5_PerItem;
+            MD5_PerItem.From_UTF8(uint128toString(MD5Stored, 16));
+            while (MD5_PerItem.size()<32)
+                MD5_PerItem.insert(MD5_PerItem.begin(), '0'); //Padding with 0, this must be a 32-byte string
+            Fill(Stream_Audio, 0, "MD5_Unencoded", MD5_PerItem);
+        }
+
+        File__Tags_Helper::Streams_Fill();
     FILLING_END();
 }
 
@@ -302,28 +384,16 @@ void File_Flac::PICTURE()
     Get_B4 (Data_Size,                                          "Data size");
     if (Element_Offset+Data_Size>Element_Size)
         return; //There is a problem
+    auto Element_Size_Save=Element_Size;
+    Element_Size=Element_Offset+Data_Size;
 
     //Filling
-    Fill(Stream_General, 0, General_Cover, "Yes");
-    Fill(Stream_General, 0, General_Cover_Description, Description);
-    Fill(Stream_General, 0, General_Cover_Type, Id3v2_PictureType((int8u)PictureType));
-    Fill(Stream_General, 0, General_Cover_Mime, MimeType);
-    #if MEDIAINFO_ADVANCED
-        if (MediaInfoLib::Config.Flags1_Get(Flags_Cover_Data_base64))
-        {
-            std::string Data_Raw((const char*)(Buffer+(size_t)(Buffer_Offset+Element_Offset)), Data_Size);
-            std::string Data_Base64(Base64::encode(Data_Raw));
-            Fill(Stream_General, 0, General_Cover_Data, Data_Base64);
-        }
-    #endif //MEDIAINFO_ADVANCED
-
-    Skip_XX(Data_Size,                                          "Data");
-    if (Element_Offset<Element_Size)
-        Skip_XX(Element_Size-Element_Offset,                    "?");
+    Attachment("FLAC Picture", Description, Id3v2_PictureType(PictureType).c_str(), MimeType, true);
+    
+    Element_Size=Element_Size_Save;
+    Skip_XX(Element_Size-Element_Offset,                        "(Unknown)");
 }
 
 } //NameSpace
 
 #endif //MEDIAINFO_FLAC_YES
-
-

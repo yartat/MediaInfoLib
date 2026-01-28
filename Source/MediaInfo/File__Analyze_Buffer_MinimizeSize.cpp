@@ -284,9 +284,9 @@ void File__Analyze::Get_BFP4_(int8u  Bits, float32 &Info)
     int32s Integer=(int32s)BS->Get4(Bits);
     int32u Fraction=BS->Get4(32-Bits);
     BS_End();
-    if (Integer>=(1<<Bits)/2)
+    if (Bits && Integer>=(1<<Bits)/2)
         Integer-=1<<Bits;
-    Info=Integer+((float32)Fraction)/(1<<(32-Bits));
+    Info=Integer+((float32)Fraction)/(1LL<<(32-Bits));
 }
 
 //---------------------------------------------------------------------------
@@ -1341,6 +1341,32 @@ void File__Analyze::Get_ISO_8859_5(int64u Bytes, Ztring &Info)
 }
 
 //---------------------------------------------------------------------------
+void File__Analyze::Get_ISO_8859_9(int64u Bytes, Ztring &Info)
+{
+    INTEGRITY_SIZE_ATLEAST_STRING(Bytes);
+    Info.clear();
+    size_t End = Buffer_Offset + (size_t)Element_Offset + (size_t)Bytes;
+    for (size_t Pos=Buffer_Offset+(size_t)Element_Offset; Pos<End; ++Pos)
+    {
+        switch (Buffer[Pos])
+        {
+            case 0xD0 : Info+=Ztring().From_Unicode(L"\x11E"); break;
+            case 0xDD : Info+=Ztring().From_Unicode(L"\x130"); break;
+            case 0xDE : Info+=Ztring().From_Unicode(L"\x15E"); break;
+            case 0xF0 : Info+=Ztring().From_Unicode(L"\x11F"); break;
+            case 0xFD : Info+=Ztring().From_Unicode(L"\x131"); break;
+            case 0xFE : Info+=Ztring().From_Unicode(L"\x15F"); break;
+            default   :
+                        {
+                        wchar_t NewChar=Buffer[Pos];
+                        Info+=Ztring().From_Unicode(&NewChar, 1);
+                        }
+        }
+    }
+    Element_Offset+=Bytes;
+}
+
+//---------------------------------------------------------------------------
 extern const int16u Ztring_MacRoman[128];
 void File__Analyze::Get_MacRoman(int64u Bytes, Ztring &Info)
 {
@@ -1400,6 +1426,13 @@ void File__Analyze::Get_UTF8(int64u Bytes, Ztring &Info)
 }
 
 //---------------------------------------------------------------------------
+void File__Analyze::Peek_UTF8(int64u Bytes, Ztring& Info)
+{
+    INTEGRITY_SIZE_ATLEAST_STRING(Bytes);
+    Info.From_UTF8((const char*)(Buffer+Buffer_Offset+(size_t)Element_Offset), (size_t)Bytes);
+}
+
+//---------------------------------------------------------------------------
 void File__Analyze::Get_UTF16(int64u Bytes, Ztring &Info)
 {
     INTEGRITY_SIZE_ATLEAST_STRING(Bytes);
@@ -1421,6 +1454,17 @@ void File__Analyze::Get_UTF16L(int64u Bytes, Ztring &Info)
     INTEGRITY_SIZE_ATLEAST_STRING(Bytes);
     Info.From_UTF16LE((const char*)(Buffer+Buffer_Offset+(size_t)Element_Offset), (size_t)Bytes);
     Element_Offset+=Bytes;
+}
+
+//---------------------------------------------------------------------------
+size_t File__Analyze::SizeUpTo0(size_t MaxSize)
+{
+    auto Buffer_Begin=Buffer+Buffer_Offset+(size_t)Element_Offset;
+    auto Buffer_Current=Buffer_Begin;
+    auto Buffer_End=Buffer+Buffer_Offset+(MaxSize>((size_t)Element_Size)?((size_t)Element_Size):MaxSize);
+    while (Buffer_Current<Buffer_End && *Buffer_Current)
+        Buffer_Current++;
+    return Buffer_Current-Buffer_Begin;
 }
 
 //***************************************************************************

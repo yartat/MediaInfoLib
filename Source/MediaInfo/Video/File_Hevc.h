@@ -11,6 +11,7 @@
 
 //---------------------------------------------------------------------------
 #include "MediaInfo/File__Analyze.h"
+#include "MediaInfo/TimeCode.h"
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -25,10 +26,10 @@ class File_Hevc : public File__Analyze
 public :
     //In
     int64u Frame_Count_Valid;
-    bool   FrameIsAlwaysComplete;
     bool   MustParse_VPS_SPS_PPS;
     bool   MustParse_VPS_SPS_PPS_FromMatroska;
     bool   MustParse_VPS_SPS_PPS_FromFlv;
+    bool   MustParse_VPS_SPS_PPS_FromLhvc;
     bool   SizedBlocks;
     size_t SizedBlocks_FileThenStream;
 
@@ -40,6 +41,35 @@ private :
     File_Hevc(const File_Hevc &File_Hevc); //No copy
     File_Hevc &operator =(const File_Hevc &); //No copy
 
+    struct profile_tier_level_struct {
+        int8u   profile_space;
+        int8u   profile_idc;
+        int8u   level_idc;
+        bool    tier_flag;
+        bool    general_progressive_source_flag;
+        bool    general_interlaced_source_flag;
+        bool    general_frame_only_constraint_flag;
+        bool    general_max_8bit_constraint_flag;
+        bool    general_max_10bit_constraint_flag;
+        bool    general_max_12bit_constraint_flag;
+        bool    general_max_14bit_constraint_flag;
+
+        profile_tier_level_struct& Clear()
+        {
+            profile_space = -1;
+            profile_idc = -1;
+            level_idc = -1;
+            tier_flag = true;
+            general_progressive_source_flag = true;
+            general_interlaced_source_flag = true;
+            general_frame_only_constraint_flag = true;
+            general_max_8bit_constraint_flag = true;
+            general_max_10bit_constraint_flag = true;
+            general_max_12bit_constraint_flag = true;
+            general_max_14bit_constraint_flag = true;
+            return *this;
+        }
+    };
 
     //Structures - video_parameter_set
     struct video_parameter_set_struct
@@ -48,15 +78,19 @@ private :
         int8u*  AnnexB_Buffer;
         size_t  AnnexB_Buffer_Size;
         #endif //MEDIAINFO_DEMUX
+        vector<profile_tier_level_struct> profile_tier_level_info_layers;
+        vector<int16u> view_id_val;
         int8u   vps_max_sub_layers_minus1;
 
         //Constructor/Destructor
-        video_parameter_set_struct(int8u vps_max_sub_layers_minus1_)
+        video_parameter_set_struct(const vector<profile_tier_level_struct>& profile_tier_level_info_layers_, int8u vps_max_sub_layers_minus1_, vector<int16u> view_id_val_)
         :
             #if MEDIAINFO_DEMUX
             AnnexB_Buffer(NULL),
             AnnexB_Buffer_Size(0),
             #endif //MEDIAINFO_DEMUX
+            profile_tier_level_info_layers(profile_tier_level_info_layers_),
+            view_id_val(view_id_val_),
             vps_max_sub_layers_minus1(vps_max_sub_layers_minus1_)
         {
         }
@@ -76,6 +110,16 @@ private :
     typedef vector<video_parameter_set_struct*> video_parameter_set_structs;
 
     //Structures - seq_parameter_set
+    enum vui_flag
+    {
+        video_signal_type_present_flag,
+        video_full_range_flag,
+        colour_description_present_flag,
+        pic_struct_present_flag,
+        frame_field_info_present_flag,
+        vui_flags_Max
+    };
+    typedef std::bitset<vui_flags_Max> vui_flags;
     struct seq_parameter_set_struct
     {
         struct vui_parameters_struct
@@ -149,19 +193,13 @@ private :
             int32u  time_scale;
             int16u  sar_width;
             int16u  sar_height;
-            int8u   aspect_ratio_idc;
             int8u   video_format;
-            int8u   video_full_range_flag;
             int8u   colour_primaries;
             int8u   transfer_characteristics;
             int8u   matrix_coefficients;
-            bool    aspect_ratio_info_present_flag;
-            bool    video_signal_type_present_flag;
-            bool    frame_field_info_present_flag;
-            bool    colour_description_present_flag;
-            bool    timing_info_present_flag;
+            vui_flags flags;
 
-            vui_parameters_struct(xxl* NAL_, xxl* VCL_, xxl_common* xxL_Common_, int32u num_units_in_tick_, int32u time_scale_, int16u sar_width_, int16u sar_height_, int8u aspect_ratio_idc_, int8u video_format_, int8u video_full_range_flag_, int8u colour_primaries_, int8u transfer_characteristics_, int8u matrix_coefficients_, bool aspect_ratio_info_present_flag_, bool video_signal_type_present_flag_, bool frame_field_info_present_flag_, bool colour_description_present_flag_, bool timing_info_present_flag_)
+            vui_parameters_struct(xxl* NAL_, xxl* VCL_, xxl_common* xxL_Common_, int32u num_units_in_tick_, int32u time_scale_, int16u sar_width_, int16u sar_height_, int8u video_format_, int8u colour_primaries_, int8u transfer_characteristics_, int8u matrix_coefficients_, vui_flags flags_)
                 :
                 NAL(NAL_),
                 VCL(VCL_),
@@ -170,17 +208,11 @@ private :
                 time_scale(time_scale_),
                 sar_width(sar_width_),
                 sar_height(sar_height_),
-                aspect_ratio_idc(aspect_ratio_idc_),
                 video_format(video_format_),
-                video_full_range_flag(video_full_range_flag_),
                 colour_primaries(colour_primaries_),
                 transfer_characteristics(transfer_characteristics_),
                 matrix_coefficients(matrix_coefficients_),
-                aspect_ratio_info_present_flag(aspect_ratio_info_present_flag_),
-                video_signal_type_present_flag(video_signal_type_present_flag_),
-                frame_field_info_present_flag(frame_field_info_present_flag_),
-                colour_description_present_flag(colour_description_present_flag_),
-                timing_info_present_flag(timing_info_present_flag_)
+                flags(flags_)
             {
             }
 
@@ -196,15 +228,13 @@ private :
             vui_parameters_struct(const vui_parameters_struct &);
             vui_parameters_struct();
         };
+        int32u  nuh_layer_id;
         vui_parameters_struct* vui_parameters;
         #if MEDIAINFO_DEMUX
         int8u*  AnnexB_Buffer;
         size_t  AnnexB_Buffer_Size;
         #endif //MEDIAINFO_DEMUX
-        int32u  profile_space;
-        bool    tier_flag;
-        int32u  profile_idc;
-        int32u  level_idc;
+        profile_tier_level_struct profile_tier_level_info;
         int32u  pic_width_in_luma_samples;
         int32u  pic_height_in_luma_samples;
         int32u  conf_win_left_offset;
@@ -218,10 +248,6 @@ private :
         int8u   bit_depth_luma_minus8;
         int8u   bit_depth_chroma_minus8;
         int8u   sps_max_num_reorder_pics;
-        bool    general_progressive_source_flag;
-        bool    general_interlaced_source_flag;
-        bool    general_frame_only_constraint_flag;
-        bool    general_max_8bit_constraint_flag;
 
         //Computed value
         bool    NalHrdBpPresentFlag() {return vui_parameters && vui_parameters->NAL;}
@@ -230,17 +256,15 @@ private :
         int8u   ChromaArrayType() {return separate_colour_plane_flag?0:chroma_format_idc;}
 
         //Constructor/Destructor
-        seq_parameter_set_struct(vui_parameters_struct* vui_parameters_, int32u profile_space_, bool tier_flag_, int32u profile_idc_, int32u level_idc_, int32u pic_width_in_luma_samples_, int32u pic_height_in_luma_samples_, int32u conf_win_left_offset_, int32u conf_win_right_offset_, int32u conf_win_top_offset_, int32u conf_win_bottom_offset_, int8u video_parameter_set_id_, int8u chroma_format_idc_, bool separate_colour_plane_flag_, int8u log2_max_pic_order_cnt_lsb_minus4_, int8u bit_depth_luma_minus8_, int8u bit_depth_chroma_minus8_, int8u sps_max_num_reorder_pics_, bool general_progressive_source_flag_, bool general_interlaced_source_flag_, bool general_frame_only_constraint_flag_, bool general_max_8bit_constraint_flag_)
+        seq_parameter_set_struct(int32u nuh_layer_id_, vui_parameters_struct* vui_parameters_, const profile_tier_level_struct& profile_tier_level_info_, int32u pic_width_in_luma_samples_, int32u pic_height_in_luma_samples_, int32u conf_win_left_offset_, int32u conf_win_right_offset_, int32u conf_win_top_offset_, int32u conf_win_bottom_offset_, int8u video_parameter_set_id_, int8u chroma_format_idc_, bool separate_colour_plane_flag_, int8u log2_max_pic_order_cnt_lsb_minus4_, int8u bit_depth_luma_minus8_, int8u bit_depth_chroma_minus8_, int8u sps_max_num_reorder_pics_)
             :
+            nuh_layer_id(nuh_layer_id_),
             vui_parameters(vui_parameters_),
             #if MEDIAINFO_DEMUX
             AnnexB_Buffer(NULL),
             AnnexB_Buffer_Size(0),
             #endif //MEDIAINFO_DEMUX
-            profile_space(profile_space_),
-            tier_flag(tier_flag_),
-            profile_idc(profile_idc_),
-            level_idc(level_idc_),
+            profile_tier_level_info(profile_tier_level_info_),
             pic_width_in_luma_samples(pic_width_in_luma_samples_),
             pic_height_in_luma_samples(pic_height_in_luma_samples_),
             conf_win_left_offset(conf_win_left_offset_),
@@ -253,11 +277,7 @@ private :
             log2_max_pic_order_cnt_lsb_minus4(log2_max_pic_order_cnt_lsb_minus4_),
             bit_depth_luma_minus8(bit_depth_luma_minus8_),
             bit_depth_chroma_minus8(bit_depth_chroma_minus8_),
-            sps_max_num_reorder_pics(sps_max_num_reorder_pics_),
-            general_progressive_source_flag(general_progressive_source_flag_),
-            general_interlaced_source_flag(general_interlaced_source_flag_),
-            general_frame_only_constraint_flag(general_frame_only_constraint_flag_),
-            general_max_8bit_constraint_flag(general_max_8bit_constraint_flag_)
+            sps_max_num_reorder_pics(sps_max_num_reorder_pics_)
         {
         }
 
@@ -320,6 +340,8 @@ private :
 
     //Streams management
     void Streams_Fill();
+    void Streams_Fill_Profile(const profile_tier_level_struct& p);
+    void Streams_Fill(vector<video_parameter_set_struct*>::iterator video_parameter_set_Item);
     void Streams_Fill(vector<seq_parameter_set_struct*>::iterator seq_parameter_set_Item);
     void Streams_Finish();
 
@@ -334,7 +356,7 @@ private :
     //Buffer - Demux
     #if MEDIAINFO_DEMUX
     bool Demux_UnpacketizeContainer_Test();
-    bool Demux_Transcode_Iso14496_15_to_AnnexB;
+    bool Demux_Transcode_Iso14496_15_to_AnnexB{};
     #endif //MEDIAINFO_DEMUX
 
     //Buffer - Global
@@ -349,7 +371,7 @@ private :
     //Elements
     void slice_segment_layer();
     void video_parameter_set();
-    void video_parameter_sets_creating_data(int8u vps_video_parameter_set_id, int8u vps_max_sub_layers_minus1);
+    void video_parameter_sets_creating_data(int8u vps_video_parameter_set_id, const vector<profile_tier_level_struct>& profile_tier_level_info_layers, int8u vps_max_sub_layers_minus1, const vector<int16u>& view_id_val);
     void seq_parameter_set();
     void pic_parameter_set();
     void access_unit_delimiter();
@@ -388,12 +410,14 @@ private :
     void sei_message_mastering_display_colour_volume();
     void sei_message_light_level();
     void sei_alternative_transfer_characteristics();
+    void sei_ambient_viewing_environment();
+    void three_dimensional_reference_displays_info(int32u payloadSize);
 
     //Packets - SubElements
     void slice_segment_header();
-    void profile_tier_level(int8u maxNumSubLayersMinus1);
+    void profile_tier_level(profile_tier_level_struct& p, bool profilePresentFlag, int8u maxNumSubLayersMinus1);
     void short_term_ref_pic_sets(int8u num_short_term_ref_pic_sets);
-    void vui_parameters(std::vector<video_parameter_set_struct*>::iterator video_parameter_set_Item, seq_parameter_set_struct::vui_parameters_struct* &vui_parameters_Item);
+    void vui_parameters(seq_parameter_set_struct::vui_parameters_struct* &vui_parameters_Item, int8u maxNumSubLayersMinus1);
     void hrd_parameters(bool commonInfPresentFlag, int8u maxNumSubLayersMinus1, seq_parameter_set_struct::vui_parameters_struct::xxl_common* &xxL_Common, seq_parameter_set_struct::vui_parameters_struct::xxl* &NAL, seq_parameter_set_struct::vui_parameters_struct::xxl* &VCL);
     void sub_layer_hrd_parameters(seq_parameter_set_struct::vui_parameters_struct::xxl_common* xxL_Common, int8u bit_rate_scale, int8u cpb_size_scale, int32u cpb_cnt_minus1, seq_parameter_set_struct::vui_parameters_struct::xxl* &hrd_parameters_Item);
     void scaling_list_data();
@@ -415,10 +439,10 @@ private :
             buffer_data* GA94_03;
         #endif //MEDIAINFO_DTVCCTRANSPORT_YES
 
-        int32u frame_num;
+        int32u frame_num{};
         int8u  slice_type;
-        bool   IsTop;
-        bool   IsField;
+        bool   IsTop{};
+        bool   IsField{};
 
         temporal_reference()
         {
@@ -453,9 +477,12 @@ private :
         bool                            GA94_03_IsPresent;
     #endif //defined(MEDIAINFO_DTVCCTRANSPORT_YES)
 
+    //Misc
+    TimeCode                            TC_Current;
+
     //Replacement of File__Analyze buffer
-    const int8u*                        Buffer_ToSave;
-    size_t                              Buffer_Size_ToSave;
+    const int8u*                        Buffer_ToSave{};
+    size_t                              Buffer_Size_ToSave{};
 
     //parameter_sets
     video_parameter_set_structs         video_parameter_sets;
@@ -469,7 +496,7 @@ private :
     int8u                               lengthSizeMinusOne;
 
     //File specific
-    size_t                              IFrame_Count;
+    size_t                              IFrame_Count{};
 
     //Temp
     Ztring                              Encoded_Library;
@@ -489,25 +516,20 @@ private :
     typedef std::map<video, Ztring[HdrFormat_Max]> hdr;
     hdr                                 HDR;
     Ztring                              EtsiTS103433;
-    int32u  chroma_format_idc;
-    int32u  slice_pic_parameter_set_id;
-    int32u  slice_type;
-    int32u  chroma_sample_loc_type_top_field;
-    int32u  chroma_sample_loc_type_bottom_field;
+    int32u  chroma_format_idc{};
+    int32u  slice_pic_parameter_set_id{};
+    int32u  slice_type{};
+    int32u  chroma_sample_loc_type_top_field{};
+    int32u  chroma_sample_loc_type_bottom_field{};
     Ztring  maximum_content_light_level;
     Ztring  maximum_frame_average_light_level;
-    int8u   nuh_layer_id;
-    int8u   profile_space;
-    int8u   profile_idc;
-    int8u   level_idc;
-    int8u   preferred_transfer_characteristics;
-    bool    tier_flag;
-    bool    general_progressive_source_flag;
-    bool    general_interlaced_source_flag;
-    bool    general_frame_only_constraint_flag;
-    bool    general_max_8bit_constraint_flag;
-    bool    RapPicFlag;
-    bool    first_slice_segment_in_pic_flag;
+    int8u   nuh_layer_id{};
+    int8u   preferred_transfer_characteristics{};
+    float64 ambient_viewing_environment_illuminance{};
+    Ztring  ambient_viewing_environment_illuminance_string;
+    Ztring  ambient_viewing_environment_chromaticity;
+    bool    RapPicFlag{};
+    bool    first_slice_segment_in_pic_flag{};
 };
 
 } //NameSpace

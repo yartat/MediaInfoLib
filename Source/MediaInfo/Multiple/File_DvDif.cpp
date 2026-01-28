@@ -233,7 +233,6 @@ File_DvDif::File_DvDif()
         Demux_Level=3; //Container and Stream
     #endif //MEDIAINFO_DEMUX
     MustSynchronize=true;
-    Buffer_TotalBytes_FirstSynched_Max=64*1024;
 
     //In
     Frame_Count_Valid=IsSub?1:2;
@@ -282,6 +281,7 @@ File_DvDif::File_DvDif()
     AbstBf_Previous_MaxAbst=0xFFFFFF;
     SMP=(int8u)-1;
     QU=(int8u)-1;
+    REC_IsValid=false;
     Speed_TimeCode_IsValid=false;
     Speed_Arb_IsValid=false;
     Mpeg4_stts=NULL;
@@ -396,6 +396,7 @@ void File_DvDif::Streams_Fill()
                         case 7 : Fill(Stream_Video, 0, Video_DisplayAspectRatio, 4.0/3.0, 3, true); break;
                         default: ; //No indication of aspect ratio?
                      }
+                     break;
             default: ;
         }
     }
@@ -847,10 +848,12 @@ bool File_DvDif::Demux_UnpacketizeContainer_Test()
         }
 
         Element_Code=-1;
+    #ifdef MEDIAINFO_DVDIF_ANALYZE_YES
         FrameInfo.DTS=FrameInfo.PTS=Speed_FrameCount_system[0]*100100000/3+Speed_FrameCount_system[1]*40000000;
         Speed_FrameCount_system[system]++;
         int64u NextPTS=Speed_FrameCount_system[0]*100100000/3+Speed_FrameCount_system[1]*40000000;
         Speed_FrameCount_system[system]--;
+    #endif //MEDIAINFO_DVDIF_ANALYZE_YES
         FrameInfo.DUR=(int64u)-1; // Unknown, system flag is not yet checked
         Demux_UnpacketizeContainer_Demux();
     }
@@ -933,7 +936,7 @@ size_t File_DvDif::Read_Buffer_Seek (size_t Method, int64u Value, int64u /*ID*/)
                         //We transform TimeStamp to a frame number
                         Value=float64_int64s(((float64)Value)*(DSF?25.000:(30.000*1000/1001))/1000000000);
                     }
-                    //No break;
+                    [[fallthrough]];
         case 3  :   //FrameNumber
                     if (!FSP_WasNotSet)
                     {
@@ -1902,4 +1905,3 @@ void File_DvDif::rectime(bool FromVideo)
 } //NameSpace
 
 #endif //MEDIAINFO_DV_YES
-

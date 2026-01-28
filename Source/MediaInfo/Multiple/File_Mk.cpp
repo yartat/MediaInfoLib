@@ -40,6 +40,9 @@
 #if defined(MEDIAINFO_AVC_YES)
     #include "MediaInfo/Video/File_Avc.h"
 #endif
+#if defined(MEDIAINFO_AVS3V_YES)
+    #include "MediaInfo/Video/File_Avs3V.h"
+#endif
 #if defined(MEDIAINFO_DVDIF_YES)
     #include "MediaInfo/Multiple/File_DvDif.h"
 #endif
@@ -412,6 +415,7 @@ namespace Elements
     const int64u Segment_Tags_Tag_Targets_TagEditionUID=0x23C9;
     const int64u Segment_Tags_Tag_Targets_TagChapterUID=0x23C4;
     const int64u Segment_Tags_Tag_Targets_TagAttachmentUID=0x23C6;
+    const int64u Segment_Tags_Tag_Targets_TagBlockAddIDValue=0x23C7;
     const int64u Segment_Tags_Tag_SimpleTag=0x27C8;
     const int64u Segment_Tags_Tag_SimpleTag_TagName=0x5A3;
     const int64u Segment_Tags_Tag_SimpleTag_TagLanguage=0x47A;
@@ -424,11 +428,18 @@ namespace Elements
 //---------------------------------------------------------------------------
 // CRC_32_Table (Little Endian bitstream, )
 // The CRC in use is the IEEE-CRC-32 algorithm as used in the ISO 3309 standard and in section 8.1.1.6.2 of ITU-T recommendation V.42, with initial value of 0xFFFFFFFF. The CRC value MUST be computed on a little endian bitstream and MUST use little endian storage.
-// A CRC is computed like this:
-// Init: int32u CRC32 ^= 0;
-// for each data byte do
-//     CRC32=(CRC32>>8) ^ Mk_CRC32_Table[(CRC32&0xFF)^*Buffer_Current++];
-// End: CRC32 ^= 0;
+// Also known as CRC-32/ISO-HDLC
+//   Polynomial - 0x04C11DB7
+//   Init       - 0xFFFFFFFF
+//   RefIn      - true
+//   RefOut     - true
+//   XorOut     - 0xFFFFFFFF
+//   Check      - 0xCBF43926
+// The CRC is computed like this:
+//   Init: int32u CRC32 = 0xFFFFFFFF;
+//   For each data byte do:
+//       CRC32 = (CRC32 >> 8) ^ Mk_CRC32_Table[(CRC32 & 0xFF) ^ *Buffer_Current++];
+//   End: CRC32 ^= 0xFFFFFFFF;
 static const int32u Mk_CRC32_Table[256] =
 {
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
@@ -548,7 +559,7 @@ static const char* Mk_ContentCompAlgo(int64u Algo)
 }
 
 //---------------------------------------------------------------------------
-static const char* Mk_StereoMode(int64u StereoMode)
+const char* Mk_StereoMode(int64u StereoMode)
 {
     switch (StereoMode)
     {
@@ -707,6 +718,9 @@ const char* Mk_Video_Colour_Range(int8u range)
     }
 }
 
+//---------------------------------------------------------------------------
+std::string File_Mpeg4_sv3d_ProjectionType(int8u Value);
+
 //***************************************************************************
 // Constructor/Destructor
 //***************************************************************************
@@ -737,8 +751,6 @@ File_Mk::File_Mk()
     Segment_Info_Count=0;
     Segment_Tracks_Count=0;
     Segment_Cluster_Count=0;
-    CurrentAttachmentIsCover=false;
-    CoverIsSetFromAttachment=false;
     BlockAddIDType=0;
     Laces_Pos=0;
     IsParsingSegmentTrack_SeekBackTo=0;
@@ -772,6 +784,8 @@ File_Mk::~File_Mk()
 //---------------------------------------------------------------------------
 void File_Mk::Streams_Finish()
 {
+    Segment_Tags_Tag_Targets_Remap();
+
     if (Duration!=0 && TimecodeScale!=0)
         Fill(Stream_General, 0, General_Duration, Duration*int64u_float64(TimecodeScale)/1000000.0, 0);
 
@@ -780,7 +794,7 @@ void File_Mk::Streams_Finish()
 
     //Tags (General)
     for (tags::iterator Item=Segment_Tags_Tag_Items.begin(); Item!=Segment_Tags_Tag_Items.end(); ++Item)
-        if (!Item->first || Item->first == (int64u)-1)
+        if (!Item->first.TagTrackUID)
         {
             for (tagspertrack::iterator Tag=Item->second.begin(); Tag!=Item->second.end(); ++Tag)
                 if ((Tag->first!=__T("Encoded_Library") || Retrieve(Stream_General, 0, "Encoded_Library")!=Tag->second) // Avoid repetition if Info block is same as tags
@@ -793,6 +807,12 @@ void File_Mk::Streams_Finish()
     {
         StreamKind_Last=Temp->second.StreamKind;
         StreamPos_Last=Temp->second.StreamPos;
+        if (StreamKind_Last==Stream_Max)
+        {
+            Stream_Prepare(Stream_Other);
+            Temp->second.StreamKind=StreamKind_Last;
+            Temp->second.StreamPos=StreamPos_Last;
+        }
         float64 FrameRate_FromTags = 0.0;
         bool HasStats=false;
 
@@ -803,7 +823,7 @@ void File_Mk::Streams_Finish()
             for (std::map<std::string, Ztring>::iterator Info=Temp->second.Infos.begin(); Info!=Temp->second.Infos.end(); ++Info)
                 Fill(StreamKind_Last, StreamPos_Last, Info->first.c_str(), Info->second);
 
-            tags::iterator Item=Segment_Tags_Tag_Items.find(Temp->second.TrackUID);
+            tags::iterator Item = Segment_Tags_Tag_Items.find({ Temp->second.TrackUID, {} });
             if (Item != Segment_Tags_Tag_Items.end())
             {
                 //Statistic Tags
@@ -1032,7 +1052,7 @@ void File_Mk::Streams_Finish()
                             }
                         }
                     }
-                    if ((Tag->first!=__T("Language") || Retrieve(StreamKind_Last, StreamPos_Last, "Language").empty())) // Prioritize Tracks block over tags
+                    if (Tag->first!=__T("BPS") && (Tag->first!=__T("Language") || Retrieve(StreamKind_Last, StreamPos_Last, "Language").empty())) // Prioritize Tracks block over tags
                         Fill(StreamKind_Last, StreamPos_Last, Tag->first.To_UTF8().c_str(), Tag->second);
                 }
             }
@@ -1287,7 +1307,6 @@ void File_Mk::Streams_Finish()
             if (Temp->second.StreamKind==Stream_Video && !Codec_Temp.empty())
                 Fill(StreamKind_Last, StreamPos_Last, Fill_Parameter(StreamKind_Last, Generic_Codec), Codec_Temp, true);
 
-
             //Format specific
             #if defined(MEDIAINFO_DVDIF_YES)
                 if (StreamKind_Last==Stream_Video && Retrieve(Stream_Video, StreamPos_Last, Video_Format)==__T("DV"))
@@ -1356,10 +1375,33 @@ void File_Mk::Streams_Finish()
                 Fill(Stream_Video, StreamPos_Last, Video_Height_Offset, Temp->second.PixelCropTop, 10, true);
             }
         }
-        for (auto BlockAddition : Temp->second.BlockAdditions)
+
+        //BlockAdditions
+        for (auto Add=Temp->second.BlockAdditions.begin(); Add!=Temp->second.BlockAdditions.end(); ++Add)
         {
-            Finish(BlockAddition.second);
-            Merge(*BlockAddition.second, StreamKind_Last, 0, StreamPos_Last);
+            auto StreamKind_Last_Sav=StreamKind_Last;
+            auto StreamPos_Last_Sav=StreamPos_Last;
+            Finish(Add->second.Parser);
+            Merge(*Add->second.Parser);
+            if (StreamKind_Last!=StreamKind_Last_Sav || StreamPos_Last!=StreamPos_Last_Sav)
+            {
+                Fill(StreamKind_Last, StreamPos_Last, Other_ID, to_string(Temp->first)+"-Add-"+to_string(Add->first));
+                Fill(StreamKind_Last, StreamPos_Last, Other_MuxingMode, "BlockAddition");
+
+                //Tags (BlockID)
+                for (tags::iterator Item = Segment_Tags_Tag_Items.begin(); Item != Segment_Tags_Tag_Items.end(); ++Item)
+                    if (Item->first.TagTrackUID == Temp->second.TrackUID && Item->first.TagBlockAddIDValue == Add->first)
+                    {
+                        for (tagspertrack::iterator Tag = Item->second.begin(); Tag != Item->second.end(); ++Tag)
+                            if ((Tag->first != __T("Encoded_Library") || Retrieve(Stream_General, 0, "Encoded_Library") != Tag->second) // Avoid repetition if Info block is same as tags
+                                && (Tag->first != __T("Encoded_Date") || Retrieve(StreamKind_Last, StreamPos_Last, "Encoded_Date") != Tag->second)
+                                && (Tag->first != __T("Title") || Retrieve(StreamKind_Last, StreamPos_Last, "Title") != Tag->second))
+                                Fill(StreamKind_Last, StreamPos_Last, Tag->first == __T("Title") ? "TimeCode_Source" : Tag->first.To_UTF8().c_str(), Tag->second);
+                    }
+
+                StreamKind_Last=StreamKind_Last_Sav;
+                StreamPos_Last=StreamPos_Last_Sav;
+            }
         }
 
         if (Temp->second.FrameRate!=0 && Retrieve(Stream_Video, StreamPos_Last, Video_FrameRate).empty())
@@ -1425,7 +1467,7 @@ void File_Mk::Read_Buffer_Unsynched()
     if (!File_GoTo)
         Element_Level=0;
 
-    for (std::map<int64u, stream>::iterator streamItem=Stream.begin(); streamItem!=Stream.end(); streamItem++)
+    for (std::map<int64u, stream>::iterator streamItem=Stream.begin(); streamItem!=Stream.end(); ++streamItem)
     {
         if (!File_GoTo)
             streamItem->second.PacketCount=0;
@@ -1640,7 +1682,7 @@ void File_Mk::Header_Parse()
     {
         Param_Error("TRUNCATED-ELEMENT:1");
         if (Element_Level<=2)
-            Fill(Stream_General, 0, "IsTruncated", "Yes");
+            IsTruncated(File_Offset+Buffer_Offset+Element_Offset+Size, true, "Matroska");
     }
 
     //Should we parse Cluster?
@@ -2122,6 +2164,7 @@ void File_Mk::Data_Parse()
                     ATO2(Segment_Tags_Tag_Targets_TagEditionUID, "TagEditionUID")
                     ATO2(Segment_Tags_Tag_Targets_TagChapterUID, "TagChapterUID")
                     ATO2(Segment_Tags_Tag_Targets_TagAttachmentUID, "TagAttachmentUID")
+                    ATO2(Segment_Tags_Tag_Targets_TagBlockAddIDValue, "TagBlockAddIDValue")
                     ATOM_END_MK
                 LIS2(Segment_Tags_Tag_SimpleTag, "SimpleTag")
                     ATOM_BEGIN
@@ -2548,10 +2591,6 @@ void File_Mk::Segment_Attachments_AttachedFile_FileName()
 
     Fill(Stream_General, 0, "Attachments", Data);
     
-    //Cover is in the first file which name contains "cover"
-    if (!CoverIsSetFromAttachment && Data.MakeLowerCase().find(__T("cover")) != string::npos)
-        CurrentAttachmentIsCover=true;
-
     AttachedFile_FileName=Data.To_UTF8();
 }
 
@@ -2569,10 +2608,13 @@ void File_Mk::Segment_Attachments_AttachedFile_FileData()
 {
     Element_Name("FileData");
 
-    bool Attachments_Demux=true;
-
     //Parsing
-    if ((Attachments_Demux || !CoverIsSetFromAttachment && CurrentAttachmentIsCover) && Element_TotalSize_Get()<=16*1024*1024) //TODO: option for setting the acceptable maximum size of the attachment
+    auto Size=Element_TotalSize_Get();
+    if (Size>16*1024*1024) //TODO: option for setting the acceptable maximum size of the attachment
+    {
+        Skip_XX(Size,                                           "(Data)");
+        return;
+    }
     {
         if (!Element_IsComplete_Get())
         {
@@ -2594,29 +2636,14 @@ void File_Mk::Segment_Attachments_AttachedFile_FileData()
             }
         #endif //MEDIAINFO_TRACE
 
-        std::string Data_Raw;
-        Peek_String(Element_TotalSize_Get(), Data_Raw);
-
-        if (!CoverIsSetFromAttachment && CurrentAttachmentIsCover)
-        {
-            //Filling
-            #if MEDIAINFO_ADVANCED
-                if (MediaInfoLib::Config.Flags1_Get(Flags_Cover_Data_base64))
-                {
-                    std::string Data_Base64(Base64::encode(Data_Raw));
-                    Fill(Stream_General, 0, General_Cover_Data, Data_Base64);
-                }
-            #endif //MEDIAINFO_ADVANCED
-            Fill(Stream_General, 0, General_Cover, "Yes");
-            CoverIsSetFromAttachment=true;
-        }
+        //Filling
+        Attachment("Attachment", Ztring().From_UTF8(AttachedFile_FileName));
 
         #if MEDIAINFO_EVENTS
-            if (Attachments_Demux)
             {
                 EVENT_BEGIN(Global, AttachedFile, 0)
-                    Event.Content_Size=Data_Raw.size();
-                    Event.Content=(const int8u*)Data_Raw.c_str();
+                    Event.Content_Size=(size_t)Element_Size;
+                    Event.Content=Buffer+Buffer_Offset;
                     Event.Flags=0;
                     Event.Name=AttachedFile_FileName.c_str();
                     Event.MimeType=AttachedFile_FileMimeType.c_str();
@@ -2625,8 +2652,6 @@ void File_Mk::Segment_Attachments_AttachedFile_FileData()
             }
         #endif //MEDIAINFO_EVENTS
     }
-    
-    Element_Offset=Element_TotalSize_Get();
 }
 
 //---------------------------------------------------------------------------
@@ -3057,7 +3082,7 @@ void File_Mk::Segment_Cluster_BlockGroup_BlockAdditions_BlockMore_BlockAdditiona
     auto Parser=BlockAdditions.find(BlockAddIDValue);
     if (Parser!=BlockAdditions.end())
     {
-        Open_Buffer_Continue(Parser->second);
+        Open_Buffer_Continue(Parser->second.Parser);
         return;
     }
 
@@ -3137,12 +3162,12 @@ void File_Mk::Segment_Info_DateUTC()
 {
     //Parsing
     int64u Data;
-    Get_B8(Data,                                                "Data"); Element_Info1(Data/1000000000+978307200); //From Beginning of the millenium, in nanoseconds
+    Get_B8(Data,                                                "Data"); Element_Info1((int64s)Data/1000000000+978307200); //From Beginning of the millenium, in nanoseconds
 
     FILLING_BEGIN();
         if (Segment_Info_Count>1)
             return; //First element has the priority
-        Ztring Time=Ztring().Date_From_Seconds_1970((int32u)(Data/1000000000+978307200)); //978307200s between beginning of the millenium and 1970
+        Ztring Time=Ztring().Date_From_Seconds_1970((int32u)((int64s)Data/1000000000+978307200)); //978307200s between beginning of the millenium and 1970
         if (!Time.empty())
         {
             Time.FindAndReplace(__T("UTC "), __T(""));
@@ -3286,26 +3311,17 @@ void File_Mk::Segment_SeekHead_Seek_SeekPosition()
 //---------------------------------------------------------------------------
 void File_Mk::Segment_Tags()
 {
-    Segment_Tag_SimpleTag_TagNames.clear();
 }
 
 //---------------------------------------------------------------------------
 void File_Mk::Segment_Tags_Tag()
 {
     //Previous tags
-    tags::iterator Items0 = Segment_Tags_Tag_Items.find((int64u)-1);
-    if (Items0 != Segment_Tags_Tag_Items.end())
-    {
-        tagspertrack &Items = Segment_Tags_Tag_Items[0]; // Creates it if not yet present, else take the previous one
-
-        //Change the key of the current tag
-        for (tagspertrack::iterator Item=Items0->second.begin(); Item!=Items0->second.end(); ++Item)
-            Items[Item->first] = Item->second;
-        Segment_Tags_Tag_Items.erase(Items0);
-    }
+    Segment_Tags_Tag_Targets_Remap();
 
     //Init
-    Segment_Tags_Tag_Targets_TagTrackUID_Value=0; // Default is all tracks
+    Segment_Tags_Tag_Target_Value = { (int64u)-1, (int64u)-1 };
+    Segment_Tags_Tag_SimpleTag_TagString_Value.clear();
 }
 
 //---------------------------------------------------------------------------
@@ -3320,6 +3336,12 @@ void File_Mk::Segment_Tags_Tag_SimpleTag_TagLanguage()
 }
 
 //---------------------------------------------------------------------------
+void File_Mk::Segment_Tags_Tag_SimpleTag()
+{
+    Segment_Tag_SimpleTag_TagNames.resize(Element_Level - 4); //4 is the first level of a tag main element
+}
+
+//---------------------------------------------------------------------------
 void File_Mk::Segment_Tags_Tag_SimpleTag_TagName()
 {
     //Parsing
@@ -3327,20 +3349,26 @@ void File_Mk::Segment_Tags_Tag_SimpleTag_TagName()
 
     Segment_Tag_SimpleTag_TagNames.resize(Element_Level-5); //5 is the first level of a tag
     Segment_Tag_SimpleTag_TagNames.push_back(TagName);
+    Segment_Tags_Tag_SimpleTag_Assign();
 }
 
 //---------------------------------------------------------------------------
 void File_Mk::Segment_Tags_Tag_SimpleTag_TagString()
 {
     //Parsing
-    Ztring TagString;
-    TagString=UTF8_Get();
+    Segment_Tags_Tag_SimpleTag_TagString_Value=UTF8_Get();
+    Segment_Tags_Tag_SimpleTag_Assign();
+}
 
-    if (Segment_Tag_SimpleTag_TagNames.empty())
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tags_Tag_SimpleTag_Assign()
+{
+    if (Segment_Tag_SimpleTag_TagNames.empty() || Segment_Tags_Tag_SimpleTag_TagString_Value.empty())
         return;
+    auto TagString=std::move(Segment_Tags_Tag_SimpleTag_TagString_Value);
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("AERMS_OF_USE")) Segment_Tag_SimpleTag_TagNames[0]=__T("TermsOfUse"); //Typo in the source file
-    if (Segment_Tag_SimpleTag_TagNames[0]==__T("BITSPS")) return; //Useless
-    if (Segment_Tag_SimpleTag_TagNames[0]==__T("COMPATIBLE_BRANDS")) return; //QuickTime techinical info, useless
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("BITSPS")) Segment_Tag_SimpleTag_TagNames[0].clear(); //Useless
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("COMPATIBLE_BRANDS")) Segment_Tag_SimpleTag_TagNames[0].clear(); //QuickTime techinical info, useless
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("CONTENT_TYPE")) Segment_Tag_SimpleTag_TagNames[0]=__T("ContentType");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("COPYRIGHT")) Segment_Tag_SimpleTag_TagNames[0]=__T("Copyright");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("CREATION_TIME")) {Segment_Tag_SimpleTag_TagNames[0]=__T("Encoded_Date"); TagString+=__T(" UTC");}
@@ -3354,28 +3382,32 @@ void File_Mk::Segment_Tags_Tag_SimpleTag_TagString()
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("ENCODED_BY")) Segment_Tag_SimpleTag_TagNames[0]=__T("EncodedBy");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("ENCODER")) Segment_Tag_SimpleTag_TagNames[0]=__T("Encoded_Library");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("ENCODER_SETTINGS")) Segment_Tag_SimpleTag_TagNames[0]=__T("Encoded_Library_Settings");
-    if (Segment_Tag_SimpleTag_TagNames[0]==__T("FPS")) return; //Useless
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("FPS")) Segment_Tag_SimpleTag_TagNames[0].clear(); //Useless
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("HANDLER_NAME"))
     {
         if (TagString.find(__T("Handler"))!=std::string::npos || TagString.find(__T("handler"))!=std::string::npos || TagString.find(__T("vide"))!=std::string::npos || TagString.find(__T("soun"))!=std::string::npos)
-            return; //This is not a Title
-        Segment_Tag_SimpleTag_TagNames[0]=__T("Title");
+            Segment_Tag_SimpleTag_TagNames[0].clear(); //This is not a Title
+        else 
+            Segment_Tag_SimpleTag_TagNames[0]=__T("Title");
     }
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("LANGUAGE")) Segment_Tag_SimpleTag_TagNames[0]=__T("Language");
-    if (Segment_Tag_SimpleTag_TagNames[0]==__T("MAJOR_BRAND")) return; //QuickTime techinical info, useless
-    if (Segment_Tag_SimpleTag_TagNames[0]==__T("MINOR_VERSION")) return; //QuickTime techinical info, useless
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("MAJOR_BRAND")) Segment_Tag_SimpleTag_TagNames[0].clear(); //QuickTime techinical info, useless
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("MINOR_VERSION")) Segment_Tag_SimpleTag_TagNames[0].clear(); //QuickTime techinical info, useless
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("PART_NUMBER")) Segment_Tag_SimpleTag_TagNames[0]=__T("Track/Position");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("ORIGINAL_MEDIA_TYPE")) Segment_Tag_SimpleTag_TagNames[0]=__T("OriginalSourceForm");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("SAMPLE") && Segment_Tag_SimpleTag_TagNames.size()==2 && Segment_Tag_SimpleTag_TagNames[1]==__T("PART_NUMBER")) return; //Useless
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("SAMPLE") && Segment_Tag_SimpleTag_TagNames.size()==2 && Segment_Tag_SimpleTag_TagNames[1]==__T("TITLE")) {Segment_Tag_SimpleTag_TagNames.resize(1); Segment_Tag_SimpleTag_TagNames[0]=__T("Title_More");}
-    if (Segment_Tag_SimpleTag_TagNames[0]==__T("STEREO_MODE")) return; //Useless
+    if (Segment_Tag_SimpleTag_TagNames[0]==__T("STEREO_MODE")) Segment_Tag_SimpleTag_TagNames[0].clear(); //Useless
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("TERMS_OF_USE")) Segment_Tag_SimpleTag_TagNames[0]=__T("TermsOfUse");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("TIMECODE"))
     {
         if (TagString.find(__T("Handler"))!=std::string::npos || TagString.find(__T("handler"))!=std::string::npos || TagString.find(__T("vide"))!=std::string::npos || TagString.find(__T("soun"))!=std::string::npos)
-            return; //This is not a Title
-        Segment_Tag_SimpleTag_TagNames[0]=__T("TimeCode_FirstFrame");
-        Segment_Tags_Tag_Items[Segment_Tags_Tag_Targets_TagTrackUID_Value]["TimeCode_Source"]="Matroska tags";
+            Segment_Tag_SimpleTag_TagNames[0].clear(); //This is not a Title
+        else
+        {
+            Segment_Tag_SimpleTag_TagNames[0]=__T("TimeCode_FirstFrame");
+            Segment_Tags_Tag_Items[Segment_Tags_Tag_Target_Value]["TimeCode_Source"]="Matroska tags";
+        }
     }
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("TITLE")) Segment_Tag_SimpleTag_TagNames[0]=__T("Title");
     if (Segment_Tag_SimpleTag_TagNames[0]==__T("TOTAL_PARTS")) Segment_Tag_SimpleTag_TagNames[0]=__T("Track/Position_Total");
@@ -3395,27 +3427,46 @@ void File_Mk::Segment_Tags_Tag_SimpleTag_TagString()
             TagName+=__T('/');
     }
 
-    Segment_Tags_Tag_Items[Segment_Tags_Tag_Targets_TagTrackUID_Value][TagName]=TagString;
+    if (!TagName.empty())
+        Segment_Tags_Tag_Items[Segment_Tags_Tag_Target_Value][TagName]=TagString;
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tags_Tag_Targets()
+{
+    Segment_Tags_Tag_Target_Value = {};
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tags_Tag_Targets_Remap()
+{
+    if (Segment_Tags_Tag_Target_Value == tagid{ (int64u)-1, (int64u)-1 })
+        return;
+
+    tags::iterator Items0 = Segment_Tags_Tag_Items.find({ (int64u)-1, (int64u)-1 });
+    if (Items0 == Segment_Tags_Tag_Items.end())
+        return;
+
+    tagspertrack& Items = Segment_Tags_Tag_Items[Segment_Tags_Tag_Target_Value]; // Creates it if not yet present, else take the previous one
+
+    //Change the key of the current tag
+    for (tagspertrack::iterator Item = Items0->second.begin(); Item != Items0->second.end(); ++Item)
+        Items[Item->first] = Item->second;
+    Segment_Tags_Tag_Items.erase(Items0);
 }
 
 //---------------------------------------------------------------------------
 void File_Mk::Segment_Tags_Tag_Targets_TagTrackUID()
 {
     //Parsing
-    Segment_Tags_Tag_Targets_TagTrackUID_Value=UInteger_Get();
+    Segment_Tags_Tag_Target_Value.TagTrackUID=UInteger_Get();
+}
 
-    FILLING_BEGIN();
-        tags::iterator Items0 = Segment_Tags_Tag_Items.find((int64u)-1);
-        if (Items0 != Segment_Tags_Tag_Items.end())
-        {
-            tagspertrack &Items = Segment_Tags_Tag_Items[Segment_Tags_Tag_Targets_TagTrackUID_Value]; // Creates it if not yet present, else take the previous one
-
-            //Change the key of the current tag
-            for (tagspertrack::iterator Item=Items0->second.begin(); Item!=Items0->second.end(); ++Item)
-                Items[Item->first] = Item->second;
-            Segment_Tags_Tag_Items.erase(Items0);
-        }
-    FILLING_END();
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tags_Tag_Targets_TagBlockAddIDValue()
+{
+    //Parsing
+    Segment_Tags_Tag_Target_Value.TagBlockAddIDValue=UInteger_Get();
 }
 
 //---------------------------------------------------------------------------
@@ -3449,6 +3500,67 @@ void File_Mk::Segment_Tracks_TrackEntry()
     Fill_Flush();
     Fill(StreamKind_Last, StreamPos_Last, "Language", "eng");
     Fill(StreamKind_Last, StreamPos_Last, General_StreamOrder, Stream.size());
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Projection()
+{
+    Fill(StreamKind_Last, StreamPos_Last, "Spatial", "Yes", Unlimited, true, true);
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Projection_ProjectionType()
+{
+    //Parsing
+    int64u UInteger=UInteger_Get();
+
+    FILLING_BEGIN();
+        if (Segment_Info_Count>1)
+            return; //First element has the priority
+        if (UInteger)
+        {
+            Fill(StreamKind_Last, StreamPos_Last, "Spatial ProjectionType", File_Mpeg4_sv3d_ProjectionType(UInteger));
+        }
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Projection_ProjectionPoseYaw()
+{
+    //Parsing
+    auto Value=Float_Get();
+
+    FILLING_BEGIN();
+        if (Segment_Info_Count>1)
+            return; //First element has the priority
+        Fill(StreamKind_Last, StreamPos_Last, "Spatial PoseYaw", Value);
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Projection_ProjectionPosePitch()
+{
+    //Parsing
+    auto Value=Float_Get();
+
+    FILLING_BEGIN();
+        if (Segment_Info_Count>1)
+            return; //First element has the priority
+        Fill(StreamKind_Last, StreamPos_Last, "Spatial PosePitch", Value);
+    FILLING_END();
+}
+
+//---------------------------------------------------------------------------
+void File_Mk::Segment_Tracks_TrackEntry_Video_Projection_ProjectionPoseRoll()
+{
+    //Parsing
+    auto Value=Float_Get();
+
+    FILLING_BEGIN();
+        if (Segment_Info_Count>1)
+            return; //First element has the priority
+        Fill(StreamKind_Last, StreamPos_Last, "Spatial PoseRoll", Value);
+    FILLING_END();
 }
 
 //---------------------------------------------------------------------------
@@ -3571,6 +3683,11 @@ void File_Mk::Segment_Tracks_TrackEntry_BlockAdditionMapping_Manage()
             {
             auto Temp=new File_Gxf_TimeCode();
             Temp->IsBigEndian=true;
+            Temp->IsTimeCodeTrack=true;
+            Temp->Format="SMPTE ST 12-1";
+            #if MEDIAINFO_ADVANCED
+            Temp->id=std::to_string(TrackNumber)+"-Add-"+std::to_string(BlockAddIDValue);
+            #endif //MEDIAINFO_ADVANCED
             Parser=Temp;
             }
             #endif
@@ -3583,7 +3700,7 @@ void File_Mk::Segment_Tracks_TrackEntry_BlockAdditionMapping_Manage()
     {
         Open_Buffer_Init(Parser);
         stream& streamItem=Stream[TrackNumber];
-        streamItem.BlockAdditions[BlockAddIDValue]=Parser;
+        streamItem.BlockAdditions[BlockAddIDValue].Parser=Parser;
     }
 }
 
@@ -4055,6 +4172,12 @@ void File_Mk::Segment_Tracks_TrackEntry_TrackNumber()
             return; //First element has the priority
         Fill(StreamKind_Last, StreamPos_Last, General_ID, TrackNumber);
         stream& streamItem = Stream[TrackNumber];
+        auto Previous=Stream.find((int64u)-1);
+        if (Previous!=Stream.end())
+        {
+            streamItem=Previous->second;
+            Stream.erase(Previous);
+        }
         if (StreamKind_Last!=Stream_Max)
         {
             streamItem.StreamKind=StreamKind_Last;
@@ -4721,7 +4844,7 @@ Ztring File_Mk::String_Get()
             while (s && !Data[s-1])
                 s--;
             for (size_t i=0; i<s; i++)
-                if (Data[i]<0x20 || Data[i]>=0x80)
+                if ((unsigned)Data[i]<0x20 || (unsigned)Data[i]>=0x80)
                 {
                     Param_Error("EBML-ASCII-ONLY-IN-STRING:1");
                     break;
@@ -4797,6 +4920,12 @@ void File_Mk::CodecID_Manage()
                 }
             #endif //MEDIAINFO_DEMUX
         }
+    }
+    #endif
+    #if defined(MEDIAINFO_AVS3V_YES)
+    else if (Format==__T("AVS3 Video"))
+    {
+        streamItem.Parser=new File_Avs3V;
     }
     #endif
     #if defined(MEDIAINFO_HUFFYUV_YES)
@@ -5294,6 +5423,7 @@ void File_Mk::sei_message_user_data_registered_itu_t_t35()
     switch (itu_t_t35_country_code)
     {
         case 0xB5:  sei_message_user_data_registered_itu_t_t35_B5(); break; // USA
+        case 0x26:  sei_message_user_data_registered_itu_t_t35_26(); break; // China
     }
 }
 
@@ -5341,112 +5471,10 @@ void File_Mk::sei_message_user_data_registered_itu_t_t35_B5_003C_0001()
 void File_Mk::sei_message_user_data_registered_itu_t_t35_B5_003C_0001_04()
 {
     Element_Info1("SMPTE ST 2094 App 4");
-    int8u application_version;
-    bool IsHDRplus=false, tone_mapping_flag;
-    Get_B1 (application_version,                                "application_version");
-    if (application_version<=1)
-    {
-        int32u targeted_system_display_maximum_luminance, maxscl[4], distribution_maxrgb_percentiles[16];
-        int16u fraction_bright_pixels;
-        int8u num_distribution_maxrgb_percentiles, distribution_maxrgb_percentages[16], num_windows, num_bezier_curve_anchors;
-        bool targeted_system_display_actual_peak_luminance_flag, mastering_display_actual_peak_luminance_flag, color_saturation_mapping_flag;
-        BS_Begin();
-        Get_S1 ( 2, num_windows,                                "num_windows");
 
-        for (int8u w=1; w<num_windows; w++)
-        {
-            Element_Begin1("window");
-            Skip_S2(16,                                         "window_upper_left_corner_x");
-            Skip_S2(16,                                         "window_upper_left_corner_y");
-            Skip_S2(16,                                         "window_lower_right_corner_x");
-            Skip_S2(16,                                         "window_lower_right_corner_y");
-            Skip_S2(16,                                         "center_of_ellipse_x");
-            Skip_S2(16,                                         "center_of_ellipse_y");
-            Skip_S1( 8,                                         "rotation_angle");
-            Skip_S2(16,                                         "semimajor_axis_internal_ellipse");
-            Skip_S2(16,                                         "semimajor_axis_external_ellipse");
-            Skip_S2(16,                                         "semiminor_axis_external_ellipse");
-            Skip_SB(                                            "overlap_process_option");
-            Element_End0();
-        }
-
-        Get_S4 (27, targeted_system_display_maximum_luminance,  "targeted_system_display_maximum_luminance");
-        TEST_SB_GET (targeted_system_display_actual_peak_luminance_flag, "targeted_system_display_actual_peak_luminance_flag");
-            int8u num_rows_targeted_system_display_actual_peak_luminance, num_cols_targeted_system_display_actual_peak_luminance;
-            Get_S1(5, num_rows_targeted_system_display_actual_peak_luminance, "num_rows_targeted_system_display_actual_peak_luminance");
-            Get_S1(5, num_cols_targeted_system_display_actual_peak_luminance, "num_cols_targeted_system_display_actual_peak_luminance");
-            for(int8u i=0; i<num_rows_targeted_system_display_actual_peak_luminance; i++)
-                for(int8u j=0; j<num_cols_targeted_system_display_actual_peak_luminance; j++)
-                    Skip_S1(4,                                   "targeted_system_display_actual_peak_luminance");
-        TEST_SB_END();
-
-        for (int8u w=0; w<num_windows; w++)
-        {
-            Element_Begin1("window");
-            for(int8u i=0; i<3; i++)
-            {
-                Get_S3 (17, maxscl[i],                          "maxscl"); Param_Info2(Ztring::ToZtring(((float)maxscl[i])/100000, 5), " cd/m2");
-            }
-            Get_S3 (17, maxscl[3],                              "average_maxrgb");   Param_Info2(Ztring::ToZtring(((float)maxscl[3])/100000, 5), " cd/m2");
-
-            Get_S1(4, num_distribution_maxrgb_percentiles,      "num_distribution_maxrgb_percentiles");
-            for (int8u i=0; i< num_distribution_maxrgb_percentiles; i++)
-            {
-                Element_Begin1(                                 "distribution_maxrgb");
-                Get_S1 ( 7, distribution_maxrgb_percentages[i], "distribution_maxrgb_percentages");
-                Get_S3 (17, distribution_maxrgb_percentiles[i], "distribution_maxrgb_percentiles");
-                Element_Info1(distribution_maxrgb_percentages[i]);
-                Element_Info1(distribution_maxrgb_percentiles[i]);
-                Element_End0();
-            }
-            Get_S2 (10, fraction_bright_pixels,                 "fraction_bright_pixels");
-            Element_End0();
-        }
-
-        TEST_SB_GET (mastering_display_actual_peak_luminance_flag, "mastering_display_actual_peak_luminance_flag");
-            int8u num_rows_mastering_display_actual_peak_luminance, num_cols_mastering_display_actual_peak_luminance;
-            Get_S1(5, num_rows_mastering_display_actual_peak_luminance, "num_rows_mastering_display_actual_peak_luminance");
-            Get_S1(5, num_cols_mastering_display_actual_peak_luminance, "num_cols_mastering_display_actual_peak_luminance");
-            for(int8u i=0; i< num_rows_mastering_display_actual_peak_luminance; i++)
-                for(int8u j=0; j< num_cols_mastering_display_actual_peak_luminance; j++)
-                    Skip_S1(4,                                   "mastering_display_actual_peak_luminance");
-        TEST_SB_END();
-
-        for (int8u w=0; w<num_windows; w++)
-        {
-            Element_Begin1("window");
-            TEST_SB_GET (tone_mapping_flag,                     "tone_mapping_flag");
-                Skip_S2(12,                                     "knee_point_x");
-                Skip_S2(12,                                     "knee_point_y");
-                Get_S1(4, num_bezier_curve_anchors,             "num_bezier_curve_anchors");
-                for (int8u i = 0; i < num_bezier_curve_anchors; i++)
-                    Skip_S2(10,                                 "bezier_curve_anchor");
-            TEST_SB_END();
-            Element_End0();
-        }
-        TEST_SB_GET (color_saturation_mapping_flag,             "color_saturation_mapping_flag");
-            Info_S1(6, color_saturation_weight,                 "color_saturation_weight"); Param_Info1(((float)color_saturation_weight)/8);
-        TEST_SB_END();
-        BS_End();
-
-        FILLING_BEGIN();
-            IsHDRplus=true;
-            if (num_windows!=1 || targeted_system_display_actual_peak_luminance_flag || num_distribution_maxrgb_percentiles!=9 || fraction_bright_pixels || mastering_display_actual_peak_luminance_flag || (distribution_maxrgb_percentages[2]>100 && distribution_maxrgb_percentages[2]!=0xFF) || (!tone_mapping_flag && targeted_system_display_maximum_luminance) || (tone_mapping_flag && num_bezier_curve_anchors>9) || color_saturation_mapping_flag)
-                IsHDRplus=false;
-            for(int8u i=0; i<4; i++)
-                if (maxscl[i]>100000)
-                    IsHDRplus=false;
-            if (IsHDRplus)
-                for(int8u i=0; i<9; i++)
-                {
-                    static const int8u distribution_maxrgb_percentages_List[9]={1, 5, 10, 25, 50, 75, 90, 95, 99};
-                    if (distribution_maxrgb_percentages[i]!=distribution_maxrgb_percentages_List[i])
-                        IsHDRplus=false;
-                    if (distribution_maxrgb_percentiles[i]>100000)
-                        IsHDRplus=false;
-                }
-        FILLING_END();
-    }
+    int8u application_version{};
+    bool IsHDRplus{ false }, tone_mapping_flag{};
+    Get_SMPTE_ST_2094_40(application_version, IsHDRplus, tone_mapping_flag);
 
     FILLING_BEGIN();
         auto& HDR_Format=HDR[Video_HDR_Format][HdrFormat_SmpteSt209440];
@@ -5457,6 +5485,141 @@ void File_Mk::sei_message_user_data_registered_itu_t_t35_B5_003C_0001_04()
             if (IsHDRplus)
                 HDR[Video_HDR_Format_Compatibility][HdrFormat_SmpteSt209440]=tone_mapping_flag?__T("HDR10+ Profile B"):__T("HDR10+ Profile A");
         }
+    FILLING_END();
+}
+
+
+//---------------------------------------------------------------------------
+// SEI - 4 - China
+void File_Mk::sei_message_user_data_registered_itu_t_t35_26()
+{
+    int16u itu_t_t35_terminal_provider_code;
+    Get_B2(itu_t_t35_terminal_provider_code, "itu_t_t35_terminal_provider_code");
+
+    //HDR Vivid terminal provide code 0x0004, terminal provide oriented code 0x0005 , 0x0005 indicates HDR Vivid version 1
+    switch (itu_t_t35_terminal_provider_code)
+    {
+    case 0x0004: sei_message_user_data_registered_itu_t_t35_26_0004(); break;
+    }
+}
+
+//---------------------------------------------------------------------------
+// SEI - 4 - China    similar to sei_message_user_data_registered_itu_t_t35_B5_003C()
+void File_Mk::sei_message_user_data_registered_itu_t_t35_26_0004()
+{
+    int16u itu_t_t35_terminal_provider_oriented_code;
+    Get_B2(itu_t_t35_terminal_provider_oriented_code, "itu_t_t35_terminal_provider_oriented_code");
+    //HDR Vivid terminal provide code 0x0004, terminal provide oriented code 0x0005
+    switch (itu_t_t35_terminal_provider_oriented_code)
+    {
+    case 0x0005: sei_message_user_data_registered_itu_t_t35_26_0004_0005(); break;
+    }
+}
+
+//---------------------------------------------------------------------------
+// SEI - 4 - China - 0004
+void File_Mk::sei_message_user_data_registered_itu_t_t35_26_0004_0005()
+{
+    //Parsing
+    Element_Info1("T/UWA 005 (HDR Vivid)");
+    int16u targeted_system_display_maximum_luminance_Max = 0;
+    int8u system_start_code;
+    bool color_saturation_mapping_enable_flag;
+    Get_B1(system_start_code, "system_start_code");
+    if (system_start_code != 0x01)
+    {
+        Skip_XX(Element_Size, "Unknown");
+        return;
+    }
+    BS_Begin();
+    //int8u num_windows=1;
+    //for (int8u w=0; w<num_windows; w++)
+    {
+        Skip_S2(12, "minimum_maxrgb_pq");
+        Skip_S2(12, "average_maxrgb_pq");
+        Skip_S2(12, "variance_maxrgb_pq");
+        Skip_S2(12, "maximum_maxrgb_pq");
+    }
+
+    //for (int8u w=0; w<num_windows; w++)
+    {
+        bool tone_mapping_enable_mode_flag;
+        Get_SB(tone_mapping_enable_mode_flag, "tone_mapping_enable_mode_flag");
+        if (tone_mapping_enable_mode_flag)
+        {
+            int8u tone_mapping_param_enable_num;
+            Get_S1(1, tone_mapping_param_enable_num, "tone_mapping_param_enable_num");
+            for (int i = 0; i < (tone_mapping_param_enable_num + 1); i++)
+            {
+                Element_Begin1("tone_mapping_param");
+                int16u targeted_system_display_maximum_luminance_pq;
+                bool base_enable_flag, ThreeSpline_enable_flag;
+                Get_S2(12, targeted_system_display_maximum_luminance_pq,
+                    "targeted_system_display_maximum_luminance_pq");
+                if (targeted_system_display_maximum_luminance_Max < targeted_system_display_maximum_luminance_pq)
+                    targeted_system_display_maximum_luminance_Max = targeted_system_display_maximum_luminance_pq;
+                Get_SB(base_enable_flag, "base_enable_flag");
+                if (base_enable_flag)
+                {
+                    Skip_S2(14, "base_param_m_p");
+                    Skip_S1(6, "base_param_m_m");
+                    Skip_S2(10, "base_param_m_a");
+                    Skip_S2(10, "base_param_m_b");
+                    Skip_S1(6, "base_param_m_n");
+                    Skip_S1(2, "base_param_K1");
+                    Skip_S1(2, "base_param_K2");
+                    Skip_S1(4, "base_param_K3");
+                    Skip_S1(3, "base_param_Delta_enable_mode");
+                    Skip_S1(7, "base_param_enable_Delta");
+                }
+                Get_SB(ThreeSpline_enable_flag, "3Spline_enable_flag");
+                if (ThreeSpline_enable_flag)
+                {
+                    int8u ThreeSpline_enable_num;
+                    Get_S1(1, ThreeSpline_enable_num, "3Spline_enable_num");
+                    for (int j = 0; j < (ThreeSpline_enable_num + 1); j++)
+                    {
+                        Element_Begin1("3Spline");
+                        int8u ThreeSpline_TH_enable_mode;
+                        Get_S1(2, ThreeSpline_TH_enable_mode, "3Spline_TH_enable_mode");
+                        switch (ThreeSpline_TH_enable_mode)
+                        {
+                        case 0:
+                        case 2:
+                            Skip_S1(8, "3Spline_TH_enable_MB");
+                            break;
+                        default:;
+                        }
+                        Skip_S2(12, "3Spline_TH_enable");
+                        Skip_S2(10, "3Spline_TH_enable_Delta1");
+                        Skip_S2(10, "3Spline_TH_enable_Delta2");
+                        Skip_S1(8, "3Spline_enable_Strength");
+                        Element_End0();
+                    }
+                }
+                Element_End0();
+            }
+        }
+        Get_SB(color_saturation_mapping_enable_flag, "color_saturation_mapping_enable_flag");
+        if (color_saturation_mapping_enable_flag)
+        {
+            int8u color_saturation_enable_num;
+            Get_S1(3, color_saturation_enable_num, "color_saturation_enable_num");
+            for (int i = 0; i < color_saturation_enable_num; i++)
+            {
+                Skip_S1(8, "color_saturation_enable_gain");
+            }
+        }
+    }
+    BS_End();
+
+    FILLING_BEGIN();
+    auto& HDR_Format = HDR[Video_HDR_Format][HdrFormat_T_UWA005];
+    if (HDR_Format.empty())
+    {
+        HDR_Format = __T("HDR Vivid");
+        HDR[Video_HDR_Format_Version][HdrFormat_T_UWA005] = Ztring::ToZtring(system_start_code);
+    }
     FILLING_END();
 }
 

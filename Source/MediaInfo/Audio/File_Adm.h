@@ -34,9 +34,14 @@ class File_Adm : public File__Analyze
 public :
     //In
     string MuxingMode;
+    float Container_Duration = {};
+    int64u TotalSize = 0;
     void chna_Add(int32u Index, const string& TrackUID);
     void* chna_Move();
     void chna_Move(File_Adm*);
+
+    //Out
+    bool NeedToJumpToEnd = false;
 
     //Constructor/Destructor
     File_Adm();
@@ -44,14 +49,17 @@ public :
 
 private :
     //Streams management
+    void Streams_Accept();
     void Streams_Fill();
+    void Streams_Finish();
 
     //Buffer - File header
     bool FileHeader_Begin();
 
     //Buffer - Global
+    void Read_Buffer_Init();
     void Read_Buffer_Continue();
-
+ 
     //Temp
     file_adm_private* File_Adm_Private;
 };

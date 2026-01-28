@@ -316,6 +316,11 @@ bool File_Swf::FileHeader_Begin()
 void File_Swf::FileHeader_Parse()
 {
     //Parsing
+    if (Buffer_Size<8)
+    {
+        Element_WaitForMoreData();
+        return;
+    }
     int32u Signature;
     if (FileLength==0 && Version==0)
     {
@@ -335,6 +340,12 @@ void File_Swf::FileHeader_Parse()
     if (Signature==0x435753) //CWS
     {
         Decompress();
+        return;
+    }
+
+    if (Signature!=0x465753) //FWS
+    {
+        Reject();
         return;
     }
 
@@ -677,9 +688,12 @@ bool File_Swf::Decompress()
     File_Swf MI;
     MI.FileLength=FileLength;
     MI.Version=Version;
-    Open_Buffer_Init(&MI);
-    MI.Open_Buffer_Continue(Dest, FileLength-8);
+    auto File_Size_Sav=File_Size;
+    File_Size=Dest_Size;
+    Open_Buffer_Init(&MI, Dest_Size);
+    MI.Open_Buffer_Continue(Dest, Dest_Size);
     MI.Open_Buffer_Finalize();
+    File_Size=File_Size_Sav;
     Merge(MI, Stream_General, 0, 0);
     Merge(MI);
     delete[] Dest; //Dest=NULL;

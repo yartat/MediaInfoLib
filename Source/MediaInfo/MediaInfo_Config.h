@@ -53,6 +53,8 @@ enum basicformat
     enum config_flags1
     {
         Flags_Cover_Data_base64,
+        Flags_Enable_FFmpeg,
+        Flags_Enable_Mesh_Vertex_Data,
     };
 #else //MEDIAINFO_COMPRESS
     #define MEDIAINFO_FLAG1 0
@@ -70,6 +72,14 @@ enum basicformat
 #else //MEDIAINFO_COMPRESS
     #define MEDIAINFO_FLAGX 0
 #endif //MEDIAINFO_COMPRESS
+
+enum class display_if
+{
+    Never,
+    Needed,
+    Supported,
+    Always,
+};
 
 //***************************************************************************
 // Class MediaInfo_Config
@@ -209,7 +219,13 @@ public :
           #if MEDIAINFO_ADVANCED
           Ztring    Cover_Data_Set (const Ztring &NewValue);
           Ztring    Cover_Data_Get ();
+          Ztring    Flags_Enable_Mesh_Vertex_Data_Set(const Ztring &NewValue);
+          bool      Flags_Enable_Mesh_Vertex_Data_Get();
           #endif //MEDIAINFO_ADVANCED
+          #if MEDIAINFO_ADVANCED && defined(MEDIAINFO_FILE_YES)
+          Ztring    Enable_FFmpeg_Set (bool NewValue);
+          bool      Enable_FFmpeg_Get ();
+          #endif //MEDIAINFO_ADVANCED && defined(MEDIAINFO_FILE_YES
           #if MEDIAINFO_COMPRESS
           Ztring    Inform_Compress_Set (const Ztring &NewInform);
           Ztring    Inform_Compress_Get ();
@@ -217,10 +233,10 @@ public :
           Ztring    Input_Compressed_Get();
           #endif //MEDIAINFO_COMPRESS
           #if MEDIAINFO_FLAG1
-          bool      Flags1_Get(config_flags1 Flag) { return Flags1&(1 << Flag); }
+          bool      Flags1_Get(config_flags1 Flag) { return Flags1&(static_cast<int64u>(1) << Flag); }
           #endif //MEDIAINFO_FLAGX
           #if MEDIAINFO_FLAGX
-          bool      FlagsX_Get(config_flagsX Flag) { return FlagsX&(1 << Flag); }
+          bool      FlagsX_Get(config_flagsX Flag) { return FlagsX&(static_cast<int64u>(1) << Flag); }
           #endif //MEDIAINFO_FLAGX
 
     const Ztring   &Format_Get (const Ztring &Value, infoformat_t KindOfFormatInfo=InfoFormat_Name);
@@ -236,7 +252,7 @@ public :
     const Ztring   &Iso639_1_Get (const Ztring &Value);
     const Ztring   &Iso639_2_Get (const Ztring &Value);
     const Ztring    Iso639_Find (const Ztring &Value);
-    const Ztring    Iso639_Translate (const Ztring Value);
+    const Ztring    Iso639_Translate (const Ztring &Value);
 
     const Ztring   &Info_Get (stream_t KindOfStream, const Ztring &Value, info_t KindOfInfo=Info_Text);
     const Ztring   &Info_Get (stream_t KindOfStream, size_t Pos, info_t KindOfInfo=Info_Text);
@@ -321,9 +337,17 @@ public :
 
     ZtringListList  SubFile_Config_Get ();
 
+    #if MEDIAINFO_CONFORMANCE
+          Ztring      Conformance_Limit_Set (const Ztring &Value);
+          int64u      Conformance_Limit_Get ();
+    #endif //MEDIAINFO_CONFORMANCE
     #if MEDIAINFO_ADVANCED
           void        Collection_Trigger_Set (const Ztring& Value);
           int64s      Collection_Trigger_Get();
+          Ztring      Collection_Display_Set(const Ztring& Value);
+          display_if  Collection_Display_Get();
+    #else //MEDIAINFO_ADVANCED
+          display_if  Collection_Display_Get() {return display_if::Needed;}
     #endif //MEDIAINFO_ADVANCED
 
     void            CustomMapping_Set (const Ztring &Value);
@@ -509,8 +533,12 @@ private :
 
     ZtringListList  SubFile_Config;
 
+    #if MEDIAINFO_CONFORMANCE
+        int64u      Conformance_Limit;
+    #endif //MEDIAINFO_CONFORMANCE
     #if MEDIAINFO_ADVANCED
         int64s      Collection_Trigger;
+        display_if  Collection_Display;
     #endif //MEDIAINFO_ADVANCED
 
     std::map<Ztring, std::map<Ztring, Ztring> > CustomMapping;

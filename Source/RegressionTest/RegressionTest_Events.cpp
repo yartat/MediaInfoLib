@@ -178,7 +178,7 @@ void Video_SliceInfo_0(struct MediaInfo_Event_Video_SliceInfo_0 *Event, struct E
         echo1("DUR=%s, ", Ztring().Duration_From_Milliseconds(Event->DUR/1000000).To_Local().c_str());
     if (Event->PCR!=static_cast<int64u>(-1) || Event->PTS!=static_cast<int64u>(-1) || Event->DTS!=static_cast<int64u>(-1) || Event->DUR!=static_cast<int64u>(-1))
         echo0("\n");
-    echo1("SliceType=%i,", Event->SliceType);
+    echo1("SliceType=%u,", Event->SliceType);
     echo1(" Flags=%08llx\n", Event->Flags);
 }
 
@@ -220,9 +220,9 @@ void __stdcall Event_CallBackFunction(unsigned char* Data_Content, size_t Data_S
     }
 
     /*Retrieving EventID*/
-    ParserID    =static_cast<unsigned char>((Event_Generic->EventCode & 0xFF000000) >> 24);
-    EventID     =static_cast<unsigned short>((Event_Generic->EventCode & 0x00FFFF00) >> 8);
-    EventVersion=static_cast<unsigned char>(Event_Generic->EventCode & 0x000000FF);
+    ParserID    =(unsigned char) ((Event_Generic->EventCode&0xFF000000)>>24);
+    EventID     =(unsigned short)((Event_Generic->EventCode&0x00FFFF00)>>8 );
+    EventVersion=(unsigned char) ( Event_Generic->EventCode&0x000000FF     );
 
 
     //*Global to all parsers
@@ -313,7 +313,7 @@ void RegressionTest_Events(Ztring Files, Ztring DataBaseDirectory, int32u Scenar
         // form is "CallBack=memory://handlerInDecimal;UserHandler=memory://handlerInDecimal"
         // UserHandler is a unique value wich will be provided to the callback function, in order to know which MediaInfo instance send the event
         wostringstream Event_CallBackFunction_Text;
-        Event_CallBackFunction_Text<<__T("CallBack=memory://")<<reinterpret_cast<MediaInfo_int64u>(Event_CallBackFunction)<<__T(";UserHandler=memory://")<<reinterpret_cast<MediaInfo_int64u>(&FilesList[FilesList_Pos]);
+        Event_CallBackFunction_Text<<__T("CallBack=memory://")<<(MediaInfo_int64u)Event_CallBackFunction<<__T(";UserHandler=memory://")<<(MediaInfo_int64u)&FilesList[FilesList_Pos];
         MI_Result=MI.Option(__T("File_Event_CallBackFunction"), Event_CallBackFunction_Text.str());
         if (!MI_Result.empty())
         {

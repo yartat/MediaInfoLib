@@ -21,7 +21,7 @@
 //***************************************************************************
 
 //---------------------------------------------------------------------------
-#if defined(MEDIAINFO_MPEGV_YES) || defined(MEDIAINFO_MPEG4V_YES) || defined(MEDIAINFO_AVC_YES) || defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_PRORES_YES)
+#if defined(MEDIAINFO_MPEGV_YES) || defined(MEDIAINFO_MPEG4V_YES) || defined(MEDIAINFO_AVC_YES) || defined(MEDIAINFO_HEVC_YES) || defined(MEDIAINFO_MPEG4_YES) || defined(MEDIAINFO_PRORES_YES) || defined(MEDIAINFO_PNG_YES)
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -93,6 +93,7 @@ extern const char* Mpegv_matrix_coefficients(int8u matrix_coefficients)
         case 12 : return "Chromaticity-derived non-constant";           //Added in HEVC 2016
         case 13 : return "Chromaticity-derived constant";               //Added in HEVC 2016
         case 14 : return "ICtCp";                                       //Added in HEVC 2016
+        case 15 : return "IPT-PQ-C2";
         default : return "";
     }
 }
@@ -1085,7 +1086,6 @@ File_Mpegv::File_Mpegv()
     #endif //MEDIAINFO_TRACE
     Trusted_Multiplier=2;
     MustSynchronize=true;
-    Buffer_TotalBytes_FirstSynched_Max=64*1024;
     PTS_DTS_Needed=true;
     StreamSource=IsStream;
     Frame_Count_NotParsedIncluded=0;
@@ -2538,16 +2538,22 @@ void File_Mpegv::slice_start()
             Time_End_Frames =Time_Current_Frames+(int8u)temporal_reference;
         }
 
+        bool IsSecondField=false;
         if (temporal_reference==temporal_reference_Old)
         {
             Frame_Count--;
             if (IFrame_IsParsed && Frame_Count_NotParsedIncluded!=(int64u)-1)
                 Frame_Count_NotParsedIncluded--;
             Frame_Count_InThisBlock--;
-            if (FrameInfo.DTS!=(int64u)-1)
-                FrameInfo.DTS-=tc_ToAdd;
-            if (FrameInfo.PTS!=(int64u)-1)
-                FrameInfo.PTS-=tc_ToAdd;
+            if (!progressive_sequence && picture_coding_type!=3)
+                IsSecondField=true;
+            else
+            {
+                if (FrameInfo.DTS!=(int64u)-1)
+                    FrameInfo.DTS-=tc_ToAdd;
+                if (FrameInfo.PTS!=(int64u)-1)
+                    FrameInfo.PTS-=tc_ToAdd;
+            }
         }
         else
         {
@@ -2565,6 +2571,8 @@ void File_Mpegv::slice_start()
         if (PTS_LastIFrame!=(int64u)-1)
         {
             FrameInfo.PTS=PTS_LastIFrame+(temporal_reference-temporal_reference_LastIFrame)*tc;
+            if (IsSecondField)
+                FrameInfo.PTS+=tc_ToAdd;
             if ((PTS_Begin==(int64u)-1 && picture_coding_type==1) //IFrame
              || (IFrame_Count<2 && group_start_IsParsed && group_start_closed_gop && FrameInfo.PTS<PTS_Begin))
                 PTS_Begin=FrameInfo.PTS;

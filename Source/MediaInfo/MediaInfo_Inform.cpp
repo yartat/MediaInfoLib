@@ -50,19 +50,20 @@
 #include "MediaInfo/MediaInfo_Internal.h"
 #include "MediaInfo/File__Analyze.h"
 #include "ThirdParty/base64/base64.h"
-# if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
 #include "MediaInfo/OutputHelpers.h"
-#endif //MEDIAINFO_XML_YES || MEDIAINFO_JSON_YES
 
 //---------------------------------------------------------------------------
 #include <ctime>
+#if !defined(UNICODE) && !defined(_UNICODE)
+#include <codecvt>
+#include <locale>
+#endif
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
 {
 
 //---------------------------------------------------------------------------
-#if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
 Ztring Xml_Name_Escape_0_7_78 (const Ztring &Name)
 {
     Ztring ToReturn(Name);
@@ -96,7 +97,23 @@ Ztring Xml_Name_Escape_0_7_78 (const Ztring &Name)
 
     return ToReturn;
 }
-#endif //defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
+
+//---------------------------------------------------------------------------
+std::wstring ToFullWidth(const std::wstring& input)
+{
+    std::wstring result;
+    for (wchar_t ch : input) {
+        if (ch >= 0x20 && ch <= 0x7E) {
+            if (ch == 0x20)
+                result += 0x3000;
+            else
+                result += ch + 0xFEE0;
+        }
+        else
+            result += ch;
+    }
+    return result;
+}
 
 //---------------------------------------------------------------------------
 std::string URL_Encoded_Encode(const std::string& URL);
@@ -170,6 +187,47 @@ Ztring MediaInfo_Internal::Inform()
             {
                 Result+="  <timecode_stream";
                 Result+=TimeCode_Dump.second.Attributes_First;
+                if (TimeCode_Dump.second.Attributes_First.find(" frame_rate=\"")==string::npos && Count_Get(Stream_Video)==1)
+                {
+                    auto FrameRate_Num=Get(Stream_Video, 0, Video_FrameRate_Num);
+                    auto FrameRate_Den=Get(Stream_Video, 0, Video_FrameRate_Den);
+                    auto FrameRate=Get(Stream_Video, 0, Video_FrameRate);
+                    if (!FrameRate_Num.empty() && !FrameRate_Den.empty())
+                        FrameRate=FrameRate_Num+__T('/')+FrameRate_Den;
+                    if (!FrameRate.empty())
+                    {
+                        Result += " frame_rate=\"";
+                        Result += XML_Encode(FrameRate).To_UTF8();
+                        Result += '"';
+                    }
+                }
+                if (TimeCode_Dump.second.Attributes_First.find(" source=\"")==string::npos)
+                {
+                    auto ID_Pos=TimeCode_Dump.second.Attributes_First.find(" id=\"");
+                    if (ID_Pos!=string::npos)
+                    {
+                        ID_Pos+=5;
+                        auto ID_Pos2=TimeCode_Dump.second.Attributes_First.find("\"", ID_Pos);
+                        if (ID_Pos2!=string::npos)
+                        {
+                            Ztring ID;
+                            ID.From_UTF8(TimeCode_Dump.second.Attributes_First.substr(ID_Pos, ID_Pos2-ID_Pos));
+                            auto Count = Count_Get(Stream_Other);
+                            for (size_t i = 0; i < Count; i++)
+                            {
+                                if (Get(Stream_Other, i, Other_ID) != ID)
+                                    continue;
+                                auto Source = Get(Stream_Other, i, Other_TimeCode_Source);
+                                if (!Source.empty())
+                                {
+                                    Result += " source=\"";
+                                    Result += Source.To_UTF8();
+                                    Result += '"';
+                                }
+                            }
+                        }
+                    }
+                }
                 Result+=" frame_count=\""+std::to_string(TimeCode_Dump.second.FrameCount)+'\"';
                 Result+=TimeCode_Dump.second.Attributes_Last;
                 if (TimeCode_Dump.second.List.empty())
@@ -241,8 +299,10 @@ Ztring MediaInfo_Internal::Inform()
             return Export_Mpeg7().Transform(*this, Export_Mpeg7::Version_Strict);
         if (MediaInfoLib::Config.Inform_Get()==__T("MPEG-7_Relaxed"))
             return Export_Mpeg7().Transform(*this, Export_Mpeg7::Version_BestEffort_Strict);
-        if (MediaInfoLib::Config.Inform_Get()==__T("MPEG-7_Extended"))
+        if (MediaInfoLib::Config.Inform_Get()==__T("MPEG-7_Extended_If_Needed"))
             return Export_Mpeg7().Transform(*this, Export_Mpeg7::Version_BestEffort_Extended);
+        if (MediaInfoLib::Config.Inform_Get()==__T("MPEG-7_Extended"))
+            return Export_Mpeg7().Transform(*this, Export_Mpeg7::Version_Extended);
     #endif //defined(MEDIAINFO_MPEG7_YES)
     #if defined(MEDIAINFO_PBCORE_YES)
         if (MediaInfoLib::Config.Inform_Get()==__T("PBCore_1") || MediaInfoLib::Config.Inform_Get()==__T("PBCore1")) // 1.x
@@ -419,7 +479,7 @@ Ztring MediaInfo_Internal::Inform()
         XML=true;
     if (MediaInfoLib::Config.Inform_Get()==__T("MAXML"))
         XML_0_7_78_MA=true;
-    if (MediaInfoLib::Config.Inform_Get()==__T("MIXML") || MediaInfoLib::Config.Inform_Get()==__T("XML"))
+    if (MediaInfoLib::Config.Inform_Get()==__T("MIXML") || MediaInfoLib::Config.Inform_Get()==__T("XML") || MediaInfoLib::Config.Inform_Get().MakeLowerCase() == __T("xmlwithattr"))
         XML_0_7_78_MI=true;
     #endif //defined(MEDIAINFO_XML_YES)
      #if defined(MEDIAINFO_JSON_YES)
@@ -434,7 +494,46 @@ Ztring MediaInfo_Internal::Inform()
     #endif //defined(MEDIAINFO_CSV_YES)
 
     if (HTML)
-        Retour+=__T("<html>\n\n<head>\n<META http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" /></head>\n<body>\n");
+        Retour+=__T("<!DOCTYPE html>\n"
+            "<html lang=\"") + MediaInfoLib::Config.Language_Get(__T("  Language_ISO639")) + __T("\">\n"
+            "  <head>\n"
+            "    <meta charset=\"utf-8\">\n"
+            "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+            "    <title>MediaInfo</title>\n"
+            "    <style>\n"
+            "      :root { color-scheme: var(--color-scheme, light); }\n"
+            "      @media (prefers-color-scheme: dark) {\n"
+            "        :root { --color-scheme: dark; --border-color: blue; }\n"
+            "      }\n"
+            "      table { width: 100%; padding: 2px; border-spacing: 2px; border:1px solid var(--border-color, navy); margin-bottom: 18px; }\n"
+            "      td.Prefix { width: 25vw; min-width: 150px; max-width: 500px; font-style: italic; }\n"
+            "      h2 { margin-top: 0px; }\n"
+            "      .cover-image {\n"
+            "        height: 100px;\n"
+            "        width: auto;\n"
+            "        cursor: pointer;\n"
+            "      }\n"
+            "      .overlay-sheet {\n"
+            "        display: none;\n"
+            "        position: fixed;\n"
+            "        top: 0;\n"
+            "        left: 0;\n"
+            "        width: 100%;\n"
+            "        height: 100%;\n"
+            "        background-color: rgba(0, 0, 0, 0.8);\n"
+            "        justify-content: center;\n"
+            "        align-items: center;\n"
+            "        z-index: 1000;\n"
+            "        cursor: pointer;\n"
+            "      }\n"
+            "      .overlay-image {\n"
+            "        max-width: 90vw;\n"
+            "        max-height: 90vh;\n"
+            "        cursor: pointer;\n"
+            "      }\n"
+            "    </style>\n"
+            "  </head>\n"
+            "  <body>\n");
     #if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
     if (XML_0_7_78_MA || XML_0_7_78_MI || JSON)
     {
@@ -467,7 +566,7 @@ Ztring MediaInfo_Internal::Inform()
         for (size_t StreamPos=0; StreamPos<(size_t)Count_Get((stream_t)StreamKind); StreamPos++)
         {
             //Pour chaque stream
-            if (HTML) Retour+=__T("<table width=\"100%\" border=\"0\" cellpadding=\"1\" cellspacing=\"2\" style=\"border:1px solid Navy\">\n<tr>\n    <td width=\"150\"><h2>");
+            if (HTML) Retour+=__T("    <table>\n      <tr>\n        <td colspan=\"2\"><h2>");
             #if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
             Node* Node_Current=NULL;
             if (XML || XML_0_7_78_MA || XML_0_7_78_MI || JSON) Node_Current=Node_MI?Node_MI->Add_Child("track", true):Node_Main->Add_Child("track", true);
@@ -487,7 +586,7 @@ Ztring MediaInfo_Internal::Inform()
                 }
                 Retour+=A;
             }
-            if (HTML) Retour+=__T("</h2></td>\n  </tr>");
+            if (HTML) Retour+=__T("</h2></td>\n      </tr>");
             #if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
             if (XML || XML_0_7_78_MA || XML_0_7_78_MI || JSON)
             {
@@ -509,12 +608,31 @@ Ztring MediaInfo_Internal::Inform()
                 Retour+=Inform((stream_t)StreamKind, StreamPos, false);
             }
 
-            if (HTML) Retour+=__T("</table>\n<br />");
+            if (HTML) Retour += __T("    </table>");
             if (!XML && !XML_0_7_78_MA && !XML_0_7_78_MI && !JSON) Retour+=MediaInfoLib::Config.LineSeparator_Get();
         }
     }
 
-    if (HTML) Retour+=__T("\n</body>\n</html>\n");
+    if (HTML) {
+        Retour += __T("    <div id=\"overlaySheet\" class=\"overlay-sheet\">\n"
+            "      <img id=\"overlayImg\" class=\"overlay-image\" alt=\"Cover image\" src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=\">\n"
+            "    </div>\n"
+            "    <script>\n"
+            "      document.addEventListener('click', function(event) {\n"
+            "        const target = event.target;\n"
+            "        const overlaySheet = document.getElementById('overlaySheet');\n"
+            "        const overlayImg = document.getElementById('overlayImg');\n"
+            "        if (target.classList.contains('cover-image')) {\n"
+            "          overlayImg.src = target.src;\n"
+            "          overlaySheet.style.display = 'flex';\n"
+            "        }\n"
+            "        else {\n"
+            "          overlaySheet.style.display = 'none';\n"
+            "        }\n"
+            "      });\n"
+            "    </script>\n");
+        Retour += __T("  </body>\n</html>\n");
+    }
 
     if (!CSV && !HTML && !XML && !XML_0_7_78_MA && !XML_0_7_78_MI && !JSON)
     {
@@ -617,13 +735,13 @@ Ztring MediaInfo_Internal::Inform()
 }
 
 //---------------------------------------------------------------------------
-#if defined(MEDIAINFO_TEXT_YES) || defined(MEDIAINFO_HTML_YES) || defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_CSV_YES) || defined(MEDIAINFO_CUSTOM_YES)
+#if defined(MEDIAINFO_TEXT_YES) || defined(MEDIAINFO_HTML_YES) || defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES) || defined(MEDIAINFO_CSV_YES) || defined(MEDIAINFO_CUSTOM_YES)
 #if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
 namespace
 {
 struct nested
 {
-    std::vector<Node*>* Target;
+    std::vector<Node*>* Target{};
     Ztring Name;
 };
 }
@@ -656,6 +774,9 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
         #if defined(MEDIAINFO_XML_YES)
         XML=MediaInfoLib::Config.Inform_Get()==__T("OLDXML")?true:false;
         XML_0_7_78=(MediaInfoLib::Config.Inform_Get()==__T("MAXML") || MediaInfoLib::Config.Inform_Get()==__T("MIXML") || MediaInfoLib::Config.Inform_Get() == __T("XML"))?true:false;
+        bool XWM_WithAttr=(MediaInfoLib::Config.Inform_Get().MakeLowerCase()==__T("xmlwithattr"));
+        if (XWM_WithAttr)
+            XML_0_7_78=true;
         if (XML_0_7_78)
             XML=true;
         #endif //defined(MEDIAINFO_XML_YES)
@@ -666,7 +787,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
         #if defined(MEDIAINFO_CSV_YES)
         bool CSV=MediaInfoLib::Config.Inform_Get()==__T("CSV")?true:false;
         #endif //defined(MEDIAINFO_CSV_YES)
-        #if defined(MEDIAINFO_TEXT_YES) && (defined(MEDIAINFO_HTML_YES) || defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_CSV_YES))
+        #if defined(MEDIAINFO_TEXT_YES) && (defined(MEDIAINFO_HTML_YES) || defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES) || defined(MEDIAINFO_CSV_YES))
         bool Text=true;
         #if defined(MEDIAINFO_HTML_YES)
          if (HTML)
@@ -728,7 +849,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                 if (Conformance_JSON)
                 {
                     Ztring Name=Get((stream_t)StreamKind, StreamPos, Champ_Pos, Info_Name);
-                    if (Name!=__T("Format") && Name.rfind(__T("Conformance"), 11))
+                    if (Name!=__T("StreamKind") && Name!=__T("Format") && Name!=__T("Metadata_Format") && Name.rfind(__T("Conformance"), 11))
                         Shouldshow=false; // Override, it is intended only for conformance checks
                 }
             #endif 
@@ -755,6 +876,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
 
                 //Subs
                 #if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
+                bool IsXmlAttributeConformance=false;
                 if (XML || JSON)
                 {
                     const Ztring& NextName=Get((stream_t)StreamKind, StreamPos, Champ_Pos+1, Info_Name);
@@ -780,7 +902,11 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                                 Fields_Current=&Fields;
                         }
                         else
+                        {
                             Nom_ToErase=LastNested->Name.size()+1;
+                            if (XWM_WithAttr && LastNested->Name.rfind(__T("Conformance"), 0)==0)
+                                IsXmlAttributeConformance=true;
+                        }
                     }
 
                     if (NextName.size()>Nom.size() && !NextName.rfind(Nom, Nom.size()) && NextName[Nom.size()]==__T(' '))
@@ -789,9 +915,9 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                         size_t Space=SubName.rfind(' ');
                         if (Space!=(size_t)-1)
                             SubName.erase(0, Space+1);
-                        size_t NumbersPos=SubName.find_first_of("0123456789");
+                        size_t NumbersPos=SubName.find_last_not_of("0123456789");
                         if (NumbersPos!=(size_t)-1)
-                            SubName.resize(NumbersPos);
+                            SubName.resize(NumbersPos+1);
                         if (XML_0_7_78 || JSON)
                             SubName=Xml_Name_Escape_0_7_78(Ztring().From_UTF8(SubName)).To_UTF8();
                         else
@@ -817,7 +943,21 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                      int8u Nom_Size=MediaInfoLib::Config.Language_Get(__T("  Config_Text_ColumnSize")).To_int8u();
                      if (Nom_Size==0)
                         Nom_Size=32; //Default
-                     Nom.resize(Nom_Size, ' ');
+                     Ztring lang = MediaInfoLib::Config.Language_Get(__T("  Language_ISO639"));
+                     if (!lang.compare(__T("ja")) || !lang.compare(__T("ko")) || !lang.compare(__T("zh-CN")) || !lang.compare(__T("zh-HK")) || !lang.compare(__T("zh-TW")))
+                     {
+                        #if !defined(UNICODE) && !defined(_UNICODE)
+                        std::wstring_convert<std::codecvt_utf8<wchar_t>> Converter;
+                        std::wstring Nom_Wide=Converter.from_bytes(Nom);
+                        Nom_Wide.resize(Nom_Size, ' ');
+                        Nom=Ztring().From_Unicode(ToFullWidth(Nom_Wide)); //Align Japanese, Korean and Chinese characters with ASCII characters
+                        #else
+                        Nom.resize(Nom_Size, ' ');
+                        Nom=ToFullWidth(Nom); //Align Japanese, Korean and Chinese characters with ASCII characters
+                        #endif
+                     }
+                     else
+                        Nom.resize(Nom_Size, ' ');
                 }
                 Ztring Valeur=Get((stream_t)StreamKind, StreamPos, Champ_Pos, Info_Text);
 
@@ -856,11 +996,39 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                     for (size_t Pos=0; Pos<Level; Pos++)
                         Prefix+=__T("&nbsp;");
 
-                    Retour+=__T("  <tr>\n    <td><i>");
+                    Retour+=__T("      <tr>\n        <td class=\"Prefix\">");
                     Retour+=Prefix+Nom.TrimLeft();
-                    Retour+=__T(" :</i></td>\n    <td colspan=\"3\">");
+                    Retour+=__T(" :</td>\n        <td>");
+                    Valeur.FindAndReplace(__T("&"), __T("&amp;"), 0, Ztring_Recursive);
+                    Valeur.FindAndReplace(__T("<"), __T("&lt;"), 0, Ztring_Recursive);
+                    Valeur.FindAndReplace(__T(">"), __T("&gt;"), 0, Ztring_Recursive);
+                    Valeur.FindAndReplace(__T("  "), __T(" &nbsp;"), 0, Ztring_Recursive);
                     Retour+=Valeur;
-                    Retour+=__T("</td>\n  </tr>");
+                    Retour+=__T("</td>\n      </tr>");
+
+                    #if MEDIAINFO_ADVANCED
+                    if (MediaInfoLib::Config.Flags1_Get(Flags_Cover_Data_base64)) {
+                        if (Get((stream_t)StreamKind, StreamPos, Champ_Pos, Info_Name) == __T("Cover")) {
+                            Retour += __T("\n      <tr>\n        <td class=\"Prefix\">");
+                            Retour += __T("Cover image :</td>\n        <td>");
+
+                            Ztring cover_data = Get((stream_t)StreamKind, StreamPos, __T("Cover_Data"));
+                            Ztring delimiter = " / ";
+                            std::vector<Ztring> cover_data_vec;
+                            size_t pos = 0;
+                            while ((pos = cover_data.find(delimiter)) != std::string::npos) {
+                                cover_data_vec.push_back(cover_data.substr(0, pos));
+                                cover_data.erase(0, pos + delimiter.length());
+                            }
+                            cover_data_vec.push_back(cover_data);
+                            for (size_t i = 0; i < cover_data_vec.size(); ++i) {
+                                Retour += __T(R"(<img class="cover-image" alt="Cover image preview" src="data:;base64,)") + cover_data_vec[i] + __T(R"("> )");
+                            }
+
+                            Retour += __T("</td>\n      </tr>");
+                        }
+                    }
+                    #endif //defined(MEDIAINFO_ADVANCED)
                 }
                 #endif //defined(MEDIAINFO_HTML_YES)
                 #if defined(MEDIAINFO_XML_YES) || defined(MEDIAINFO_JSON_YES)
@@ -896,15 +1064,86 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                             Valeur.erase(SlashPos);
                     }
 
+                    if (IsXmlAttributeConformance)
+                    {
+                        auto Valeur_Parenthesis_Begin = Valeur.find(__T(" ("));
+                        if (Valeur_Parenthesis_Begin != string::npos) {
+                            auto Valeur_Parenthesis_Begin2 = Valeur_Parenthesis_Begin + 2;
+                            auto Valeur_Parenthesis_End = Valeur.find(')', Valeur_Parenthesis_Begin2);
+                            ZtringListList AttributesList;
+                            if (Valeur_Parenthesis_End != string::npos) {
+                                AttributesList.Separator_Set(0, ", ");
+                                AttributesList.Separator_Set(1, " ");
+                                AttributesList.Write(Valeur.substr(Valeur_Parenthesis_Begin2, Valeur_Parenthesis_End - Valeur_Parenthesis_Begin2));
+                                Valeur.erase(Valeur_Parenthesis_Begin);
+                            }
+                            for (auto& Item : AttributesList) {
+                                if (Item.size() == 1 && Item[0] == __T("conf")) {
+                                    Item[0] = __T("frame");
+                                    Item.push_back(__T("conf"));
+                                }
+                            }
+                            if (AttributesList.empty()) {
+                                AttributesList.resize(1);
+                            }
+                            vector<ZtringList> AttributesValues;
+                            AttributesValues.resize(AttributesList.size());
+                            for (size_t i = 0; i < AttributesValues.size(); i++) {
+                                if (AttributesList[i].size() <= 1) {
+                                    continue;
+                                }
+                                AttributesValues[i].Separator_Set(0, "+");
+                                AttributesValues[i].Write(AttributesList[i][1]);
+                            }
+
+                            auto ItemCount = 0;
+                            for (const auto& Item : AttributesValues) {
+                                if (ItemCount < Item.size()) {
+                                    ItemCount = Item.size();
+                                }
+                            }
+                            for (size_t j = 0; j < ItemCount; j++) {
+                                auto Node_Current = new Node(Nom.To_UTF8());
+                                for (size_t i = 0; i < AttributesValues.size(); i++) {
+                                    auto Att = AttributesList[i][0].To_UTF8();
+                                    string Value;
+                                    if (j < AttributesValues[i].size()) {
+                                        Value = AttributesValues[i][j].To_UTF8();
+                                    }
+                                    string Att2;
+                                    string Value2;
+                                    for (size_t k = 2; k < AttributesList[i].size(); k++) {
+                                        const auto Item = AttributesList[i][k];
+                                        if (!Item.empty()) {
+                                            if (Item.back() == '%') {
+                                                Att2 = Att + "_percent";
+                                                Value2 = Item.To_UTF8();
+                                            }
+                                            else {
+                                                Value += ' ';
+                                                Value += Item.To_UTF8();
+                                            }
+                                        }
+                                    }
+                                    Node_Current->Add_Attribute(Att, Value);
+                                    if (!Att2.empty()) {
+                                        Node_Current->Add_Attribute(Att2, Value2);
+                                    }
+                                }
+                                Node_Current->Value = Valeur.To_UTF8();
+                                Fields_Current->push_back(Node_Current);
+                            }
+                        }
+                    }
+                    else {
                     Node* Node_Current=NULL;
                     Node_Current=new Node(Nom.To_UTF8());
                     if (Modified==1 && !MediaInfoLib::Config.SkipBinaryData_Get()) //Base64
-                        Node_Current->Add_Attribute("dt", "binary.base64");
-
-                    if (Modified==1 && MediaInfoLib::Config.SkipBinaryData_Get())
-                        Node_Current->Value="(Binary data)";
+                    Node_Current->Add_Attribute("dt", "binary.base64");
+                    if (Modified == 1 && MediaInfoLib::Config.SkipBinaryData_Get())
+                        Node_Current->Value = "(Binary data)";
                     else
-                        Node_Current->Value=Valeur.To_UTF8();
+                        Node_Current->Value = Valeur.To_UTF8();
                     Fields_Current->push_back(Node_Current);
 
                     if (!Format_Profile_More.empty())
@@ -924,6 +1163,7 @@ Ztring MediaInfo_Internal::Inform (stream_t StreamKind, size_t StreamPos, bool I
                             Node_Current=new Node("Format_Level", Format_Profile_More.To_UTF8());
                             Fields_Current->push_back(Node_Current);
                         }
+                    }
                     }
                 }
 

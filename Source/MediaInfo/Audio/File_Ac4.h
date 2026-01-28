@@ -225,6 +225,7 @@ private :
         vector<presentation_substream> Substreams;
 
         int8u presentation_version;
+        int8u mdcompat;
         int32u presentation_id;
         bool b_pres_ndot;
         bool b_alternative;
@@ -250,6 +251,7 @@ private :
 
         presentation() :
             presentation_config((int8u)-1),
+            mdcompat((int8u)-1),
             presentation_id((int32u)-1),
             frame_rate_fraction_minus1(0),
             dolby_atmos_indicator(false),
@@ -360,10 +362,12 @@ private :
                 uint8_t* Data_ToDelete=Data;
                 Size=NewOffset;
                 Data=new int8u[Size];
-                memcpy(Data, Data_ToDelete, Offset);
+                if (Data_ToDelete)
+                    memcpy(Data, Data_ToDelete, Offset);
                 delete[] Data_ToDelete;
             }
-            memcpy(Data+Offset, BufferToAdd, SizeToAdd);
+            if (Data+Offset)
+                memcpy(Data+Offset, BufferToAdd, SizeToAdd);
             Offset=NewOffset;
         }
 

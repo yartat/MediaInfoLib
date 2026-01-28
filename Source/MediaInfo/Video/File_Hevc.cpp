@@ -168,8 +168,13 @@ extern const char* Mpegv_matrix_coefficients(int8u matrix_coefficients);
 const char* Mpegv_matrix_coefficients_ColorSpace(int8u matrix_coefficients);
 
 //---------------------------------------------------------------------------
-extern const int8u Avc_PixelAspectRatio_Size;
-extern const float32 Avc_PixelAspectRatio[];
+struct par
+{
+    int8u w;
+    int8u h;
+};
+extern const par Avc_PixelAspectRatio[];
+extern const size_t Avc_PixelAspectRatio_Size;
 extern const char* Avc_video_format[];
 extern const char* Avc_video_full_range[];
 
@@ -189,7 +194,6 @@ File_Hevc::File_Hevc()
         Trace_Layers_Update(8); //Stream
     #endif //MEDIAINFO_TRACE
     MustSynchronize=true;
-    Buffer_TotalBytes_FirstSynched_Max=64*1024;
     PTS_DTS_Needed=true;
     StreamSource=IsStream;
     Frame_Count_NotParsedIncluded=0;
@@ -200,6 +204,7 @@ File_Hevc::File_Hevc()
     MustParse_VPS_SPS_PPS=false;
     MustParse_VPS_SPS_PPS_FromMatroska=false;
     MustParse_VPS_SPS_PPS_FromFlv=false;
+    MustParse_VPS_SPS_PPS_FromLhvc=false;
     SizedBlocks=false;
     SizedBlocks_FileThenStream=0;
 
@@ -274,6 +279,10 @@ void File_Hevc::Streams_Fill()
         Stream_Prepare(Stream_Video);
     Fill(Stream_Video, 0, Video_Format, "HEVC");
     Fill(Stream_Video, 0, Video_Codec, "HEVC");
+
+    for (std::vector<video_parameter_set_struct*>::iterator video_parameter_set_Item=video_parameter_sets.begin(); video_parameter_set_Item!=video_parameter_sets.end(); ++video_parameter_set_Item)
+        if ((*video_parameter_set_Item))
+            Streams_Fill(video_parameter_set_Item);
 
     for (std::vector<seq_parameter_set_struct*>::iterator seq_parameter_set_Item=seq_parameter_sets.begin(); seq_parameter_set_Item!=seq_parameter_sets.end(); ++seq_parameter_set_Item)
         if ((*seq_parameter_set_Item))
@@ -355,89 +364,148 @@ void File_Hevc::Streams_Fill()
     if (chroma_sample_loc_type_bottom_field != (int32u)-1 && chroma_sample_loc_type_bottom_field != chroma_sample_loc_type_top_field)
         Fill(Stream_Video, 0, "ChromaSubsampling_Position", __T("Type ") + Ztring::ToZtring(chroma_sample_loc_type_bottom_field));
     }
+    if (ambient_viewing_environment_illuminance && !ambient_viewing_environment_illuminance_string.empty()) {
+        Fill(Stream_Video, 0, "AmbientViewingEnvironment_Illuminance", ambient_viewing_environment_illuminance);
+        Fill_SetOptions(Stream_Video, 0, "AmbientViewingEnvironment_Illuminance", "N NF");
+        Fill(Stream_Video, 0, "AmbientViewingEnvironment_Illuminance/String", ambient_viewing_environment_illuminance_string);
+    }
+    if (!ambient_viewing_environment_chromaticity.empty()) {
+        Fill(Stream_Video, 0, "AmbientViewingEnvironment_Chromaticity", ambient_viewing_environment_chromaticity);
+    }
 }
 
 //---------------------------------------------------------------------------
-void File_Hevc::Streams_Fill(std::vector<seq_parameter_set_struct*>::iterator seq_parameter_set_Item)
+void File_Hevc::Streams_Fill_Profile(const profile_tier_level_struct& p)
 {
-    int32u Width = (*seq_parameter_set_Item)->pic_width_in_luma_samples;
-    int32u Height= (*seq_parameter_set_Item)->pic_height_in_luma_samples;
-    int8u chromaArrayType = (*seq_parameter_set_Item)->ChromaArrayType();
-    if (chromaArrayType >= 4)
-        chromaArrayType = 0;
-    int32u CropUnitX=Hevc_SubWidthC [chromaArrayType];
-    int32u CropUnitY=Hevc_SubHeightC[chromaArrayType];
-    Width -=((*seq_parameter_set_Item)->conf_win_left_offset+(*seq_parameter_set_Item)->conf_win_right_offset)*CropUnitX;
-    Height-=((*seq_parameter_set_Item)->conf_win_top_offset +(*seq_parameter_set_Item)->conf_win_bottom_offset)*CropUnitY;
+    bool LegacyStreamDisplay=MediaInfoLib::Config.LegacyStreamDisplay_Get();
+    if (!LegacyStreamDisplay && !Retrieve_Const(Stream_Video, 0, Video_Format_Profile).empty())
+        return;
 
     Ztring Profile;
-    if ((*seq_parameter_set_Item)->profile_space==0)
+    if (p.profile_space==0)
     {
-        if ((*seq_parameter_set_Item)->profile_idc)
+        if (p.profile_idc)
         {
-            Profile=Ztring().From_UTF8(Hevc_profile_idc((*seq_parameter_set_Item)->profile_idc));
-            if ((*seq_parameter_set_Item)->profile_idc == 7 && (*seq_parameter_set_Item)->general_max_8bit_constraint_flag)
-                Profile+=__T(" 10");
+            Profile=Ztring().From_UTF8(Hevc_profile_idc(p.profile_idc));
+            int8u Profile_Addition_Bits=0;
+            switch (p.profile_idc)
+            {
+                case 6 :
+                case 7 :
+                    if (!p.general_max_8bit_constraint_flag)
+                    {
+                        if (!p.general_max_10bit_constraint_flag)
+                        {
+                            if (!p.general_max_12bit_constraint_flag)
+                            {
+                                if (!p.general_max_14bit_constraint_flag)
+                                    Profile_Addition_Bits=4;
+                                else
+                                    Profile_Addition_Bits=3;
+                            }
+                            else
+                                Profile_Addition_Bits=2;
+                        }
+                        else
+                            Profile_Addition_Bits=1;
+                    }
+            }
+            if (Profile_Addition_Bits)
+            {
+                Profile+=' ';
+                Profile+=Ztring::ToZtring(8+Profile_Addition_Bits*2);
+            }
         }
-        if ((*seq_parameter_set_Item)->level_idc)
+        if (p.level_idc)
         {
-            if ((*seq_parameter_set_Item)->profile_idc)
+            if (p.profile_idc)
                 Profile+=__T('@');
-            Profile+=__T('L')+Ztring().From_Number(((float)(*seq_parameter_set_Item)->level_idc)/30, ((*seq_parameter_set_Item)->level_idc%10)?1:0);
+            Profile+=__T('L')+Ztring().From_Number(((float)p.level_idc)/30, (p.level_idc%10)?1:0);
             Profile+=__T('@');
-            Profile+=Ztring().From_UTF8(Hevc_tier_flag((*seq_parameter_set_Item)->tier_flag));
+            Profile+=Ztring().From_UTF8(Hevc_tier_flag(p.tier_flag));
         }
     }
     Fill(Stream_Video, 0, Video_Format_Profile, Profile);
     Fill(Stream_Video, 0, Video_Codec_Profile, Profile);
+}
+
+//---------------------------------------------------------------------------
+void File_Hevc::Streams_Fill(std::vector<video_parameter_set_struct*>::iterator video_parameter_set_Item)
+{
+    if ((*video_parameter_set_Item)->profile_tier_level_info_layers.size()==1)
+        return; //Priority on seq_parameter_set
+
+    const auto&p=(*video_parameter_set_Item)->profile_tier_level_info_layers.back();
+    Streams_Fill_Profile(p);
+    if (!(*video_parameter_set_Item)->view_id_val.empty())
+    {
+        size_t Count=0;
+        for (const auto val : (*video_parameter_set_Item)->view_id_val)
+            if (val!=(int16u)-1)
+                Count++;
+        Fill(Stream_Video, 0, Video_MultiView_Count, Count);
+    }
+}
+
+//---------------------------------------------------------------------------
+void File_Hevc::Streams_Fill(std::vector<seq_parameter_set_struct*>::iterator seq_parameter_set_Item_)
+{
+    auto seq_parameter_set_Item = *seq_parameter_set_Item_;
+    if (seq_parameter_set_Item->nuh_layer_id)
+        return;
+
+    int32u Width = seq_parameter_set_Item->pic_width_in_luma_samples;
+    int32u Height= seq_parameter_set_Item->pic_height_in_luma_samples;
+    int8u chromaArrayType = seq_parameter_set_Item->ChromaArrayType();
+    if (chromaArrayType >= 4)
+        chromaArrayType = 0;
+    int32u CropUnitX=Hevc_SubWidthC [chromaArrayType];
+    int32u CropUnitY=Hevc_SubHeightC[chromaArrayType];
+    Width -=(seq_parameter_set_Item->conf_win_left_offset+seq_parameter_set_Item->conf_win_right_offset)*CropUnitX;
+    Height-=(seq_parameter_set_Item->conf_win_top_offset +seq_parameter_set_Item->conf_win_bottom_offset)*CropUnitY;
+
+    const auto& p=seq_parameter_set_Item->profile_tier_level_info;
+    Streams_Fill_Profile(p);
     Fill(Stream_Video, StreamPos_Last, Video_Width, Width);
     Fill(Stream_Video, StreamPos_Last, Video_Height, Height);
-    if ((*seq_parameter_set_Item)->conf_win_left_offset || (*seq_parameter_set_Item)->conf_win_right_offset)
-        Fill(Stream_Video, StreamPos_Last, Video_Stored_Width, (*seq_parameter_set_Item)->pic_width_in_luma_samples);
-    if ((*seq_parameter_set_Item)->conf_win_top_offset || (*seq_parameter_set_Item)->conf_win_bottom_offset)
-        Fill(Stream_Video, StreamPos_Last, Video_Stored_Height, (*seq_parameter_set_Item)->pic_height_in_luma_samples);
+    if (seq_parameter_set_Item->conf_win_left_offset || seq_parameter_set_Item->conf_win_right_offset)
+        Fill(Stream_Video, StreamPos_Last, Video_Stored_Width, seq_parameter_set_Item->pic_width_in_luma_samples);
+    if (seq_parameter_set_Item->conf_win_top_offset || seq_parameter_set_Item->conf_win_bottom_offset)
+        Fill(Stream_Video, StreamPos_Last, Video_Stored_Height, seq_parameter_set_Item->pic_height_in_luma_samples);
 
-    Fill(Stream_Video, 0, Video_ColorSpace, Hevc_chroma_format_idc_ColorSpace((*seq_parameter_set_Item)->chroma_format_idc));
-    Fill(Stream_Video, 0, Video_ChromaSubsampling, Hevc_chroma_format_idc((*seq_parameter_set_Item)->chroma_format_idc));
-    if ((*seq_parameter_set_Item)->bit_depth_luma_minus8==(*seq_parameter_set_Item)->bit_depth_chroma_minus8)
-        Fill(Stream_Video, 0, Video_BitDepth, (*seq_parameter_set_Item)->bit_depth_luma_minus8+8);
+    Fill(Stream_Video, 0, Video_ColorSpace, Hevc_chroma_format_idc_ColorSpace(seq_parameter_set_Item->chroma_format_idc));
+    Fill(Stream_Video, 0, Video_ChromaSubsampling, Hevc_chroma_format_idc(seq_parameter_set_Item->chroma_format_idc));
+    if (seq_parameter_set_Item->bit_depth_luma_minus8==seq_parameter_set_Item->bit_depth_chroma_minus8)
+        Fill(Stream_Video, 0, Video_BitDepth, seq_parameter_set_Item->bit_depth_luma_minus8+8);
 
     if (preferred_transfer_characteristics!=2)
         Fill(Stream_Video, 0, Video_transfer_characteristics, Mpegv_transfer_characteristics(preferred_transfer_characteristics));
-    if ((*seq_parameter_set_Item)->vui_parameters)
+    const auto vui_parameters = seq_parameter_set_Item->vui_parameters;
+    if (vui_parameters)
     {
-        if ((*seq_parameter_set_Item)->vui_parameters->timing_info_present_flag)
+        if (vui_parameters->time_scale && vui_parameters->num_units_in_tick)
+            Fill(Stream_Video, StreamPos_Last, Video_FrameRate, (float32)vui_parameters->time_scale / vui_parameters->num_units_in_tick);
+
+        if (vui_parameters->sar_width && vui_parameters->sar_height)
         {
-                if ((*seq_parameter_set_Item)->vui_parameters->time_scale && (*seq_parameter_set_Item)->vui_parameters->num_units_in_tick)
-                        Fill(Stream_Video, StreamPos_Last, Video_FrameRate, (float64)(*seq_parameter_set_Item)->vui_parameters->time_scale / (*seq_parameter_set_Item)->vui_parameters->num_units_in_tick);
+            auto PixelAspectRatio = ((float32)vui_parameters->sar_width) / vui_parameters->sar_height;
+            Fill(Stream_Video, 0, Video_PixelAspectRatio, PixelAspectRatio, 3, true);
+            if (Width && Height)
+                Fill(Stream_Video, 0, Video_DisplayAspectRatio, Width*PixelAspectRatio/Height, 3, true); //More precise
         }
 
-        if ((*seq_parameter_set_Item)->vui_parameters->aspect_ratio_info_present_flag)
+        if (vui_parameters->flags[video_signal_type_present_flag])
         {
-                float64 PixelAspectRatio = 1;
-                if ((*seq_parameter_set_Item)->vui_parameters->aspect_ratio_idc<Avc_PixelAspectRatio_Size)
-                        PixelAspectRatio = Avc_PixelAspectRatio[(*seq_parameter_set_Item)->vui_parameters->aspect_ratio_idc];
-                else if ((*seq_parameter_set_Item)->vui_parameters->aspect_ratio_idc == 0xFF && (*seq_parameter_set_Item)->vui_parameters->sar_height)
-                        PixelAspectRatio = ((float64) (*seq_parameter_set_Item)->vui_parameters->sar_width) / (*seq_parameter_set_Item)->vui_parameters->sar_height;
-
-                Fill(Stream_Video, 0, Video_PixelAspectRatio, PixelAspectRatio, 3, true);
-                if(Height)
-                   Fill(Stream_Video, 0, Video_DisplayAspectRatio, Width*PixelAspectRatio/Height, 3, true); //More precise
-        }
-
-        //Colour description
-        if ((*seq_parameter_set_Item)->vui_parameters->video_signal_type_present_flag)
-        {
-            Fill(Stream_Video, 0, Video_Standard, Avc_video_format[(*seq_parameter_set_Item)->vui_parameters->video_format]);
-            Fill(Stream_Video, 0, Video_colour_range, Avc_video_full_range[(*seq_parameter_set_Item)->vui_parameters->video_full_range_flag]);
-            if ((*seq_parameter_set_Item)->vui_parameters->colour_description_present_flag)
+            Fill(Stream_Video, 0, Video_Standard, Avc_video_format[vui_parameters->video_format]);
+            Fill(Stream_Video, 0, Video_colour_range, Avc_video_full_range[vui_parameters->flags[video_full_range_flag]]);
+            if (vui_parameters->flags[colour_description_present_flag])
             {
                 Fill(Stream_Video, 0, Video_colour_description_present, "Yes");
-                Fill(Stream_Video, 0, Video_colour_primaries, Mpegv_colour_primaries((*seq_parameter_set_Item)->vui_parameters->colour_primaries));
-                Fill(Stream_Video, 0, Video_transfer_characteristics, Mpegv_transfer_characteristics((*seq_parameter_set_Item)->vui_parameters->transfer_characteristics));
-                Fill(Stream_Video, 0, Video_matrix_coefficients, Mpegv_matrix_coefficients((*seq_parameter_set_Item)->vui_parameters->matrix_coefficients));
-                if ((*seq_parameter_set_Item)->vui_parameters->matrix_coefficients!=2)
-                    Fill(Stream_Video, 0, Video_ColorSpace, Mpegv_matrix_coefficients_ColorSpace((*seq_parameter_set_Item)->vui_parameters->matrix_coefficients), Unlimited, true, true);
+                Fill(Stream_Video, 0, Video_colour_primaries, Mpegv_colour_primaries(vui_parameters->colour_primaries));
+                Fill(Stream_Video, 0, Video_transfer_characteristics, Mpegv_transfer_characteristics(vui_parameters->transfer_characteristics));
+                Fill(Stream_Video, 0, Video_matrix_coefficients, Mpegv_matrix_coefficients(vui_parameters->matrix_coefficients));
+                if (vui_parameters->matrix_coefficients!=2)
+                    Fill(Stream_Video, 0, Video_ColorSpace, Mpegv_matrix_coefficients_ColorSpace(vui_parameters->matrix_coefficients), Unlimited, true, true);
             }
         }
     }
@@ -1061,13 +1129,11 @@ void File_Hevc::Header_Parse()
             case 3:     Get_B4 (Size,                           "size");
                     break;
             default:    Trusted_IsNot("No size of NALU defined");
-                        Size=(int32u)(Buffer_Size-Buffer_Offset);
+                        Header_Fill_Size(Buffer_Size-Buffer_Offset);
+                        return;
         }
-        Size+=lengthSizeMinusOne+1;
-
-        //Coherency checking
-        if (Size<lengthSizeMinusOne+1+2 || Buffer_Offset+Size>Buffer_Size || (Buffer_Offset+Size!=Buffer_Size && Buffer_Offset+Size+lengthSizeMinusOne+1>Buffer_Size))
-            Size=Buffer_Size-Buffer_Offset;
+        if (Element_Size<(int64u)lengthSizeMinusOne+1+2 || Size>Element_Size-Element_Offset)
+            return RanOutOfData("HEVC");
 
         //In case there are more than 1 NAL in the block (in Stream format), trying to find the first NAL being a slice
         size_t Buffer_Offset_Temp=Buffer_Offset+lengthSizeMinusOne+1;
@@ -1087,8 +1153,10 @@ void File_Hevc::Header_Parse()
         if (Buffer_Offset_Temp+3<=Buffer_Offset+Size)
         {
             SizedBlocks_FileThenStream=File_Offset+Buffer_Offset+Size;
-            Size=Buffer_Offset_Temp-Buffer_Offset;
+            Size=Buffer_Offset_Temp-(Buffer_Offset+Element_Offset);
         }
+
+        Header_Fill_Size(Element_Offset+Size);
 
         BS_Begin();
         Mark_0 ();
@@ -1099,10 +1167,6 @@ void File_Hevc::Header_Parse()
 
         //if (nuh_temporal_id_plus1==0) // Found 1 stream with nuh_temporal_id_plus1==0, lets disable this coherency test for the moment
         //    Trusted_IsNot("nuh_temporal_id_plus1");
-
-        FILLING_BEGIN();
-            Header_Fill_Size(Size);
-        FILLING_END();
     }
 
     //Filling
@@ -1405,6 +1469,13 @@ void File_Hevc::slice_segment_layer()
         if (first_slice_segment_in_pic_flag)
         {
             //Frame_Count
+            if (Frame_Count_NotParsedIncluded<16 && TC_Current.IsSet())
+            {
+                TimeCode TC_Previous(Retrieve_Const(Stream_Video, 0, Video_TimeCode_FirstFrame).To_UTF8(), TC_Current.GetFramesMax());
+                if (!TC_Previous.IsSet() || TC_Current<TC_Previous)
+                    Fill(Stream_Video, 0, Video_TimeCode_FirstFrame, TC_Current.ToString(), true, true);
+                TC_Current=TimeCode();
+            }
             Frame_Count++;
             if (IFrame_Count && Frame_Count_NotParsedIncluded!=(int64u)-1)
                 Frame_Count_NotParsedIncluded++;
@@ -1436,14 +1507,16 @@ void File_Hevc::slice_segment_layer()
 }
 
 //---------------------------------------------------------------------------
-void File_Hevc::video_parameter_sets_creating_data(int8u vps_video_parameter_set_id, int8u vps_max_sub_layers_minus1)
+void File_Hevc::video_parameter_sets_creating_data(int8u vps_video_parameter_set_id, const vector<profile_tier_level_struct>& profile_tier_level_info_layers, int8u vps_max_sub_layers_minus1, const vector<int16u>& view_id_val)
 {
     //Creating Data
     if (vps_video_parameter_set_id >= video_parameter_sets.size())
         video_parameter_sets.resize(vps_video_parameter_set_id + 1);
     std::vector<video_parameter_set_struct*>::iterator Data_Item = video_parameter_sets.begin() + vps_video_parameter_set_id;
     delete *Data_Item; *Data_Item = new video_parameter_set_struct(
-        vps_max_sub_layers_minus1
+        profile_tier_level_info_layers,
+        vps_max_sub_layers_minus1,
+        view_id_val
     );
 
     //NextCode
@@ -1463,9 +1536,10 @@ void File_Hevc::video_parameter_set()
     Element_Name("video_parameter_set");
 
     //Parsing
+    vector<profile_tier_level_struct> ps;
     int32u  vps_num_layer_sets_minus1;
-    int8u   vps_video_parameter_set_id, vps_max_sub_layers_minus1, vps_max_layer_id;
-    bool    vps_temporal_id_nesting_flag, vps_sub_layer_ordering_info_present_flag;
+    int8u   vps_video_parameter_set_id, vps_max_sub_layers_minus1, vps_max_layers_minus1, vps_max_layer_id;
+    bool    vps_base_layer_internal_flag, vps_temporal_id_nesting_flag, vps_sub_layer_ordering_info_present_flag;
     BS_Begin();
     Get_S1 (4,  vps_video_parameter_set_id,                     "vps_video_parameter_set_id");
     if (MustParse_VPS_SPS_PPS_FromFlv)
@@ -1474,12 +1548,21 @@ void File_Hevc::video_parameter_set()
         Skip_XX(Element_Size-Element_Offset,                     "Data");
 
         //Creating Data
-        video_parameter_sets_creating_data(vps_video_parameter_set_id, 0); //TODO: check which code is intended here
+        video_parameter_sets_creating_data(vps_video_parameter_set_id, {}, 0, {}); //TODO: check which code is intended here
 
         return;
     }
-    Skip_S1(2,                                                  "vps_reserved_three_2bits");
-    Skip_S1(6,                                                  "vps_reserved_zero_6bits");
+    Get_SB (    vps_base_layer_internal_flag,                   "vps_base_layer_internal_flag");
+    Skip_SB(                                                    "vps_base_layer_available_flag");
+    Get_S1 (6,  vps_max_layers_minus1,                          "vps_max_layers_minus1");
+    if (vps_max_layers_minus1==63)
+    {
+        Param_Info1("(Not supported)");
+        RiskCalculationN++;
+        RiskCalculationD++;
+        BS_End();
+        return;
+    }
     Get_S1 (3,  vps_max_sub_layers_minus1,                      "vps_max_sub_layers_minus1");
     if (vps_max_sub_layers_minus1>6)
     {
@@ -1497,7 +1580,8 @@ void File_Hevc::video_parameter_set()
     //    return; //Problem, not valid
     //}
     Skip_S2(16,                                                 "vps_reserved_0xffff_16bits");
-    profile_tier_level(vps_max_sub_layers_minus1);
+    ps.resize(1);
+    profile_tier_level(ps[0], true, vps_max_sub_layers_minus1);
     Get_SB (   vps_sub_layer_ordering_info_present_flag,        "vps_sub_layer_ordering_info_present_flag");
     for (int32u SubLayerPos=(vps_sub_layer_ordering_info_present_flag?0:vps_max_sub_layers_minus1); SubLayerPos<=vps_max_sub_layers_minus1; SubLayerPos++)
     {
@@ -1563,12 +1647,249 @@ void File_Hevc::video_parameter_set()
             delete VCL; VCL=NULL;
         }
     TEST_SB_END();
-    EndOfxPS(                                                   "vps_extension_flag", "vps_extension_data");
+    vector<int16u> view_id_val;
+    TESTELSE_SB_SKIP(                                           "vps_extension_flag");
+        int8u view_id_len;
+        bool splitting_flag, vps_nuh_layer_id_present_flag;
+        for (auto Bits=(Data_BS_Remain()%8); Bits; Bits--)
+            Mark_1();
+        if (vps_max_layers_minus1 && vps_base_layer_internal_flag)
+        {
+            ps.resize(ps.size()+1);
+            profile_tier_level(ps.back(), false, vps_max_sub_layers_minus1);
+        }
+        Get_SB (splitting_flag,                                 "splitting_flag");
+        int NumScalabilityTypes=0;
+        bool scalability_mask_flag[16];
+        for (int i=0; i<16; i++)
+        {
+            Get_SB (scalability_mask_flag[i],                  "scalability_mask_flag");
+            NumScalabilityTypes+=scalability_mask_flag[i];
+        }
+        int8u dimension_id_len_minus1[16];
+        for (int i=0; i<(NumScalabilityTypes-splitting_flag); i++)
+        {
+            Get_S1 (3, dimension_id_len_minus1[i],              "dimension_id_len_minus1");
+            if (dimension_id_len_minus1[i]>=6)
+            {
+                Param_Info1("dimension_id_len_minus1 not valid");
+                RiskCalculationN++;
+                RiskCalculationD++;
+                BS_End();
+                return;
+            }
+        }
+        Get_SB (vps_nuh_layer_id_present_flag,                  "vps_nuh_layer_id_present_flag");
+        auto MaxLayersMinus1=vps_max_layers_minus1>62?62:vps_max_layers_minus1;
+        int8u dimension_id[64][16];
+        int8u layer_id_in_nuh[64];
+        if (!splitting_flag)
+            for (int j=0; j<NumScalabilityTypes; j++)
+                dimension_id[0][j]=0;
+        else
+        {
+            Param_Info1("(Not supported)");
+            RiskCalculationN++;
+            RiskCalculationD++;
+            BS_End();
+            return;
+        }
+        layer_id_in_nuh[0]=0;
+        for (int i=1; i<=MaxLayersMinus1; i++)
+        {
+            if (vps_nuh_layer_id_present_flag)
+                Get_S1(6, layer_id_in_nuh[i],                  "layer_id_in_nuh");
+            else
+                layer_id_in_nuh[i]=i;
+            if (!splitting_flag)
+                for (int j=0; j<NumScalabilityTypes; j++)
+                    Get_S1 (dimension_id_len_minus1[j]+1, dimension_id[i][j], "dimension_id");
+        }
+        Get_S1 (4, view_id_len,                                 "view_id_len");
+        auto NumViews = 1;
+        int8u ScalabilityId[64][16];
+        //int8u DepthLayerFlag[64];
+        int8u ViewOrderIdx[64];
+        //int8u DependencyId[64];
+        //int8u AuxId[64];
+        memset(ScalabilityId, -1, 64 * 16 * sizeof(int8u));
+        memset(ViewOrderIdx, -1, 64 * sizeof(int8u));
+        for (int i = 0; i <= MaxLayersMinus1; i++)
+        {
+            auto lId = layer_id_in_nuh[i];
+            for (int smIdx = 0, j = 0; smIdx < 16; smIdx++)
+            {
+                if (scalability_mask_flag[smIdx])
+                    ScalabilityId[i][smIdx] = dimension_id[i][j++];
+                else
+                    ScalabilityId[i][smIdx] = 0;
+            }
+            //DepthLayerFlag[lId] = ScalabilityId[i][0];
+            ViewOrderIdx[lId] = ScalabilityId[i][1];
+            //DependencyId[lId] = ScalabilityId[i][2];
+            //AuxId[lId] = ScalabilityId[i][3];
+            if (i > 0)
+            {
+                auto newViewFlag = 1;
+                for (int j = 0; j < i; j++)
+                    if (ViewOrderIdx[lId] == ViewOrderIdx[layer_id_in_nuh[j]])
+                        newViewFlag = 0;
+                NumViews += newViewFlag;
+            }
+        }
+        if (view_id_len)
+        {
+            view_id_val.resize(64, -1);
+            for (int i=0; i<NumViews; i++)
+                if (ViewOrderIdx[i]!=(int8u)-1)
+                    Get_S2 (view_id_len, view_id_val[ViewOrderIdx[i]], "view_id_val");
+                else
+                    Trusted_IsNot("ViewOrderIdx");
+        }
+        bool direct_dependency_flag[64][64];
+        memset(direct_dependency_flag, 0, sizeof(direct_dependency_flag));
+        for (int i = 1; i <= MaxLayersMinus1; i++)
+            for (int j = 0; j < i; j++)
+                Get_SB(direct_dependency_flag[i][j],            "direct_dependency_flag");
+        int32u num_add_layer_sets;
+        int8u layerIdInListFlag[64];
+        bool DependencyFlag[64][64];
+        for (int i = 0; i <= MaxLayersMinus1; i++)
+            for (int j = 0; j <= MaxLayersMinus1; j++)
+            {
+                DependencyFlag[i][j] = direct_dependency_flag[i][j];
+                for (int k = 0; k < i; k++)
+                    if (direct_dependency_flag[i][k] && DependencyFlag[k][j])
+                        DependencyFlag[i][j] = 1;
+            }
+        int8u IdDirectRefLayer[64][64];
+        int8u IdRefLayer[64][64];
+        int8u IdPredictedLayer[64][64];
+        int8u NumDirectRefLayers[64];
+        int8u NumRefLayers[64];
+        int8u NumPredictedLayers[64];
+        int8u TreePartitionLayerIdList[64][64];
+        int8u NumLayersInTreePartition[64];
+        for (int i = 0; i <= MaxLayersMinus1; i++)
+        {
+            auto iNuhLId = layer_id_in_nuh[i];
+            int8u d = 0, r = 0, p = 0;
+            for (int j = 0; j <= MaxLayersMinus1; j++)
+            {
+                auto jNuhLid = layer_id_in_nuh[j];
+                if (direct_dependency_flag[i][j])
+                    IdDirectRefLayer[iNuhLId][d++] = jNuhLid;
+                if (DependencyFlag[i][j])
+                    IdRefLayer[iNuhLId][r++] = jNuhLid;
+                if (DependencyFlag[j][i])
+                    IdPredictedLayer[iNuhLId][p++] = jNuhLid;
+            }
+            NumDirectRefLayers[iNuhLId] = d;
+            NumRefLayers[iNuhLId] = r;
+            NumPredictedLayers[iNuhLId] = p;
+        }
+        for (int i = 0; i <= 63; i++)
+            layerIdInListFlag[i] = 0;
+        int8u k = 0;
+        for (int i = 0; i <= MaxLayersMinus1; i++)
+        {
+            auto iNuhLId = layer_id_in_nuh[i];
+            if (NumDirectRefLayers[iNuhLId] == 0)
+            {
+                TreePartitionLayerIdList[k][0] = iNuhLId;
+                int8u  h = 1;
+                for (int j = 0; j < NumPredictedLayers[iNuhLId]; j++)
+                {
+                    auto predLId = IdPredictedLayer[iNuhLId][j];
+                    if (!layerIdInListFlag[predLId])
+                    {
+                        TreePartitionLayerIdList[k][h++] = predLId;
+                        layerIdInListFlag[predLId] = 1;
+                    }
+                }
+                NumLayersInTreePartition[k++] = h;
+            }
+        }
+        auto NumIndependentLayers = k;
+
+
+        if (NumIndependentLayers > 1)
+            Get_UE (num_add_layer_sets,                         "num_add_layer_sets");
+        else
+            num_add_layer_sets=0;
+        vector<int32u> NumLayersInIdList;
+        vector<vector<int32u> > LayerSetLayerIdList;
+        vector<vector<int32u> > highest_layer_idx_plus1List;
+        highest_layer_idx_plus1List.resize(num_add_layer_sets);
+        for (int i = 0; i < num_add_layer_sets; i++)
+        {
+            highest_layer_idx_plus1List[i].reserve(NumIndependentLayers);
+            highest_layer_idx_plus1List[i].push_back(0); // Unused?
+            for (int j = 1; j < NumIndependentLayers; j++)
+            {
+                int32u highest_layer_idx_plus1;
+                Get_S4 (ceil(log2(NumLayersInTreePartition[j] + 1)), highest_layer_idx_plus1, "highest_layer_idx_plus1");
+                highest_layer_idx_plus1List[i].push_back(highest_layer_idx_plus1);
+            }
+        }
+        for (int i = 0; i < num_add_layer_sets; i++)
+        {
+            int32u layerNum = 0;
+            auto lsIdx = vps_num_layer_sets_minus1 + 1 + i;
+            for (int8u treeIdx = 1; treeIdx < NumIndependentLayers; treeIdx++)
+            {
+                for (int8u layerCnt = 0; layerCnt < highest_layer_idx_plus1List[i][treeIdx]; layerCnt++)
+                {
+                    if (LayerSetLayerIdList.size() <= lsIdx)
+                        LayerSetLayerIdList.resize(lsIdx + 1);
+                    if (LayerSetLayerIdList[lsIdx].size() <= layerNum)
+                        LayerSetLayerIdList[lsIdx].resize(layerNum + 1);
+                    LayerSetLayerIdList[lsIdx][layerNum++] = TreePartitionLayerIdList[treeIdx][layerCnt];
+                }
+            }
+            if (NumLayersInIdList.size() <= lsIdx)
+                NumLayersInIdList.resize(lsIdx + 1);
+            NumLayersInIdList[lsIdx] = layerNum;
+        }
+        TEST_SB_SKIP(                                           "vps_sub_layers_max_minus1_present_flag")
+            for (int i = 0; i <= MaxLayersMinus1; i++)
+                Skip_S1(3,                                      "sub_layers_vps_max_minus1[");
+        TEST_SB_END();
+        TEST_SB_SKIP(                                           "max_tid_ref_present_flag")
+            for (int i = 0; i <= MaxLayersMinus1; i++)
+                for (int j = i + 1; j <= MaxLayersMinus1; j++)
+                    Skip_S1(3,                                  "max_tid_il_ref_pics_plus1[");
+        TEST_SB_END();
+        Skip_SB(                                                "default_ref_layers_active_flag");
+        int32u vps_num_profile_tier_level_minus1;
+        Get_UE(vps_num_profile_tier_level_minus1,               "vps_num_profile_tier_level_minus1");
+        for (int i = vps_base_layer_internal_flag ? 2 : 1; i <= vps_num_profile_tier_level_minus1; i++)
+        {
+            bool vps_profile_present_flag;
+            Get_SB(vps_profile_present_flag,                    "vps_profile_present_flag");
+            ps.resize(ps.size()+1);
+            profile_tier_level(ps.back(), vps_profile_present_flag, vps_max_sub_layers_minus1);
+        }
+        auto NumLayerSets = vps_num_layer_sets_minus1 + 1 + num_add_layer_sets;
+        int32u num_add_olss;
+        int8u default_output_layer_idc;
+        if (NumLayerSets > 1) {
+            Get_UE (num_add_olss,                               "num_add_olss");
+            Get_S1 (2, default_output_layer_idc,                "default_output_layer_idc");
+        }
+        else
+        {
+            num_add_olss = 0;
+        }
+        Skip_BS(Data_BS_Remain(),                               "(Not parsed)");
+    TESTELSE_SB_ELSE(                                           "vps_extension_flag");
+        rbsp_trailing_bits();
+    TESTELSE_SB_END();
     BS_End();
 
     FILLING_BEGIN_PRECISE();
         //Creating Data
-        video_parameter_sets_creating_data(vps_video_parameter_set_id, vps_max_sub_layers_minus1);
+        video_parameter_sets_creating_data(vps_video_parameter_set_id, ps, vps_max_sub_layers_minus1, view_id_val);
     FILLING_END();
 }
 
@@ -1579,10 +1900,11 @@ void File_Hevc::seq_parameter_set()
     Element_Name("seq_parameter_set");
 
     //Parsing
+    profile_tier_level_struct p;
     seq_parameter_set_struct::vui_parameters_struct* vui_parameters_Item=NULL;
     int32u  sps_seq_parameter_set_id, chroma_format_idc, pic_width_in_luma_samples, pic_height_in_luma_samples, bit_depth_luma_minus8, bit_depth_chroma_minus8, log2_max_pic_order_cnt_lsb_minus4, num_short_term_ref_pic_sets;
     int32u  conf_win_left_offset=0, conf_win_right_offset=0, conf_win_top_offset=0, conf_win_bottom_offset=0, sps_max_num_reorder_pics=0;
-    int8u   video_parameter_set_id, max_sub_layers_minus1;
+    int8u   video_parameter_set_id, max_sub_layers_minus1, sps_ext_or_max_sub_layers_minus1;
     bool    separate_colour_plane_flag=false, sps_sub_layer_ordering_info_present_flag;
     BS_Begin();
     Get_S1 (4, video_parameter_set_id,                          "sps_video_parameter_set_id");
@@ -1596,9 +1918,30 @@ void File_Hevc::seq_parameter_set()
         RiskCalculationD++;
         return;
     }
+    if (nuh_layer_id)
+    {
+        const auto vps_max_sub_layers_minus1 = (*video_parameter_set_Item)->vps_max_sub_layers_minus1;
+        Get_S1 (3, sps_ext_or_max_sub_layers_minus1,            "sps_ext_or_max_sub_layers_minus1");
+        max_sub_layers_minus1=sps_ext_or_max_sub_layers_minus1 == 7 ? vps_max_sub_layers_minus1 : sps_ext_or_max_sub_layers_minus1;
+    }
+    else
+    {
+    sps_ext_or_max_sub_layers_minus1=0;
     Get_S1 (3, max_sub_layers_minus1,                           "sps_max_sub_layers_minus1");
+    }
+    auto MultiLayerExtSpsFlag=(nuh_layer_id && sps_ext_or_max_sub_layers_minus1==7);
+    if (MultiLayerExtSpsFlag)
+    {
+        p.profile_space=-1;
+        p.tier_flag=true;
+        p.profile_idc=-1;
+        p.level_idc=-1;
+    }
+    else
+    {
     Skip_SB(                                                    "sps_temporal_id_nesting_flag");
-    profile_tier_level(max_sub_layers_minus1);
+    profile_tier_level(p, true, max_sub_layers_minus1);
+    }
     Get_UE (   sps_seq_parameter_set_id,                        "sps_seq_parameter_set_id");
     if (MustParse_VPS_SPS_PPS_FromFlv)
     {
@@ -1610,7 +1953,9 @@ void File_Hevc::seq_parameter_set()
             seq_parameter_sets.resize(sps_seq_parameter_set_id+1);
         std::vector<seq_parameter_set_struct*>::iterator Data_Item=seq_parameter_sets.begin()+sps_seq_parameter_set_id;
         delete *Data_Item; *Data_Item=new seq_parameter_set_struct(
+                                                                    0,
                                                                     NULL, //TODO: check which code is intended here
+                                                                    profile_tier_level_struct().Clear(),
                                                                     0,
                                                                     0,
                                                                     0,
@@ -1623,15 +1968,7 @@ void File_Hevc::seq_parameter_set()
                                                                     0,
                                                                     0,
                                                                     0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    false,
-                                                                    false,
-                                                                    false,
-                                                                    false
+                                                                    0
                                                                     );
 
         //NextCode
@@ -1643,6 +1980,17 @@ void File_Hevc::seq_parameter_set()
 
         return;
     }
+    if (MultiLayerExtSpsFlag) {
+        TEST_SB_SKIP(                                               "update_rep_format_flag");
+            Skip_S1(1,                                              "sps_rep_format_idx");
+        TEST_SB_END();
+        chroma_format_idc=-1;
+        pic_width_in_luma_samples=-1;
+        pic_height_in_luma_samples=-1;
+        bit_depth_luma_minus8=-1;
+        bit_depth_chroma_minus8=-1;
+    }
+    else {
     Get_UE (   chroma_format_idc,                               "chroma_format_idc"); Param_Info1(Hevc_chroma_format_idc((int8u)chroma_format_idc));
     if (chroma_format_idc>=4)
     {
@@ -1678,6 +2026,7 @@ void File_Hevc::seq_parameter_set()
         RiskCalculationD++;
         return; //Problem, not valid
     }
+    }
     Get_UE (   log2_max_pic_order_cnt_lsb_minus4,               "log2_max_pic_order_cnt_lsb_minus4");
     if (log2_max_pic_order_cnt_lsb_minus4>12)
     {
@@ -1686,6 +2035,7 @@ void File_Hevc::seq_parameter_set()
         RiskCalculationD++;
         return; //Problem, not valid
     }
+    if (!MultiLayerExtSpsFlag) {
     Get_SB (   sps_sub_layer_ordering_info_present_flag,        "sps_sub_layer_ordering_info_present_flag");
     for (int32u SubLayerPos = (sps_sub_layer_ordering_info_present_flag ? 0 : max_sub_layers_minus1); SubLayerPos <= max_sub_layers_minus1; SubLayerPos++)
     {
@@ -1695,6 +2045,7 @@ void File_Hevc::seq_parameter_set()
         Skip_UE(                                                "sps_max_latency_increase_plus1");
         Element_End0();
     }
+    }
     Skip_UE(                                                    "log2_min_luma_coding_block_size_minus3");
     Skip_UE(                                                    "log2_diff_max_min_luma_coding_block_size");
     Skip_UE(                                                    "log2_min_transform_block_size_minus2");
@@ -1702,9 +2053,16 @@ void File_Hevc::seq_parameter_set()
     Skip_UE(                                                    "max_transform_hierarchy_depth_inter");
     Skip_UE(                                                    "max_transform_hierarchy_depth_intra");
     TEST_SB_SKIP(                                               "scaling_list_enabled_flag");
-        TEST_SB_SKIP(                                           "sps_scaling_list_data_present_flag");
-            scaling_list_data();
-        TEST_SB_END();
+        bool sps_infer_scaling_list_flag = false;
+        if (MultiLayerExtSpsFlag)
+           Get_SB (sps_infer_scaling_list_flag,                 "sps_infer_scaling_list_flag");
+        if (sps_infer_scaling_list_flag)
+           Skip_S1 (6,                                          "sps_scaling_list_ref_layer_id");
+        else {
+            TEST_SB_SKIP(                                       "sps_scaling_list_data_present_flag");
+                scaling_list_data();
+            TEST_SB_END();
+        }
     TEST_SB_END();
     Skip_SB(                                                    "amp_enabled_flag");
     Skip_SB(                                                    "sample_adaptive_offset_enabled_flag");
@@ -1741,9 +2099,85 @@ void File_Hevc::seq_parameter_set()
     Skip_SB(                                                    "sps_temporal_mvp_enabled_flag");
     Skip_SB(                                                    "strong_intra_smoothing_enabled_flag");
     TEST_SB_SKIP(                                               "vui_parameters_present_flag");
-        vui_parameters(video_parameter_set_Item, vui_parameters_Item);
+        vui_parameters(vui_parameters_Item, max_sub_layers_minus1);
     TEST_SB_END();
-    EndOfxPS(                                                   "sps_extension_flag", "sps_extension_data");
+    TEST_SB_SKIP(                                               "sps_extension_flag");
+        int8u sps_extension_4bits;
+        bool sps_range_extension_flag, sps_multilayer_extension_flag, sps_3d_extension_flag, sps_scc_extension_flag;
+        Get_SB (sps_range_extension_flag,                       "sps_range_extension_flag");
+        Get_SB (sps_multilayer_extension_flag,                  "sps_multilayer_extension_flag");
+        Get_SB (sps_3d_extension_flag,                          "sps_3d_extension_flag");
+        Get_SB (sps_scc_extension_flag,                         "sps_scc_extension_flag");
+        Get_S1 (4, sps_extension_4bits,                         "sps_extension_4bits");
+        if (sps_range_extension_flag)
+        {
+            Element_Begin1("sps_range_extension");
+            Skip_SB(                                            "transform_skip_rotation_enabled_flag");
+            Skip_SB(                                            "transform_skip_context_enabled_flag");
+            Skip_SB(                                            "implicit_rdpcm_enabled_flag");
+            Skip_SB(                                            "explicit_rdpcm_enabled_flag");
+            Skip_SB(                                            "extended_precision_processing_flag");
+            Skip_SB(                                            "intra_smoothing_disabled_flag");
+            Skip_SB(                                            "high_precision_offsets_enabled_flag");
+            Skip_SB(                                            "persistent_rice_adaptation_enabled_flag");
+            Skip_SB(                                            "cabac_bypass_alignment_enabled_flag");
+            Element_End0();
+        }
+        if (sps_multilayer_extension_flag)
+        {
+            Element_Begin1("sps_multilayer_extension");
+            Skip_SB(                                            "inter_view_mv_vert_constraint_flag");
+            Element_End0();
+        }
+        if (sps_3d_extension_flag)
+        {
+            Element_Begin1("sps_3d_extension");
+            Skip_SB(                                            "iv_di_mc_enabled_flag");
+            Skip_SB(                                            "iv_mv_scal_enabled_flag");
+            Skip_UE(                                            "log2_ivmc_sub_pb_size_minus3");
+            Skip_SB(                                            "iv_res_pred_enabled_flag");
+            Skip_SB(                                            "depth_ref_enabled_flag");
+            Skip_SB(                                            "vsp_mc_enabled_flag[");
+            Skip_SB(                                            "dbbp_enabled_flag");
+            Skip_SB(                                            "iv_di_mc_enabled_flag");
+            Skip_SB(                                            "iv_mv_scal_enabled_flag");
+            Skip_SB(                                            "tex_mc_enabled_flag");
+            Skip_UE(                                            "log2_texmc_sub_pb_size_minus3");
+            Skip_SB(                                            "intra_contour_enabled_flag");
+            Skip_SB(                                            "intra_dc_only_wedge_enabled_flag");
+            Skip_SB(                                            "cqt_cu_part_pred_enabled_flag");
+            Skip_SB(                                            "inter_dc_only_enabled_flag");
+            Skip_SB(                                            "skip_intra_enabled_flag");
+            Element_End0();
+        }
+        if (sps_scc_extension_flag)
+        {
+            Element_Begin1("sps_scc_extension");
+            Skip_SB(                                            "sps_curr_pic_ref_enabled_flag");
+            TEST_SB_SKIP(                                       "palette_mode_enabled_flag");
+                Skip_UE(                                        "palette_max_size");
+                Skip_UE(                                        "delta_palette_max_predictor_size");
+                TEST_SB_SKIP(                                   "sps_palette_predictor_initializers_present_flag");
+                    int32u sps_num_palette_predictor_initializers_minus1;
+                    Get_UE (sps_num_palette_predictor_initializers_minus1, "sps_num_palette_predictor_initializers_minus1");
+                    auto numComps=(chroma_format_idc==0)?1:3;
+                    for(int comp=0; comp<numComps; comp++)
+                        for (int32u i=0; i<=sps_num_palette_predictor_initializers_minus1; i++)
+                            Skip_S4(8+(comp==0?bit_depth_luma_minus8:bit_depth_chroma_minus8), "sps_palette_predictor_initializer");
+                TEST_SB_END();
+                Skip_S1(2,                                      "motion_vector_resolution_control_idc");
+                Skip_SB(                                        "intra_boundary_filtering_disabled_flag");
+            TEST_SB_END();
+            Element_End0();
+        }
+        if (sps_extension_4bits)
+        {
+            Skip_BS(Data_BS_Remain(),                           "(Not parsed)");
+            RiskCalculationN++; //xxx_extension_flag is set, we can not check the end of the content, so a bit risky
+            RiskCalculationD++;
+        }
+    TEST_SB_END();
+    rbsp_trailing_bits();
     BS_End();
 
     FILLING_BEGIN_PRECISE();
@@ -1751,12 +2185,12 @@ void File_Hevc::seq_parameter_set()
         if (sps_seq_parameter_set_id>=seq_parameter_sets.size())
             seq_parameter_sets.resize(sps_seq_parameter_set_id+1);
         std::vector<seq_parameter_set_struct*>::iterator Data_Item=seq_parameter_sets.begin()+sps_seq_parameter_set_id;
+        if (!MustParse_VPS_SPS_PPS_FromLhvc || !*Data_Item)
+        {
         delete *Data_Item; *Data_Item=new seq_parameter_set_struct(
+                                                                    nuh_layer_id,
                                                                     vui_parameters_Item,
-                                                                    profile_space,
-                                                                    tier_flag,
-                                                                    profile_idc,
-                                                                    level_idc,
+                                                                    p,
                                                                     pic_width_in_luma_samples,
                                                                     pic_height_in_luma_samples,
                                                                     conf_win_left_offset,
@@ -1769,12 +2203,9 @@ void File_Hevc::seq_parameter_set()
                                                                     (int8u)log2_max_pic_order_cnt_lsb_minus4,
                                                                     (int8u)bit_depth_luma_minus8,
                                                                     (int8u)bit_depth_chroma_minus8,
-                                                                    (int8u)sps_max_num_reorder_pics,
-                                                                    general_progressive_source_flag,
-                                                                    general_interlaced_source_flag,
-                                                                    general_frame_only_constraint_flag,
-                                                                    general_max_8bit_constraint_flag
+                                                                    (int8u)sps_max_num_reorder_pics
                                                                   );
+        }
 
         //NextCode
         NextCode_Clear();
@@ -1958,6 +2389,8 @@ void File_Hevc::pic_parameter_set()
         if (pps_pic_parameter_set_id>=pic_parameter_sets.size())
             pic_parameter_sets.resize(pps_pic_parameter_set_id+1);
         std::vector<pic_parameter_set_struct*>::iterator pic_parameter_sets_Item=pic_parameter_sets.begin()+pps_pic_parameter_set_id;
+        if (!MustParse_VPS_SPS_PPS_FromLhvc || !*pic_parameter_sets_Item)
+        {
         delete *pic_parameter_sets_Item; *pic_parameter_sets_Item = new pic_parameter_set_struct(
                                                                                                     (int8u)pps_seq_parameter_set_id,
                                                                                                     (int8u)num_ref_idx_l0_default_active_minus1,
@@ -1965,6 +2398,8 @@ void File_Hevc::pic_parameter_set()
                                                                                                     num_extra_slice_header_bits,
                                                                                                     dependent_slice_segments_enabled_flag
                                                                                                 );
+        }
+
         //Autorisation of other streams
         //if (!seq_parameter_sets.empty())
         //{
@@ -2135,6 +2570,8 @@ void File_Hevc::sei_message(int32u &seq_parameter_set_id)
         case 137 :   sei_message_mastering_display_colour_volume(); break;
         case 144 :   sei_message_light_level(); break;
         case 147 :   sei_alternative_transfer_characteristics(); break;
+        case 148 :   sei_ambient_viewing_environment(); break;
+        case 176 :   three_dimensional_reference_displays_info(payloadSize); break;
         default :
                     Element_Info1("unknown");
                     Skip_XX(payloadSize,                        "data");
@@ -2234,7 +2671,7 @@ void File_Hevc::sei_message_pic_timing(int32u &seq_parameter_set_id, int32u payl
 
     //Parsing
     BS_Begin();
-    if ((*seq_parameter_set_Item)->vui_parameters?(*seq_parameter_set_Item)->vui_parameters->frame_field_info_present_flag:((*seq_parameter_set_Item)->general_progressive_source_flag && (*seq_parameter_set_Item)->general_interlaced_source_flag))
+    if ((*seq_parameter_set_Item)->vui_parameters?(*seq_parameter_set_Item)->vui_parameters->flags[frame_field_info_present_flag]:((*seq_parameter_set_Item)->profile_tier_level_info.general_progressive_source_flag && (*seq_parameter_set_Item)->profile_tier_level_info.general_interlaced_source_flag))
     {
         Skip_S1(4,                                              "pic_struct");
         Skip_S1(2,                                              "source_scan_type");
@@ -2315,7 +2752,7 @@ void File_Hevc::sei_message_user_data_registered_itu_t_t35_B5_0031_DTG1()
         File_AfdBarData DTG1_Parser;
         for (auto seq_parameter_set_Item : seq_parameter_sets)
         {
-            if (seq_parameter_set_Item && seq_parameter_set_Item->vui_parameters && seq_parameter_set_Item->vui_parameters->aspect_ratio_info_present_flag)
+            if (seq_parameter_set_Item && seq_parameter_set_Item->vui_parameters && seq_parameter_set_Item->vui_parameters->sar_width && seq_parameter_set_Item->vui_parameters->sar_height)
             {
                 //TODO: avoid duplicated code
                 int32u Width = seq_parameter_set_Item->pic_width_in_luma_samples;
@@ -2329,11 +2766,7 @@ void File_Hevc::sei_message_user_data_registered_itu_t_t35_B5_0031_DTG1()
                 Height-=(seq_parameter_set_Item->conf_win_top_offset +seq_parameter_set_Item->conf_win_bottom_offset)*CropUnitY;
                 if (Height)
                 {
-                    float64 PixelAspectRatio = 1;
-                    if (seq_parameter_set_Item->vui_parameters->aspect_ratio_idc<Avc_PixelAspectRatio_Size)
-                            PixelAspectRatio = Avc_PixelAspectRatio[seq_parameter_set_Item->vui_parameters->aspect_ratio_idc];
-                    else if (seq_parameter_set_Item->vui_parameters->aspect_ratio_idc == 0xFF && seq_parameter_set_Item->vui_parameters->sar_height)
-                            PixelAspectRatio = ((float64) seq_parameter_set_Item->vui_parameters->sar_width) / seq_parameter_set_Item->vui_parameters->sar_height;
+                    float32 PixelAspectRatio=((float32)seq_parameter_set_Item->vui_parameters->sar_width) / seq_parameter_set_Item->vui_parameters->sar_height;
                     auto DAR=Width*PixelAspectRatio/Height;
                     if (DAR>=4.0/3.0*0.95 && DAR<4.0/3.0*1.05) DTG1_Parser.aspect_ratio_FromContainer=0; //4/3
                     if (DAR>=16.0/9.0*0.95 && DAR<16.0/9.0*1.05) DTG1_Parser.aspect_ratio_FromContainer=1; //16/9
@@ -2398,7 +2831,11 @@ void File_Hevc::sei_message_user_data_registered_itu_t_t35_B5_0031_GA94_03_Delay
             TemporalReferences_Min_New--;
         TemporalReferences_Min=TemporalReferences_Min_New;
         while (TemporalReferences[TemporalReferences_Min]==NULL)
+        {
             TemporalReferences_Min++;
+            if (TemporalReferences_Min>=TemporalReferences.size())
+                return;
+        }
     }
 
     // Parsing captions
@@ -2420,24 +2857,24 @@ void File_Hevc::sei_message_user_data_registered_itu_t_t35_B5_0031_GA94_03_Delay
             }
             if (((File_DtvccTransport*)GA94_03_Parser)->AspectRatio==0)
             {
-                float64 PixelAspectRatio=1;
-                std::vector<seq_parameter_set_struct*>::iterator seq_parameter_set_Item=seq_parameter_sets.begin();
-                for (; seq_parameter_set_Item!=seq_parameter_sets.end(); ++seq_parameter_set_Item)
-                    if ((*seq_parameter_set_Item))
+                std::vector<seq_parameter_set_struct*>::iterator seq_parameter_set_Item_=seq_parameter_sets.begin();
+                for (; seq_parameter_set_Item_!=seq_parameter_sets.end(); ++seq_parameter_set_Item_)
+                    if ((*seq_parameter_set_Item_))
                         break;
-                if (seq_parameter_set_Item!=seq_parameter_sets.end())
+                if (seq_parameter_set_Item_!=seq_parameter_sets.end())
                 {
-                    if (((*seq_parameter_set_Item)->vui_parameters) && ((*seq_parameter_set_Item)->vui_parameters->aspect_ratio_info_present_flag))
+                    const auto seq_parameter_set_Item=*seq_parameter_set_Item_;
+                    const auto vui_parameters=seq_parameter_set_Item->vui_parameters;
+                    if (vui_parameters && vui_parameters->sar_width && vui_parameters->sar_height)
                     {
-                        if ((*seq_parameter_set_Item)->vui_parameters->aspect_ratio_idc<Avc_PixelAspectRatio_Size)
-                            PixelAspectRatio=Avc_PixelAspectRatio[(*seq_parameter_set_Item)->vui_parameters->aspect_ratio_idc];
-                        else if ((*seq_parameter_set_Item)->vui_parameters->aspect_ratio_idc==0xFF && (*seq_parameter_set_Item)->vui_parameters->sar_height)
-                            PixelAspectRatio=((float64)(*seq_parameter_set_Item)->vui_parameters->sar_width)/(*seq_parameter_set_Item)->vui_parameters->sar_height;
+                        const int32u Width =seq_parameter_set_Item->pic_width_in_luma_samples;
+                        const int32u Height=seq_parameter_set_Item->pic_height_in_luma_samples;
+                        if (Height)
+                        {
+                            auto PixelAspectRatio=((float32)seq_parameter_set_Item->vui_parameters->sar_width)/seq_parameter_set_Item->vui_parameters->sar_height;
+                            ((File_DtvccTransport*)GA94_03_Parser)->AspectRatio=Width*PixelAspectRatio/Height;
+                        }
                     }
-                    const int32u Width =(*seq_parameter_set_Item)->pic_width_in_luma_samples;
-                    const int32u Height=(*seq_parameter_set_Item)->pic_height_in_luma_samples;
-                    if(Height)
-                        ((File_DtvccTransport*)GA94_03_Parser)->AspectRatio=Width*PixelAspectRatio/Height;
                 }
             }
             if (GA94_03_Parser->PTS_DTS_Needed)
@@ -2748,112 +3185,10 @@ void File_Hevc::sei_message_user_data_registered_itu_t_t35_B5_003C_0001()
 void File_Hevc::sei_message_user_data_registered_itu_t_t35_B5_003C_0001_04()
 {
     Element_Info1("SMPTE ST 2094 App 4");
-    int8u application_version;
-    bool IsHDRplus=false, tone_mapping_flag;
-    Get_B1 (application_version,                                "application_version");
-    if (application_version==1)
-    {
-        int32u targeted_system_display_maximum_luminance, maxscl[4], distribution_maxrgb_percentiles[16];
-        int16u fraction_bright_pixels;
-        int8u num_distribution_maxrgb_percentiles, distribution_maxrgb_percentages[16], num_windows, num_bezier_curve_anchors;
-        bool targeted_system_display_actual_peak_luminance_flag, mastering_display_actual_peak_luminance_flag, color_saturation_mapping_flag;
-        BS_Begin();
-        Get_S1 ( 2, num_windows,                                "num_windows");
 
-        for (int8u w=1; w<num_windows; w++)
-        {
-            Element_Begin1("window");
-            Skip_S2(16,                                         "window_upper_left_corner_x");
-            Skip_S2(16,                                         "window_upper_left_corner_y");
-            Skip_S2(16,                                         "window_lower_right_corner_x");
-            Skip_S2(16,                                         "window_lower_right_corner_y");
-            Skip_S2(16,                                         "center_of_ellipse_x");
-            Skip_S2(16,                                         "center_of_ellipse_y");
-            Skip_S1( 8,                                         "rotation_angle");
-            Skip_S2(16,                                         "semimajor_axis_internal_ellipse");
-            Skip_S2(16,                                         "semimajor_axis_external_ellipse");
-            Skip_S2(16,                                         "semiminor_axis_external_ellipse");
-            Skip_SB(                                            "overlap_process_option");
-            Element_End0();
-        }
-
-        Get_S4 (27, targeted_system_display_maximum_luminance,  "targeted_system_display_maximum_luminance");
-        TEST_SB_GET (targeted_system_display_actual_peak_luminance_flag, "targeted_system_display_actual_peak_luminance_flag");
-            int8u num_rows_targeted_system_display_actual_peak_luminance, num_cols_targeted_system_display_actual_peak_luminance;
-            Get_S1(5, num_rows_targeted_system_display_actual_peak_luminance, "num_rows_targeted_system_display_actual_peak_luminance");
-            Get_S1(5, num_cols_targeted_system_display_actual_peak_luminance, "num_cols_targeted_system_display_actual_peak_luminance");
-            for(int8u i=0; i<num_rows_targeted_system_display_actual_peak_luminance; i++)
-                for(int8u j=0; j<num_cols_targeted_system_display_actual_peak_luminance; j++)
-                    Skip_S1(4,                                   "targeted_system_display_actual_peak_luminance");
-        TEST_SB_END();
-
-        for (int8u w=0; w<num_windows; w++)
-        {
-            Element_Begin1("window");
-            for(int8u i=0; i<3; i++)
-            {
-                Get_S3 (17, maxscl[i],                          "maxscl"); Param_Info2(Ztring::ToZtring(((float)maxscl[i])/100000, 5), " cd/m2");
-            }
-            Get_S3 (17, maxscl[3],                              "average_maxrgb");   Param_Info2(Ztring::ToZtring(((float)maxscl[3])/100000, 5), " cd/m2");
-
-            Get_S1(4, num_distribution_maxrgb_percentiles,      "num_distribution_maxrgb_percentiles");
-            for (int8u i=0; i< num_distribution_maxrgb_percentiles; i++)
-            {
-                Element_Begin1(                                 "distribution_maxrgb");
-                Get_S1 ( 7, distribution_maxrgb_percentages[i], "distribution_maxrgb_percentages");
-                Get_S3 (17, distribution_maxrgb_percentiles[i], "distribution_maxrgb_percentiles");
-                Element_Info1(distribution_maxrgb_percentages[i]);
-                Element_Info1(distribution_maxrgb_percentiles[i]);
-                Element_End0();
-            }
-            Get_S2 (10, fraction_bright_pixels,                 "fraction_bright_pixels");
-            Element_End0();
-        }
-
-        TEST_SB_GET (mastering_display_actual_peak_luminance_flag, "mastering_display_actual_peak_luminance_flag");
-            int8u num_rows_mastering_display_actual_peak_luminance, num_cols_mastering_display_actual_peak_luminance;
-            Get_S1(5, num_rows_mastering_display_actual_peak_luminance, "num_rows_mastering_display_actual_peak_luminance");
-            Get_S1(5, num_cols_mastering_display_actual_peak_luminance, "num_cols_mastering_display_actual_peak_luminance");
-            for(int8u i=0; i< num_rows_mastering_display_actual_peak_luminance; i++)
-                for(int8u j=0; j< num_cols_mastering_display_actual_peak_luminance; j++)
-                    Skip_S1(4,                                   "mastering_display_actual_peak_luminance");
-        TEST_SB_END();
-
-        for (int8u w=0; w<num_windows; w++)
-        {
-            Element_Begin1("window");
-            TEST_SB_GET (tone_mapping_flag,                     "tone_mapping_flag");
-                Skip_S2(12,                                     "knee_point_x");
-                Skip_S2(12,                                     "knee_point_y");
-                Get_S1(4, num_bezier_curve_anchors,             "num_bezier_curve_anchors");
-                for (int8u i = 0; i < num_bezier_curve_anchors; i++)
-                    Skip_S2(10,                                 "bezier_curve_anchor");
-            TEST_SB_END();
-            Element_End0();
-        }
-        TEST_SB_GET (color_saturation_mapping_flag,             "color_saturation_mapping_flag");
-            Info_S1(6, color_saturation_weight,                 "color_saturation_weight"); Param_Info1(((float)color_saturation_weight)/8);
-        TEST_SB_END();
-        BS_End();
-
-        FILLING_BEGIN();
-            IsHDRplus=true;
-            if (num_windows!=1 || targeted_system_display_actual_peak_luminance_flag || num_distribution_maxrgb_percentiles!=9 || fraction_bright_pixels || mastering_display_actual_peak_luminance_flag || (distribution_maxrgb_percentages[2]>100 && distribution_maxrgb_percentages[2]!=0xFF) || (!tone_mapping_flag && targeted_system_display_maximum_luminance) || (tone_mapping_flag && num_bezier_curve_anchors>9) || color_saturation_mapping_flag)
-                IsHDRplus=false;
-            for(int8u i=0; i<4; i++)
-                if (maxscl[i]>100000)
-                    IsHDRplus=false;
-            if (IsHDRplus)
-                for(int8u i=0; i<9; i++)
-                {
-                    static const int8u distribution_maxrgb_percentages_List[9]={1, 5, 10, 25, 50, 75, 90, 95, 99};
-                    if (distribution_maxrgb_percentages[i]!=distribution_maxrgb_percentages_List[i])
-                        IsHDRplus=false;
-                    if (distribution_maxrgb_percentiles[i]>100000)
-                        IsHDRplus=false;
-                }
-        FILLING_END();
-    }
+    int8u application_version{};
+    bool IsHDRplus{ false }, tone_mapping_flag{};
+    Get_SMPTE_ST_2094_40(application_version, IsHDRplus, tone_mapping_flag);
 
     FILLING_BEGIN();
         auto& HDR_Format=HDR[Video_HDR_Format][HdrFormat_SmpteSt209440];
@@ -2899,9 +3234,10 @@ void File_Hevc::sei_message_user_data_registered_itu_t_t35_26_0004()
 void File_Hevc::sei_message_user_data_registered_itu_t_t35_26_0004_0005()
 {
     //Parsing
+    Element_Info1("T/UWA 005 (HDR Vivid)");
     int16u targeted_system_display_maximum_luminance_Max=0;
     int8u system_start_code;
-    bool color_saturation_mapping_flag;
+    bool color_saturation_mapping_enable_flag;
     Get_B1(system_start_code,                                   "system_start_code");
     if (system_start_code!=0x01)
     {
@@ -2912,30 +3248,30 @@ void File_Hevc::sei_message_user_data_registered_itu_t_t35_26_0004_0005()
     //int8u num_windows=1;
     //for (int8u w=0; w<num_windows; w++)
     {
-        Skip_S2(12,                                             "minimum_maxrgb");
-        Skip_S2(12,                                             "average_maxrgb");
-        Skip_S2(12,                                             "variance_maxrgb");
-        Skip_S2(12,                                             "maximum_maxrgb");
+        Skip_S2(12,                                             "minimum_maxrgb_pq");
+        Skip_S2(12,                                             "average_maxrgb_pq");
+        Skip_S2(12,                                             "variance_maxrgb_pq");
+        Skip_S2(12,                                             "maximum_maxrgb_pq");
     }
 
     //for (int8u w=0; w<num_windows; w++)
     {
         bool tone_mapping_enable_mode_flag;
-        Get_SB (tone_mapping_enable_mode_flag,                  "tone_mapping_mode_flag");
+        Get_SB(tone_mapping_enable_mode_flag,                   "tone_mapping_enable_mode_flag");
         if (tone_mapping_enable_mode_flag)
         {
-            bool tone_mapping_param_enable_num_b;
-            Get_SB (tone_mapping_param_enable_num_b,            "tone_mapping_param_num");
-            int tone_mapping_param_enable_num=(int)tone_mapping_param_enable_num_b; // Just for avoiding some compiler warning
-            for (int i=0; i<=tone_mapping_param_enable_num; i++)
+            int8u tone_mapping_param_enable_num;
+            Get_S1(1, tone_mapping_param_enable_num,            "tone_mapping_param_enable_num");
+            for (int i=0; i<(tone_mapping_param_enable_num+1); i++)
             {
                 Element_Begin1("tone_mapping_param");
-                int16u targeted_system_display_maximum_luminance;
+                int16u targeted_system_display_maximum_luminance_pq;
                 bool base_enable_flag, ThreeSpline_enable_flag;
-                Get_S2 (12, targeted_system_display_maximum_luminance, "targeted_system_display_maximum_luminance");
-                if (targeted_system_display_maximum_luminance_Max<targeted_system_display_maximum_luminance)
-                    targeted_system_display_maximum_luminance_Max=targeted_system_display_maximum_luminance;
-                Get_SB (    base_enable_flag,                   "base_enable_flag");
+                Get_S2(12, targeted_system_display_maximum_luminance_pq, 
+                                                                "targeted_system_display_maximum_luminance_pq");
+                if (targeted_system_display_maximum_luminance_Max<targeted_system_display_maximum_luminance_pq)
+                    targeted_system_display_maximum_luminance_Max=targeted_system_display_maximum_luminance_pq;
+                Get_SB(    base_enable_flag,                    "base_enable_flag");
                 if (base_enable_flag)
                 {
                     Skip_S2(14,                                 "base_param_m_p");
@@ -2943,50 +3279,49 @@ void File_Hevc::sei_message_user_data_registered_itu_t_t35_26_0004_0005()
                     Skip_S2(10,                                 "base_param_m_a");
                     Skip_S2(10,                                 "base_param_m_b");
                     Skip_S1( 6,                                 "base_param_m_n");
-                    Skip_S1( 2,                                 "base_param_k1");
-                    Skip_S1( 2,                                 "base_param_k2");
-                    Skip_S1( 4,                                 "base_param_k2");
+                    Skip_S1( 2,                                 "base_param_K1");
+                    Skip_S1( 2,                                 "base_param_K2");
+                    Skip_S1( 4,                                 "base_param_K3");
                     Skip_S1( 3,                                 "base_param_Delta_enable_mode");
-                    Skip_S1( 7,                                 "base_param_Delta");
-                    Get_SB (    ThreeSpline_enable_flag,        "3Spline_enable_flag");
-                    if (ThreeSpline_enable_flag)
+                    Skip_S1( 7,                                 "base_param_enable_Delta");
+                }
+                Get_SB(ThreeSpline_enable_flag,                 "3Spline_enable_flag");
+                if (ThreeSpline_enable_flag)
+                {
+                    int8u ThreeSpline_enable_num;
+                    Get_S1(1, ThreeSpline_enable_num,           "3Spline_enable_num");
+                    for (int j=0; j<(ThreeSpline_enable_num+1); j++)
                     {
-                        bool ThreeSpline_num_b;
-                        Get_SB(    ThreeSpline_num_b,           "3Spline_num");
-                        int ThreeSpline_num=(int)ThreeSpline_num_b; // Just for avoiding some compiler warning
-                        for (int j=0; j<=ThreeSpline_num; j++)
+                        Element_Begin1("3Spline");
+                        int8u ThreeSpline_TH_enable_mode;
+                        Get_S1(2, ThreeSpline_TH_enable_mode,   "3Spline_TH_enable_mode");
+                        switch (ThreeSpline_TH_enable_mode)
                         {
-                            Element_Begin1("3Spline");
-                            int8u ThreeSpline_TH_mode;
-                            Get_S1 (2, ThreeSpline_TH_mode,     "3Spline_TH_mode");
-                            switch (ThreeSpline_TH_mode)
-                            {
-                                case 0:
-                                case 2:
-                                    Skip_S1(8,                  "3Spline_TH_enable_MB");
-                                    break;
-                                default:;
-                            }
-                            Skip_S2(12,                         "3Spline_TH");
-                            Skip_S2(10,                         "3Spline_TH_Delta1");
-                            Skip_S2(10,                         "3Spline_TH_Delta2");
-                            Skip_S1( 8,                         "3Spline_enable_Strength");
-                            Element_End0();
+                            case 0:
+                            case 2:
+                                Skip_S1(8,                      "3Spline_TH_enable_MB");
+                                break;
+                            default:;
                         }
+                        Skip_S2(12,                             "3Spline_TH_enable");
+                        Skip_S2(10,                             "3Spline_TH_enable_Delta1");
+                        Skip_S2(10,                             "3Spline_TH_enable_Delta2");
+                        Skip_S1( 8,                             "3Spline_enable_Strength");
+                        Element_End0();
                     }
                 }
                 Element_End0();
             }
         }
-    }
-    Get_SB (color_saturation_mapping_flag,                      "color_saturation_mapping_flag");
-    if (color_saturation_mapping_flag)
-    {
-        int8u color_saturation_enable_num;
-        Get_S1 (3, color_saturation_enable_num,                 "color_saturation_enable_num");
-        for (int i=0; i<color_saturation_enable_num; i++)
+        Get_SB(color_saturation_mapping_enable_flag,            "color_saturation_mapping_enable_flag");
+        if (color_saturation_mapping_enable_flag)
         {
-            Skip_S1(8,                                          "color_saturation_enable_gain");
+            int8u color_saturation_enable_num;
+            Get_S1(3, color_saturation_enable_num,              "color_saturation_enable_num");
+            for (int i=0; i<color_saturation_enable_num; i++)
+            {
+                Skip_S1(8,                                      "color_saturation_enable_gain");
+            }
         }
     }
     BS_End();
@@ -3197,19 +3532,14 @@ void File_Hevc::sei_time_code()
         {
             int16u n_frames;
             int8u counting_type, seconds_value, minutes_value, hours_value, time_offset_length;
-            bool units_field_based_flag, full_timestamp_flag, discontinuity_flag, cnt_dropped_flag, seconds_flag, minutes_flag, hours_flag;
+            bool units_field_based_flag, full_timestamp_flag, seconds_flag, minutes_flag, hours_flag;
             Get_SB (units_field_based_flag,                     "units_field_based_flag");
             Get_S1 (5, counting_type,                           "counting_type");
             Get_SB (full_timestamp_flag,                        "full_timestamp_flag");
-            Get_SB (discontinuity_flag,                         "discontinuity_flag");
-            Get_SB (cnt_dropped_flag,                           "cnt_dropped_flag");
+            Skip_SB(                                            "discontinuity_flag");
+            Skip_SB(                                            "cnt_dropped_flag");
             Get_S2 (9, n_frames,                                "n_frames");
-            if (full_timestamp_flag)
-            {
-                seconds_flag=true;
-                minutes_flag=true;
-                hours_flag=true;
-            }
+            seconds_flag=minutes_flag=hours_flag=full_timestamp_flag;
             if (!full_timestamp_flag)
                 Get_SB (seconds_flag,                           "seconds_flag");
             if (seconds_flag)
@@ -3226,10 +3556,23 @@ void File_Hevc::sei_time_code()
             if (time_offset_length)
                 Skip_S1(time_offset_length,                     "time_offset_value");
             FILLING_BEGIN();
-                if (!i && seconds_flag && minutes_flag && hours_flag && !Frame_Count)
+                if (!i && seconds_flag && minutes_flag && hours_flag && Frame_Count_NotParsedIncluded<16)
                 {
-                    TimeCode TC(hours_value, minutes_value, seconds_value, n_frames, 99, TimeCode::DropFrame(counting_type==4));
-                    Fill(Stream_Video, 0, Video_TimeCode_FirstFrame, TC.ToString(), true, true);
+                    int32u FrameMax;
+                    if (counting_type>1 && counting_type!=4)
+                    {
+                        n_frames=0;
+                        FrameMax=0; //Unsupported type
+                    }
+                    else if (!seq_parameter_sets.empty() && seq_parameter_sets[0] && seq_parameter_sets[0]->vui_parameters && seq_parameter_sets[0]->vui_parameters->time_scale && seq_parameter_sets[0]->vui_parameters->num_units_in_tick) //TODO: get the exact seq
+                        FrameMax=(int32u)(float64_int64s((float64)seq_parameter_sets[0]->vui_parameters->time_scale/seq_parameter_sets[0]->vui_parameters->num_units_in_tick)-1);
+                    else if (n_frames>99)
+                        FrameMax=n_frames;
+                    else
+                        FrameMax=99;
+
+                    TC_Current=TimeCode(hours_value, minutes_value, seconds_value, n_frames, FrameMax, TimeCode::DropFrame(counting_type==4));
+                    Element_Info1(TC_Current.ToString());
                 }
             FILLING_END();
         }
@@ -3294,6 +3637,128 @@ void File_Hevc::sei_alternative_transfer_characteristics()
 
     //Parsing
     Get_B1(preferred_transfer_characteristics,                  "preferred_transfer_characteristics"); Param_Info1(Mpegv_transfer_characteristics(preferred_transfer_characteristics));
+}
+
+//---------------------------------------------------------------------------
+void File_Hevc::sei_ambient_viewing_environment()
+{
+    Element_Info1("ambient_viewing_environment");
+
+    //Parsing
+    Get_AmbientViewingEnvironment(ambient_viewing_environment_illuminance, ambient_viewing_environment_illuminance_string, ambient_viewing_environment_chromaticity);
+}
+
+//---------------------------------------------------------------------------
+void File_Hevc::three_dimensional_reference_displays_info(int32u payloadSize)
+{
+    Element_Info1("three_dimensional_reference_displays_info");
+
+    //Parsing
+    BS_Begin();
+    auto End=Data_BS_Remain()-payloadSize*8;
+    int32u prec_ref_display_width, num_ref_displays_minus1;
+    int32u left_view_id0, right_view_id0;
+    bool ref_viewing_distance_flag;
+    Get_UE (prec_ref_display_width,                             "prec_ref_display_width");
+    if (prec_ref_display_width>=32)
+    {
+        Trusted_IsNot("prec_ref_display_width out of range");
+        BS_End();
+        return;
+    }
+    TEST_SB_GET (ref_viewing_distance_flag,                     "ref_viewing_distance_flag");
+        Skip_UE(                                                "prec_ref_viewing_dist");
+    TEST_SB_END();
+    Get_UE (num_ref_displays_minus1,                            "num_ref_displays_minus1");
+    if (num_ref_displays_minus1>=32)
+    {
+        Trusted_IsNot("num_ref_displays_minus1 out of range");
+        BS_End();
+        return;
+    }
+    for (int32u i=0; i<=num_ref_displays_minus1; i++)
+    {
+        Element_Begin1("ref_display");
+        int32u left_view_id, right_view_id;
+        int8u exponent_ref_display_width;
+        Get_UE (left_view_id,                                   "left_view_id");
+        Get_UE (right_view_id,                                  "right_view_id");
+        if (!i)
+        {
+            left_view_id0=left_view_id;
+            right_view_id0=right_view_id;
+        }
+        Get_S1 (6, exponent_ref_display_width,                  "exponent_ref_display_width");
+        if (exponent_ref_display_width>=63)
+        {
+            if (exponent_ref_display_width>63)
+                Trusted_IsNot("exponent_ref_display_width out of range");
+            else
+                Param_Info1("(Not supported)");
+            BS_End();
+            return;
+        }
+        int8u refDispWidthBits;
+        if (exponent_ref_display_width)
+        {
+            auto temp=exponent_ref_display_width+prec_ref_display_width;
+            if (temp>31)
+                refDispWidthBits=(int8u)(temp-31);
+            else
+                refDispWidthBits=0;
+        }
+        else
+            refDispWidthBits=(prec_ref_display_width==31);
+        if (refDispWidthBits)
+            Skip_BS(refDispWidthBits,                           "mantissa_ref_display_width");
+        if (ref_viewing_distance_flag)
+        {
+            int8u exponent_ref_viewing_distance;
+            Get_S1 (6, exponent_ref_viewing_distance,           "exponent_ref_viewing_distance");
+            if (exponent_ref_viewing_distance>=63)
+            {
+                if (exponent_ref_viewing_distance>63)
+                    Trusted_IsNot("exponent_ref_viewing_distance out of range");
+                else
+                    Param_Info1("(Not supported)");
+                BS_End();
+                return;
+            }
+            int8u refViewDistBits;
+            if (exponent_ref_viewing_distance)
+            {
+                auto temp=exponent_ref_viewing_distance+prec_ref_display_width;
+                if (temp>31)
+                    refViewDistBits=(int8u)(temp-31);
+                else
+                    refViewDistBits=0;
+            }
+            else
+                refViewDistBits=(exponent_ref_viewing_distance==31);
+            if (refViewDistBits)
+                Skip_BS(refViewDistBits,                        "mantissa_ref_viewing_distance");
+        }
+        TEST_SB_SKIP(                                           "additional_shift_present_flag");
+            Skip_S2(10,                                         "num_sample_shift_plus512");
+        TEST_SB_END();
+        Element_End0();
+    }
+    TEST_SB_SKIP(                                               "three_dimensional_reference_displays_extension_flag");
+        Skip_BS(Data_BS_Remain()-End,                           "(Not parsed)");
+    TEST_SB_END();
+    BS_End();
+    FILLING_BEGIN_PRECISE();
+        /*
+        if (!video_parameter_sets.empty())
+        {
+            const auto& view_id_val=(*video_parameter_sets.begin())->view_id_val;
+            if (left_view_id0==view_id_val[0] && right_view_id0==view_id_val[1])
+                Fill(Stream_Video, 0, Video_MultiView_Order, "L R");
+            if (left_view_id0==view_id_val[1] && right_view_id0==view_id_val[0])
+                Fill(Stream_Video, 0, Video_MultiView_Order, "R L");
+        }
+        */
+    FILLING_END();
 }
 
 //***************************************************************************
@@ -3502,18 +3967,20 @@ void File_Hevc::slice_segment_header()
 }
 
 //---------------------------------------------------------------------------
-void File_Hevc::profile_tier_level(int8u maxNumSubLayersMinus1)
+void File_Hevc::profile_tier_level(profile_tier_level_struct& p, bool profilePresentFlag, int8u maxNumSubLayersMinus1)
 {
     Element_Begin1("profile_tier_level");
 
     //Parsing
     std::vector<bool>sub_layer_profile_present_flags, sub_layer_level_present_flags;
-    Get_S1 (2,  profile_space,                                  "general_profile_space");
-    Get_SB (    tier_flag,                                      "general_tier_flag");
-    Get_S1 (5,  profile_idc,                                    "general_profile_idc");
+    if (profilePresentFlag)
+    {
+    Get_S1 (2,  p.profile_space,                                "general_profile_space");
+    Get_SB (    p.tier_flag,                                    "general_tier_flag");
+    Get_S1 (5,  p.profile_idc,                                  "general_profile_idc"); Param_Info1(Hevc_profile_idc(p.profile_idc));
     Element_Begin1("general_profile_compatibility_flags");
         for (int8u profile_pos=0; profile_pos<32; profile_pos++)
-            if (profile_pos==profile_idc)
+            if (profile_pos==p.profile_idc)
             {
                 bool general_profile_compatibility_flag;
                 Get_SB (    general_profile_compatibility_flag, "general_profile_compatibility_flag");
@@ -3524,25 +3991,26 @@ void File_Hevc::profile_tier_level(int8u maxNumSubLayersMinus1)
                 Skip_SB(                                        "general_profile_compatibility_flag");
     Element_End0();
     Element_Begin1("general_profile_compatibility_flags");
-        Get_SB (    general_progressive_source_flag,            "general_progressive_source_flag");
-        Get_SB (    general_interlaced_source_flag,             "general_interlaced_source_flag");
+        Get_SB (    p.general_progressive_source_flag,          "general_progressive_source_flag");
+        Get_SB (    p.general_interlaced_source_flag,           "general_interlaced_source_flag");
         Skip_SB(                                                "general_non_packed_constraint_flag");
-        Get_SB (    general_frame_only_constraint_flag,         "general_frame_only_constraint_flag");
-        Skip_SB(                                                "general_max_12bit_constraint_flag");
-        Skip_SB(                                                "general_max_10bit_constraint_flag");
-        Get_SB (    general_max_8bit_constraint_flag,           "general_max_8bit_constraint_flag");
+        Get_SB (    p.general_frame_only_constraint_flag,       "general_frame_only_constraint_flag");
+        Get_SB (    p.general_max_12bit_constraint_flag,        "general_max_12bit_constraint_flag");
+        Get_SB (    p.general_max_10bit_constraint_flag,        "general_max_10bit_constraint_flag");
+        Get_SB (    p.general_max_8bit_constraint_flag,         "general_max_8bit_constraint_flag");
         Skip_SB(                                                "general_max_422chroma_constraint_flag");
         Skip_SB(                                                "general_max_420chroma_constraint_flag");
         Skip_SB(                                                "general_max_monochrome_constraint_flag");
         Skip_SB(                                                "general_intra_constraint_flag");
         Skip_SB(                                                "general_one_picture_only_constraint_flag");
         Skip_SB(                                                "general_lower_bit_rate_constraint_flag");
-        Skip_SB(                                                "general_max_14bit_constraint_flag");
+        Get_SB (    p.general_max_14bit_constraint_flag,        "general_max_14bit_constraint_flag");
         for (int8u constraint_pos=0; constraint_pos<33; constraint_pos++)
             Skip_SB(                                            "general_reserved");
         Skip_SB(                                                "general_inbld_flag");
     Element_End0();
-    Get_S1 (8,  level_idc,                                      "general_level_idc");
+    }
+    Get_S1 (8,  p.level_idc,                                    "general_level_idc");
     for (int32u SubLayerPos=0; SubLayerPos<maxNumSubLayersMinus1; SubLayerPos++)
     {
         Element_Begin1("SubLayer");
@@ -3563,7 +4031,7 @@ void File_Hevc::profile_tier_level(int8u maxNumSubLayersMinus1)
         {
             Skip_S1(2,                                          "sub_layer_profile_space");
             Skip_SB(                                            "sub_layer_tier_flag");
-            Skip_S1(5,                                          "sub_layer_profile_idc");
+            Info_S1(5, sub_layer_profile_idc,                   "sub_layer_profile_idc"); Param_Info1(Hevc_profile_idc(sub_layer_profile_idc));
             Skip_S4(32,                                         "sub_layer_profile_compatibility_flags");
             Skip_SB(                                            "sub_layer_progressive_source_flag");
             Skip_SB(                                            "sub_layer_interlaced_source_flag");
@@ -3646,30 +4114,45 @@ void File_Hevc::short_term_ref_pic_sets(int8u num_short_term_ref_pic_sets)
 }
 
 //---------------------------------------------------------------------------
-void File_Hevc::vui_parameters(std::vector<video_parameter_set_struct*>::iterator video_parameter_set_Item, seq_parameter_set_struct::vui_parameters_struct* &vui_parameters_Item_)
+void File_Hevc::vui_parameters(seq_parameter_set_struct::vui_parameters_struct* &vui_parameters_Item_, int8u maxNumSubLayersMinus1)
 {
     //Parsing
     seq_parameter_set_struct::vui_parameters_struct::xxl_common *xxL_Common=NULL;
     seq_parameter_set_struct::vui_parameters_struct::xxl *NAL = NULL, *VCL = NULL;
-    int32u  num_units_in_tick = (int32u)-1, time_scale = (int32u)-1;
-    int16u  sar_width=(int16u)-1, sar_height=(int16u)-1;
-    int8u   aspect_ratio_idc=0, video_format=5, video_full_range_flag=0, colour_primaries=2, transfer_characteristics=2, matrix_coefficients=2;
-    bool    aspect_ratio_info_present_flag, video_signal_type_present_flag, frame_field_info_present_flag, colour_description_present_flag=false, timing_info_present_flag;
-    TEST_SB_GET (aspect_ratio_info_present_flag,                "aspect_ratio_info_present_flag");
-        Get_S1 (8, aspect_ratio_idc,                            "aspect_ratio_idc"); Param_Info1C((aspect_ratio_idc<Avc_PixelAspectRatio_Size), Avc_PixelAspectRatio[aspect_ratio_idc]);
+    vui_flags flags;
+    int32u  num_units_in_tick=0, time_scale=0;
+    int16u  sar_width=0, sar_height=0;
+    int8u   video_format=5, colour_primaries=2, transfer_characteristics=2, matrix_coefficients=2;
+    bool flag;
+    TEST_SB_SKIP(                                               "aspect_ratio_info_present_flag");
+        int8u aspect_ratio_idc=0;
+        Get_S1 (8, aspect_ratio_idc,                            "aspect_ratio_idc");
         if (aspect_ratio_idc==0xFF)
         {
             Get_S2 (16, sar_width,                              "sar_width");
             Get_S2 (16, sar_height,                             "sar_height");
         }
+        else if (aspect_ratio_idc && aspect_ratio_idc <= Avc_PixelAspectRatio_Size)
+        {
+            aspect_ratio_idc--;
+            const auto& aspect_ratio = Avc_PixelAspectRatio[aspect_ratio_idc];
+            Param_Info1(aspect_ratio.w);
+            Param_Info1(aspect_ratio.h);
+            sar_width = aspect_ratio.w;
+            sar_height = aspect_ratio.h;
+        }
     TEST_SB_END();
     TEST_SB_SKIP(                                               "overscan_info_present_flag");
         Skip_SB(                                                "overscan_appropriate_flag");
     TEST_SB_END();
-    TEST_SB_GET (video_signal_type_present_flag,                "video_signal_type_present_flag");
+    TEST_SB_SKIP(                                               "video_signal_type_present_flag");
+        flags[video_signal_type_present_flag]=true;
+        bool video_full_range_flag_;
         Get_S1 (3, video_format,                                "video_format"); Param_Info1(Avc_video_format[video_format]);
-        Get_S1 (1, video_full_range_flag,                       "video_full_range_flag"); Param_Info1(Avc_video_full_range[video_full_range_flag]);
-        TEST_SB_GET (colour_description_present_flag,           "colour_description_present_flag");
+        Get_SB (   video_full_range_flag_,                      "video_full_range_flag"); Param_Info1(Avc_video_full_range[video_full_range_flag_]);
+        flags[video_full_range_flag]=video_full_range_flag_;
+        TEST_SB_SKIP(                                           "colour_description_present_flag");
+            flags[colour_description_present_flag]=true;
             Get_S1 (8, colour_primaries,                        "colour_primaries"); Param_Info1(Mpegv_colour_primaries(colour_primaries));
             Get_S1 (8, transfer_characteristics,                "transfer_characteristics"); Param_Info1(Mpegv_transfer_characteristics(transfer_characteristics));
             Get_S1 (8, matrix_coefficients,                     "matrix_coefficients"); Param_Info1(Mpegv_matrix_coefficients(matrix_coefficients));
@@ -3681,21 +4164,22 @@ void File_Hevc::vui_parameters(std::vector<video_parameter_set_struct*>::iterato
     TEST_SB_END();
     Skip_SB(                                                    "neutral_chroma_indication_flag");
     Skip_SB(                                                    "field_seq_flag");
-    Get_SB (   frame_field_info_present_flag,                   "frame_field_info_present_flag");
+    Get_SB (   flag,                                            "frame_field_info_present_flag");
+    flags[frame_field_info_present_flag]=flag;
     TEST_SB_SKIP(                                               "default_display_window_flag ");
         Skip_UE(                                                "def_disp_win_left_offset");
         Skip_UE(                                                "def_disp_win_right_offset");
         Skip_UE(                                                "def_disp_win_top_offset");
         Skip_UE(                                                "def_disp_win_bottom_offset");
     TEST_SB_END();
-    TEST_SB_GET (timing_info_present_flag,                      "timing_info_present_flag");
+    TEST_SB_SKIP(                                               "timing_info_present_flag");
         Get_S4 (32, num_units_in_tick,                          "num_units_in_tick");
         Get_S4 (32, time_scale,                                 "time_scale");
         TEST_SB_SKIP(                                           "vui_poc_proportional_to_timing_flag");
             Skip_UE(                                            "vui_num_ticks_poc_diff_one_minus1");
         TEST_SB_END();
         TEST_SB_SKIP(                                           "hrd_parameters_present_flag");
-            hrd_parameters(true, (*video_parameter_set_Item)->vps_max_sub_layers_minus1, xxL_Common, NAL, VCL);
+            hrd_parameters(true, maxNumSubLayersMinus1, xxL_Common, NAL, VCL);
         TEST_SB_END();
     TEST_SB_END();
     TEST_SB_SKIP(                                               "bitstream_restriction_flag");
@@ -3718,17 +4202,11 @@ void File_Hevc::vui_parameters(std::vector<video_parameter_set_struct*>::iterato
                                                                                     time_scale,
                                                                                     sar_width,
                                                                                     sar_height,
-                                                                                    aspect_ratio_idc,
                                                                                     video_format,
-                                                                                    video_full_range_flag,
                                                                                     colour_primaries,
                                                                                     transfer_characteristics,
                                                                                     matrix_coefficients,
-                                                                                    aspect_ratio_info_present_flag,
-                                                                                    video_signal_type_present_flag,
-                                                                                    frame_field_info_present_flag,
-                                                                                    colour_description_present_flag,
-                                                                                    timing_info_present_flag
+                                                                                    flags
                                                                                   );
     FILLING_ELSE();
     delete xxL_Common; xxL_Common=NULL;
@@ -3863,7 +4341,7 @@ void File_Hevc::scaling_list_data()
                 size_t coefNum=std::min(64, (1<<(4+(sizeId<<1))));
                 if( sizeId > 1 )
                 {
-                    Skip_SE(                                    "scaling_list_dc_coef_minus8"); //[ sizeId ? 2 ][ matrixId ] se(v)
+                    Skip_SE(                                    "scaling_list_dc_coef_minus8"); //[ sizeId ? 2 ][ matrixId ] se(p)
                     //nextCoef = scaling_list_dc_coef_minus8[ sizeId ? 2 ][ matrixId ] + 8
                 }
                 for(size_t i=0; i<coefNum; i++)
@@ -3906,14 +4384,17 @@ void File_Hevc::VPS_SPS_PPS()
     int8u  numOfArrays, constantFrameRate, numTemporalLayers;
     bool   general_tier_flag, temporalIdNested;
     Get_B1 (configurationVersion,                               "configurationVersion");
+    if (!MustParse_VPS_SPS_PPS_FromLhvc)
+    {
     BS_Begin();
         Get_S1 (2, general_profile_space,                       "general_profile_space");
         Get_SB (   general_tier_flag,                           "general_tier_flag");
-        Get_S1 (5, general_profile_idc,                         "general_profile_idc");
+        Get_S1 (5, general_profile_idc,                         "general_profile_idc"); Param_Info1(Hevc_profile_idc(general_profile_idc));
     BS_End();
     Get_B4 (general_profile_compatibility_flags,                "general_profile_compatibility_flags");
     Get_B6 (general_constraint_indicator_flags,                 "general_constraint_indicator_flags");
     Get_B1 (general_level_idc,                                  "general_level_idc");
+    }
     BS_Begin();
         Mark_1_NoTrustError();
         Mark_1_NoTrustError();
@@ -3930,6 +4411,8 @@ void File_Hevc::VPS_SPS_PPS()
         Mark_1_NoTrustError();
         Skip_S1(2,                                              "parallelismType");
     BS_End();
+    if (!MustParse_VPS_SPS_PPS_FromLhvc)
+    {
     BS_Begin();
         Mark_1_NoTrustError();
         Mark_1_NoTrustError();
@@ -3956,6 +4439,7 @@ void File_Hevc::VPS_SPS_PPS()
         Get_S1 (3, bitDepthChromaMinus8,                        "bitDepthChromaMinus8");
     BS_End();
     Skip_B2(                                                    "avgFrameRate");
+    }
     BS_Begin();
         Get_S1 (2, constantFrameRate,                           "constantFrameRate");
         Get_S1 (3, numTemporalLayers,                           "numTemporalLayers");
@@ -4016,6 +4500,10 @@ void File_Hevc::VPS_SPS_PPS()
     MustParse_VPS_SPS_PPS=false;
     FILLING_BEGIN_PRECISE();
         Accept("HEVC");
+    FILLING_ELSE();
+        Frame_Count_NotParsedIncluded--;
+        RanOutOfData("HEVC");
+        Frame_Count_NotParsedIncluded++;
     FILLING_END();
 }
 

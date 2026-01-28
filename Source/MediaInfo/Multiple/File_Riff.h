@@ -66,6 +66,10 @@ private :
 
     bool BookMark_Needed();
 
+    #if MEDIAINFO_CONFORMANCE
+        string CreateElementName();
+    #endif //MEDIAINFO_CONFORMANCE
+
     //Data
     struct stream
     {
@@ -135,6 +139,12 @@ private :
     int64u Interleaved1_10;
 
     //Temp
+    struct chunk_size_64
+    {
+        int32u                  ChunkId;
+        int64u                  Size;
+    };
+    std::vector<chunk_size_64> DS64_Table;
     Ztring INFO_ISMP;
     Ztring Tdat_tc_A;
     Ztring Tdat_tc_O;
@@ -142,6 +152,7 @@ private :
     File_DolbyAudioMetadata* DolbyAudioMetadata;
     #if defined(MEDIAINFO_ADM_YES)
     File_Adm* Adm;
+    File_Adm* Adm_chna;
     #endif
     int64u WAVE_data_Size;  //RF64 WAVE_data real chunk size
     int64u WAVE_fact_samplesCount;  //RF64 WAVE_fact real samplesCount
@@ -169,6 +180,7 @@ private :
     bool   IsBigEndian;
     bool   IsWave64;
     bool   IsRIFF64;
+    bool   IsBW64;
     bool   IsWaveBroken;
     bool   IsNotWordAligned;
     bool   IsNotWordAligned_Tested;
@@ -181,6 +193,7 @@ private :
         Kind_Wave,
         Kind_Aiff,
         Kind_Rmp3,
+        Kind_Axml,
     };
     kind Kind;
     #if defined(MEDIAINFO_GXF_YES)
@@ -224,7 +237,7 @@ private :
     void AVI__hdlr_strl_strf ();
     void AVI__hdlr_strl_strf_auds ();
     void AVI__hdlr_strl_strf_auds_Mpega();
-    void AVI__hdlr_strl_strf_auds_Aac();
+    void AVI__hdlr_strl_strf_auds_Aac(bool IsHEAACWAVEFORMAT=false);
     void AVI__hdlr_strl_strf_auds_Vorbis();
     void AVI__hdlr_strl_strf_auds_Vorbis2();
     void AVI__hdlr_strl_strf_auds_ExtensibleWave(int16u BitsPerSample);
@@ -318,8 +331,10 @@ private :
     void WAVE_adtl_ltxt();
     void WAVE_adtl_note();
     void WAVE_axml ();
+    void WAVE_axml_Continue ();
     void WAVE_bext ();
     void WAVE_bxml () {WAVE_axml();}
+    void WAVE_C2PA();
     void WAVE_chna();
     void WAVE_cset() { AVI__CSET(); }
     void WAVE_CSET() { AVI__CSET(); }

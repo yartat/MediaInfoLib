@@ -64,6 +64,7 @@ namespace Elements
     const int32u AIFF_SSND=0x53534E44;
     const int32u AVI_=0x41564920;
     const int32u AVI__hdlr_strl_strh_txts=0x74787473;
+    const int32u BW64=0x42573634;
     const int32u FORM=0x464F524D;
     const int32u LIST=0x4C495354;
     const int32u MThd=0x4D546864;
@@ -76,6 +77,7 @@ namespace Elements
     const int32u SMV0_xxxx=0x534D563A;
     const int32u W3DI=0x57334449;
     const int32u WAVE=0x57415645;
+    const int32u WAVE_axml=0x61786D6C;
     const int32u WAVE_data=0x64617461;
     const int32u WAVE_ds64=0x64733634;
 }
@@ -131,6 +133,7 @@ File_Riff::File_Riff()
     DolbyAudioMetadata=NULL;
     #if defined(MEDIAINFO_ADM_YES)
         Adm=NULL;
+        Adm_chna=NULL;
     #endif
     WAVE_data_Size=(int64u)-1;
     WAVE_fact_samplesCount=(int64u)-1;
@@ -156,6 +159,7 @@ File_Riff::File_Riff()
     IsBigEndian=false;
     IsWave64=false;
     IsRIFF64=false;
+    IsBW64=false;
     IsWaveBroken=false;
     IsNotWordAligned=false;
     IsNotWordAligned_Tested=false;
@@ -179,6 +183,7 @@ File_Riff::~File_Riff()
     delete DolbyAudioMetadata;
     #if defined(MEDIAINFO_ADM_YES)
         delete Adm;
+        delete Adm_chna;
     #endif
 }
 
@@ -209,11 +214,16 @@ void File_Riff::Streams_Finish ()
 
     //Global
     if (IsRIFF64)
-        Fill(Stream_General, 0, General_Format_Profile, "RF64");
+        Fill(Stream_General, 0, General_Format_Profile, IsBW64?"BW64":"RF64");
     if (DolbyAudioMetadata) //Before ADM for having content before all ADM stuff
         Merge(*DolbyAudioMetadata, Stream_Audio, 0, 0);
     if (Adm)
     {
+        if (Adm_chna)
+        {
+            Adm->chna_Move(Adm_chna);
+            delete Adm_chna; Adm_chna=NULL;
+        }
         Finish(Adm);
         Merge(*Adm, Stream_Audio, 0, 0);
     }
@@ -303,21 +313,28 @@ void File_Riff::Streams_Finish ()
                 for (size_t Pos=0; Pos<Temp->second.Parsers[0]->Count_Get(StreamKind_Last); Pos++)
                 {
                     Ztring Temp_ID=ID;
-                    Ztring Temp_ID_String=ID;
                     Merge(*Temp->second.Parsers[0], StreamKind_Last, Pos, StreamPos_Base+Pos);
                     if (!Retrieve(StreamKind_Last, StreamPos_Last, General_ID).empty())
                     {
                         if (!Temp_ID.empty())
-                        {
                             Temp_ID+=__T('-');
-                            Temp_ID_String+=__T('-');
-                        }
                         Temp_ID+=Retrieve(StreamKind_Last, StreamPos_Last, General_ID);
-                        Temp_ID_String+=Retrieve(StreamKind_Last, StreamPos_Last, General_ID);
                     }
                     Fill(StreamKind_Last, StreamPos_Last, General_ID, Temp_ID, true);
-                    Fill(StreamKind_Last, StreamPos_Last, General_StreamOrder, Temp_ID_String, true);
+                    auto Temp_ID_DashPos=Temp_ID.find(__T('-'));
+                    if (Temp_ID_DashPos!=string::npos)
+                        Temp_ID.resize(Temp_ID_DashPos);
+                    Fill(StreamKind_Last, StreamPos_Last, General_StreamOrder, Temp_ID, true);
 
+                    //Special case: multiple fmt/data chunks in WAV
+                    if (StreamKind_Last==Stream_Audio //TODO: smarter merge
+                        && Temp->second.Compression==1
+                        && Retrieve(Stream_General, 0, General_Format)==__T("Wave")
+                        && Temp->second.Parsers[0]->Get(Stream_Audio, 0, Audio_Format)==__T("PCM"))
+                    {
+                        for (size_t i=0; i<StreamPos_Base; i++)
+                            Merge(*Temp->second.Parsers[0], Stream_Audio, i, i);
+                    }
 
                     //Special case - MPEG Video + Captions
                     if (StreamKind_Last==Stream_Video && Temp->second.Parsers[0]->Count_Get(Stream_Text))
@@ -816,21 +833,33 @@ bool File_Riff::Header_Begin()
                     Element_Size-=BlockAlign;
                 if (Element_Size==0)
                     Element_Size=BlockAlign;
-                if (Buffer_Offset+Element_Size>Buffer_Size)
+                if (Element_Size>Buffer_Size-Buffer_Offset)
                     return false;
             }
             else
         #endif //MEDIAINFO_DEMUX
-        if (File_Offset+Buffer_Size<=Buffer_DataToParse_End)
-            Element_Size=Buffer_Size; //All the buffer is used
+        if (File_Offset+Buffer_Size<Buffer_DataToParse_End)
+        {
+            Element_Size=Buffer_Size-Buffer_Offset; //All the buffer is used
+            Alignement_ExtraByte=0;
+        }
         else
         {
             Element_Size=Buffer_DataToParse_End-(File_Offset+Buffer_Offset);
+
+            //Alignment
+            if (Buffer_DataToParse_End%2 && Buffer_DataToParse_End<File_Size)
+            {
+                Element_Size++; //Always 2-byte aligned
+                if ((size_t)Element_Size>Buffer_Size-Buffer_Offset)
+                    return false;
+                Alignement_ExtraByte=1;
+            }
+            else
+                Alignement_ExtraByte=0;
+
             Buffer_DataToParse_End=0;
         }
-
-        if (Buffer_Offset+(size_t)Element_Size>Buffer_Size)
-            return false;
 
         // Fake header
         Element_Begin1("...Continued"); //TODO: better method
@@ -838,7 +867,12 @@ bool File_Riff::Header_Begin()
         Element_Begin1("...Continued");
         Element_ThisIsAList();
         if (Buffer_DataToParse_End)
+        {
+            Header_Fill_Code(0x64617461);
             Header_Fill_Size(Buffer_DataToParse_End-(File_Offset+Buffer_Offset));
+            if (Buffer_DataToParse_End>File_Size)
+                Buffer_DataToParse_End=File_Size; // Done here for at least one conformance check of the value. TODO: better handling
+        }
         else
             Header_Fill_Size(Element_Size);
         Element_End();
@@ -848,19 +882,24 @@ bool File_Riff::Header_Begin()
             case Kind_Wave : WAVE_data_Continue(); break;
             case Kind_Aiff : AIFF_SSND_Continue(); break;
             case Kind_Rmp3 : RMP3_data_Continue(); break;
+            case Kind_Axml : WAVE_axml_Continue(); break;
             default        : AVI__movi_xxxx();
         }
 
         bool ShouldStop=false;
-        if (Config->ParseSpeed<1.0 && File_Offset+Buffer_Offset+Element_Offset-Buffer_DataToParse_Begin>=256*1024)
+        if (Kind!=Kind_Axml && Config->ParseSpeed<1.0 && File_Offset+Buffer_Offset+Element_Offset-Buffer_DataToParse_Begin>=256*1024)
         {
             ShouldStop=true;
             for (std::map<int32u, stream>::iterator StreamItem=Stream.begin(); StreamItem!=Stream.end(); ++StreamItem)
                 if (StreamItem->second.Parsers.size()>1 || (!StreamItem->second.Parsers.empty() && !StreamItem->second.Parsers[0]->Status[IsFilled]))
                     ShouldStop=false;
         }
-        if (ShouldStop)
+        if (ShouldStop && Buffer_DataToParse_End)
         {
+            //Alignment
+            if (Buffer_DataToParse_End%2)
+                Buffer_DataToParse_End++; //Always 2-byte aligned
+
             File_GoTo=Buffer_DataToParse_End;
             Buffer_Offset=Buffer_Size;
             Element_Size=0;
@@ -1001,6 +1040,16 @@ void File_Riff::Header_Parse()
             Size_Complete=WAVE_data_Size;
             Param_Info1(Size_Complete);
         }
+        else if (Element_Level==3) // Only the chunks directly under the main RIFF chunk
+        {
+            for (const chunk_size_64& DS64_Table_Temp : DS64_Table)
+            {
+                if (DS64_Table_Temp.ChunkId==Name) {
+                    Size_Complete=DS64_Table_Temp.Size;
+                    Param_Info1(Size_Complete);
+                }
+            }
+        }
     }
 
     //Testing malformed (not word aligned)
@@ -1012,7 +1061,7 @@ void File_Riff::Header_Parse()
         else if (!File_Name.empty())
         {
             File F(File_Name);
-            F.GoTo(File_Offset+Buffer_Offset+8+Size);
+            F.GoTo(File_Offset+Buffer_Offset+8+Size_Complete); // TODO: remove this code and check non word aligned streams directly
             int8u Temp;
             if (F.Read(&Temp, 1))
             {
@@ -1032,9 +1081,8 @@ void File_Riff::Header_Parse()
     }
     if (File_Offset+Buffer_Offset+8+Size_Complete>File_Size)
     {
-        Size_Complete=File_Size-(File_Offset+Buffer_Offset+8);
         if (Element_Level<=2) //Incoherencies info only at the top level chunk
-            Fill(Stream_General, 0, "IsTruncated", "Yes");
+            IsTruncated(File_Offset+Buffer_Offset+8+Size_Complete, Element_Offset!=8, Ztring().From_CC4(Name).Trim().To_UTF8().c_str());
     }
 
     //Alignment
@@ -1049,12 +1097,15 @@ void File_Riff::Header_Parse()
     //Top level chunks
     if (Name==Elements::LIST
      || Name==Elements::RIFF
+     || Name==Elements::BW64
      || Name==Elements::RF64
      || Name==Elements::ON2_
      || Name==Elements::FORM)
     {
         if (Name==Elements::RF64)
             IsRIFF64=true;
+        if (Name==Elements::BW64)
+            IsRIFF64=IsBW64=true;
         Get_C4 (Name,                                           "Real Name");
 
         //Handling buggy files
@@ -1089,14 +1140,20 @@ void File_Riff::Header_Parse()
         Buffer_DataToParse_End=File_Offset+Buffer_Offset+8+Size_Complete;
         Size_Complete=Buffer_Size-(Buffer_Offset+8);
     }
-    if ((Name==Elements::WAVE_data || Name==Elements::AIFF_SSND))
+    if ((Name==Elements::WAVE_data || Name==Elements::AIFF_SSND || Name==Elements::WAVE_axml))
     {
-        Buffer_DataToParse_Begin=File_Offset+Buffer_Offset+8;
+        int64u End;
         if (Size_Complete)
-            Buffer_DataToParse_End=File_Offset+Buffer_Offset+8+Size_Complete;
+            End=File_Offset+Buffer_Offset+8+Size_Complete;
         else
-            Buffer_DataToParse_End=File_Size; //Found one file with 0 as size of data part
-        Size_Complete=(Name==Elements::AIFF_SSND?8:0);
+            End=File_Size; //Found one file with 0 as size of data part
+        if (File_Offset+Buffer_Size<End)
+        {
+            Buffer_DataToParse_Begin=File_Offset+Buffer_Offset+8;
+            Buffer_DataToParse_End=End-Alignement_ExtraByte;
+            Alignement_ExtraByte=0; // Will be recalculated later
+            Size_Complete=(Name==Elements::AIFF_SSND?8:0);
+        }
     }
 
     //Filling
@@ -1132,6 +1189,27 @@ bool File_Riff::BookMark_Needed()
     Index_Pos.clear(); //We didn't succeed to find theses indexes :(
     return true;
 }
+
+//---------------------------------------------------------------------------
+#if MEDIAINFO_CONFORMANCE
+string File_Riff::CreateElementName()
+{
+    string Result;
+    for (size_t i = 1; i < Element_Level; i++) {
+        Result += Ztring().From_CC4(Element[i].Code).Trim().To_UTF8();
+        if (Result.empty()) {
+            Result = "0x20202020"; // Full of spaces
+        }
+        else if (Result.back() >= '0' && Result.back() <= '9') {
+            Result += '_';
+        }
+        Result += __T(' ');
+    }
+    if (!Result.empty())
+        Result.pop_back();
+    return Result;
+}
+#endif
 
 //***************************************************************************
 // Helpers

@@ -357,6 +357,7 @@ void File_Mpegh3da::Streams_Fill()
     bool NoLoudnesConch;
     if (!Mpegh3da_loudnessInfo_Data[0].empty())
     {
+        C.IFrameParsed=true;
         C.Reset(false, true);
         C.loudnessInfo_Data[0]=Mpegh3da_loudnessInfo_Data[0].begin()->second.Data[0];
         C.loudnessInfo_Data[1]=Mpegh3da_loudnessInfo_Data[0].begin()->second.Data[1];
@@ -407,6 +408,7 @@ void File_Mpegh3da::Streams_Fill()
             std::map<int8u, loudness_info_data>::iterator Loudness=Mpegh3da_loudnessInfo_Data[3].find(P.ID);
             if (Loudness!=Mpegh3da_loudnessInfo_Data[3].end())
             {
+                C.IFrameParsed=true;
                 C.Reset(false, true);
                 C.loudnessInfo_Data[0]=Loudness->second.Data[0];
                 Fill_Loudness(p.c_str(), NoLoudnesConch);
@@ -538,6 +540,7 @@ void File_Mpegh3da::Streams_Fill()
             std::map<int8u, loudness_info_data>::iterator Loudness=Mpegh3da_loudnessInfo_Data[1].find(G.ID);
             if (Loudness!=Mpegh3da_loudnessInfo_Data[1].end())
             {
+                C.IFrameParsed=true;
                 C.Reset(false, true);
                 C.loudnessInfo_Data[0]=Loudness->second.Data[0];
                 Fill_Loudness(g.c_str(), NoLoudnesConch);
@@ -559,6 +562,7 @@ void File_Mpegh3da::Streams_Fill()
             std::map<int8u, loudness_info_data>::iterator Loudness=Mpegh3da_loudnessInfo_Data[2].find(G.ID);
             if (Loudness!=Mpegh3da_loudnessInfo_Data[2].end())
             {
+                C.IFrameParsed=true;
                 C.Reset(false, true);
                 C.loudnessInfo_Data[0]=Loudness->second.Data[0];
                 Fill_Loudness(g.c_str(), NoLoudnesConch);
@@ -614,7 +618,10 @@ void File_Mpegh3da::Streams_Fill()
                     Summary+=Retrieve_Const(Stream_Audio, 0, (e+" NumberOfObjects/String").c_str()).To_UTF8();
                     break;
             default:
-                    Summary+=Mpegh3da_signalGroupType[E.Type];
+                    if (E.Type<Mpegh3da_signalGroupType_Size)
+                        Summary+=Mpegh3da_signalGroupType[E.Type];
+                    else
+                        Summary+=to_string(E.Type);
         }
         if (!Summary.empty())
             Fill(Stream_Audio, 0, e.c_str(), Summary, true, true);
@@ -630,6 +637,12 @@ void File_Mpegh3da::Streams_Finish()
 //***************************************************************************
 // Buffer - Global
 //***************************************************************************
+
+//---------------------------------------------------------------------------
+void File_Mpegh3da::Read_Buffer_Init()
+{
+    File_Usac::Read_Buffer_Init();
+}
 
 //---------------------------------------------------------------------------
 void File_Mpegh3da::Read_Buffer_Continue()

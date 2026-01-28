@@ -17,6 +17,7 @@
 
 //---------------------------------------------------------------------------
 #include "MediaInfo/Tag/File__Tags.h"
+#include <memory>
 //---------------------------------------------------------------------------
 
 namespace MediaInfoLib
@@ -32,6 +33,7 @@ public :
     //In
     bool NoFileHeader;
     bool VorbisHeader;
+    bool FromIamf;
 
     //Constructor/Destructor
     File_Flac();
@@ -63,6 +65,7 @@ private :
     //Temp
     bool Last_metadata_block;
     bool IsAudioFrames;
+    std::unique_ptr<int16u[]> CRC_16_Table;
 };
 
 //***************************************************************************

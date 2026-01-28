@@ -59,12 +59,16 @@ private :
     //Elements
     void id_07();
     void id_0D();
+    void id_0E();
+    void id_26();
     void id_25();
+    void id_27();
+    void id_29() { id_26(); }
 
     //Temp - Technical info
-    int32u total_samples_FirstFrame;
-    int32u block_index_FirstFrame;
-    int32u block_index_LastFrame;
+    int64u total_samples_FirstFrame;
+    int64u block_index_FirstFrame;
+    int64u block_index_LastFrame;
     int32u block_samples_LastFrame;
     bool   resolution0;
     bool   resolution1;
@@ -72,8 +76,12 @@ private :
     bool   hybrid;
     bool   joint_stereo;
     bool   cross_channel_decorrelation;
-    int8u  SamplingRate;
-    int8u  num_channels;
+    bool   correction;
+    bool   dsf;
+    int8u  SamplingRate_Index;
+    int8u  SamplingRate_Shift;
+    int16u num_channels;
+    int32u SamplingRate;
     int32u channel_mask;
     int32u Size;
     int16u version;
