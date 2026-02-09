@@ -53,6 +53,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Set current date as environment variable
+         run: echo "BUILD_DATE=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+         shell: bash
       - name: Dependencies
         if: ${{ runner.os != 'Windows' }}
         run: |
@@ -116,7 +119,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4 # Use the upload-artifact action v4
         with:
-          name: my-build-artifact # The name of the artifact
+          name: library-${{ matrix.os }}-${{ matrix.environement }}-${{ env.BUILD_DATE }} # The name of the artifact
           path: Project/GNU/Library/libmediainfo.*
 
   MSBuild:
