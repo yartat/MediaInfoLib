@@ -44,6 +44,7 @@ WebM;;;M;Mkv;;webm;video/webm;http://www.webmproject.org/;
 Windows Media;;;M;Wm;;asf dvr-ms wma wmv;video/x-ms-wmv;;
 WTV;;;M;Wtv;;wtv;;;
 AV1;;;V;Av1;AOMedia Video 1;;;http://aomedia.org/
+AV2;;;V;Av2;AOMedia Video 2;;;http://aomedia.org/
 AVC;;;V;Avc;Advanced Video Codec;avc h264 264;video/H264;http://developers.videolan.org/x264.html
 AVS Video;;;V;AvsV;Audio Video Standard, Video part;;;http://www.avs.org.cn/;Lossy
 AVS3 Video;;;V;Avs3V;Audio Video Standard 3, Video part;avs3;;http://www.avs.org.cn/;Lossy
@@ -126,6 +127,7 @@ Vorbis;;;A;;;;audio/vorbis;http://www.vorbis.com/;Lossy
 Wave;;;A;Riff;;act at9 wav;audio/vnd.wave;;
 Wave64;;;A;Riff;;w64;;;
 WavPack;;;A;Wvpk;;wv wvc;;http://www.wavpack.com;
+APNG;;;I;Png;Animated Portable Network Graphic;apng png pns;image/apng;http://www.w3.org/TR/png/;Lossless
 Arri Raw;;;I;ArriRaw;;ari;;;
 ARW;;;I;Tiff;Sony Alpha RAW;arw;image/x-sony-arw;http://www.sony.com/;
 Bitmap;;;I;Bmp;;bmp bms;image/bmp;;Lossless
@@ -145,7 +147,7 @@ MNG;;;I;Mng;Multiple-Image Network Graphic;mng;;;Lossless
 NEF;;;I;Tiff;Nikon Electronic Format;nef;image/x-nikon-nef;http://www.nikon.com/;
 NRW;;;I;Tiff;Nikon RAW;nrw;image/x-nikon-nrw;http://www.nikon.com/;
 PCX;;;I;pcx;Personal Computer eXchange;pcx;image/pcx;;Lossless
-PNG;;;I;Png;Portable Network Graphic;png pns;image/png;;Lossless
+PNG;;;I;Png;Portable Network Graphic;png pns;image/png;http://www.w3.org/TR/png/;Lossless
 PSD;;;I;Psd;Photoshop File Format;psd;image/psd;http://www.adobe.com/;Lossless
 RIFF Palette;;;I;Riff;RIFF Palette;;;;
 RLE;;;I;;Run-length encoding;rle;;;
@@ -157,7 +159,7 @@ ELF;;;C;Elf;;so;;;
 ISO 9660;;;C;Iso9660;;iso;;;
 Mach-O;;;C;MachO;;o dylib kext;;;
 Mach-O Universal;;;C;MachO;;o dylib kext;;;
-MZ;;;C;Mz;;exe dll;;;
+MZ;;;C;Mz;;exe dll efi;;;
 RAR;;;C;Rar;From Rarlabs;rar;application/x-rar-compressed;http://rarlabs.com;
 ZIP;;;C;Zip;;zip docx odt xlsx ods;application/zip;http://winzip.com;
 Adobe encore DVD;;;T;Other;;txt;;http://www.adobe.fr/products/encore/;Lossless
