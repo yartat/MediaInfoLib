@@ -54,8 +54,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Set current date as environment variable
-         run: echo "BUILD_DATE=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
-         shell: bash
+        run: echo "BUILD_DATE=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+        shell: bash
       - name: Dependencies
         if: ${{ runner.os != 'Windows' }}
         run: |
