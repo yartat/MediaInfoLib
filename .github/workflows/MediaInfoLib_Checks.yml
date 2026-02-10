@@ -100,7 +100,7 @@ jobs:
           sudo npm install -g jsonlint
           cd Project/GNU/Library
           make check
-          find . -type f >> Project/GNU/Library/libmediainfo.files
+          find . -type f >> ./libmediainfo.files
       - name: CMake Build
         if: ${{ (matrix.environement == 'cmake') || (matrix.environement == 'cmake-dll') }}
         shell: bash
@@ -118,8 +118,8 @@ jobs:
           cmake -DBUILD_ZENLIB=1 -DZLIB_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release ${{ matrix.environement == 'cmake-dll' && '-DBUILD_SHARED_LIBS=ON' || '' }} ..
           cmake --build . ${{ runner.os == 'Windows' && '--config Release' || '-j4' }}
           # List all files from Project/GNU/Library with all subdirectories
-          find Project/GNU/Library -type f >> Project/GNU/Library/libmediainfo.files
-          find . -type f >> Project/GNU/Library/libmediainfo.cmakefiles
+          find Project/GNU/Library -type f >> ../../GNU/Library/libmediainfo.files
+          find . -type f >> ../../GNU/Library/libmediainfo.cmakefiles
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
