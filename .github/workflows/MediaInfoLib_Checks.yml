@@ -118,7 +118,7 @@ jobs:
           cmake -DBUILD_ZENLIB=1 -DZLIB_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release ${{ matrix.environement == 'cmake-dll' && '-DBUILD_SHARED_LIBS=ON' || '' }} ..
           cmake --build . ${{ runner.os == 'Windows' && '--config Release' || '-j4' }}
           # List all files from Project/GNU/Library with all subdirectories
-          find Project/GNU/Library -type f >> ../../GNU/Library/libmediainfo.files
+          find ../../GNU/Library -type f >> ../../GNU/Library/libmediainfo.files
           find . -type f >> ../../GNU/Library/libmediainfo.cmakefiles
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
