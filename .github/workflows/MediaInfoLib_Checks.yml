@@ -52,7 +52,7 @@ jobs:
       RUN_TESTS: ${{ matrix.RUN_TESTS }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Set current date as environment variable
         run: echo "BUILD_DATE=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
         shell: bash
@@ -100,6 +100,7 @@ jobs:
           sudo npm install -g jsonlint
           cd Project/GNU/Library
           make check
+          find . -type f >> Project/GNU/Library/libmediainfo.files
       - name: CMake Build
         if: ${{ (matrix.environement == 'cmake') || (matrix.environement == 'cmake-dll') }}
         shell: bash
@@ -116,6 +117,9 @@ jobs:
           cd Project/CMake/Build
           cmake -DBUILD_ZENLIB=1 -DZLIB_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release ${{ matrix.environement == 'cmake-dll' && '-DBUILD_SHARED_LIBS=ON' || '' }} ..
           cmake --build . ${{ runner.os == 'Windows' && '--config Release' || '-j4' }}
+          # List all files from Project/GNU/Library with all subdirectories
+          find Project/GNU/Library -type f >> Project/GNU/Library/libmediainfo.files
+          find . -type f >> Project/GNU/Library/libmediainfo.cmakefiles
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -131,17 +135,17 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout zlib
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: MediaArea/zlib
           path: zlib
       - name: Checkout ZenLib
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: MediaArea/ZenLib
           path: ZenLib
       - name: Checkout MediaInfoLib
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: MediaInfoLib
       - name: Put current date into a variable
@@ -150,7 +154,7 @@ jobs:
           echo "BUILD_DATE=$BUILD_DATE" >> $env:GITHUB_ENV
       - name: Use variable
         run: |
-          echo "${{env.NOW}}"
+          echo "${{ env.BUILD_DATE }}"
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v2
         with:
