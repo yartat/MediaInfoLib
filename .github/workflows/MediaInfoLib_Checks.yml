@@ -6,7 +6,7 @@ jobs:
   Build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-14, macos-14-large, macos-15-large, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-14, macos-latest, windows-latest]
         environement: [gcc, utf8, minified, minimal, minimal-with-xml, cmake, cmake-dll]
         exclude:
           - os: macos-latest
@@ -132,7 +132,7 @@ jobs:
           sudo npm install -g jsonlint
           cd Project/GNU/Library
           make check
-          \cp -rf .libs/libmediainfo.* .
+          rsync -a --ignore-existing .libs/libmediainfo.* .
       - name: CMake Build
         if: ${{ (matrix.environement == 'cmake') || (matrix.environement == 'cmake-dll') }}
         shell: bash
