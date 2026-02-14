@@ -132,7 +132,7 @@ jobs:
           sudo npm install -g jsonlint
           cd Project/GNU/Library
           make check
-          cp .libs/libmediainfo.* .
+          \cp -rf .libs/libmediainfo.* .
       - name: CMake Build
         if: ${{ (matrix.environement == 'cmake') || (matrix.environement == 'cmake-dll') }}
         shell: bash
