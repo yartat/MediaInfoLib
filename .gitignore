@@ -23,6 +23,7 @@
 *.zip
 __history
 bin
+/build/
 Debug
 Debug_Ansi
 Debug_Build
@@ -47,6 +48,7 @@ MediaInfoLib.VC.db
 *.VC.db-shm
 *.VC.db-wal
 .vs/
+.vscode/
 *.GhostDoc.xml
 
 # Visual Studio 2015+ cache/options directory
