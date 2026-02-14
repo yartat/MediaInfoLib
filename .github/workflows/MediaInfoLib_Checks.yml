@@ -17,6 +17,8 @@ jobs:
             environement: minimal-with-xml
           - os: macos-latest
             environement: cmake-dll
+          - os: macos-latest
+            environement: utf8
           - os: macos-14
             environement: minified
           - os: macos-14
@@ -25,6 +27,8 @@ jobs:
             environement: minimal-with-xml
           - os: macos-14
             environement: cmake-dll
+          - os: macos-14
+            environement: utf8
           - os: macos-14-large
             environement: minified
           - os: macos-14-large
@@ -33,6 +37,8 @@ jobs:
             environement: minimal-with-xml
           - os: macos-14-large
             environement: cmake-dll
+          - os: macos-14-large
+            environement: utf8
           - os: macos-15-large
             environement: minified
           - os: macos-15-large
@@ -41,6 +47,8 @@ jobs:
             environement: minimal-with-xml
           - os: macos-15-large
             environement: cmake-dll
+          - os: macos-15-large
+            environement: utf8
           - os: windows-latest
             environement: gcc
           - os: windows-latest
@@ -124,7 +132,7 @@ jobs:
           sudo npm install -g jsonlint
           cd Project/GNU/Library
           make check
-          find . -type f >> ./libmediainfo.files
+          cp .libs/libmediainfo.* .
       - name: CMake Build
         if: ${{ (matrix.environement == 'cmake') || (matrix.environement == 'cmake-dll') }}
         shell: bash
@@ -142,8 +150,6 @@ jobs:
           cmake -DBUILD_ZENLIB=1 -DZLIB_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release ${{ matrix.environement == 'cmake-dll' && '-DBUILD_SHARED_LIBS=ON' || '' }} ..
           cmake --build . ${{ runner.os == 'Windows' && '--config Release' || '-j4' }}
           # List all files from Project/GNU/Library with all subdirectories
-          find ../../GNU/Library -type f >> ../../GNU/Library/libmediainfo.files
-          find . -type f >> ../../GNU/Library/libmediainfo.cmakefiles
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -192,5 +198,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: library-${{ matrix.os }}-${{ matrix.architecture }}-${{ env.BUILD_DATE }}
-          path: Project/GNU/Library/libmediainfo.*
+          path: Project/MSVC2022/Dll/*/mediainfo.*
           retention-days: 7
