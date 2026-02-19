@@ -6902,6 +6902,8 @@ void File_Adm::Streams_Fill()
                 }
                 for (size_t j = 0; j < metadataSegment_Element_Max; j++) {
                     if (!metadataSegmentPerElement[j]) {
+                        if (Items.empty())
+                            Items.resize(1);
                         Items[0].AddError(Error, ':' + CraftName(item_Infos[item_metadataSegment].Name) + ":GeneralCompliance:" + metadataSegment_Elements[j].Name + " is missing", Source_DolbyE_1_2);
                     }
                 }
