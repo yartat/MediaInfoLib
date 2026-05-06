@@ -131,7 +131,7 @@ static float32 TimeCodeToFloat(string v)
                   + (v[7] - '0')                       ;
     if (v.size() < 9 || v[8] != '.')
         return Value;
-    int i = 9;
+    size_t i = 9;
     int32u ValueF = 0;
     int ValueF_Exponent = 0;
     const int Exponent_Max = 9;
@@ -3384,6 +3384,7 @@ static void CheckErrors_Attributes(file_adm_private* File_Adm_Private, item Item
         if (!Count_Max1 || Info.Flags[Atmos1] || (/*File_Adm_Private->Schema != Schema_ebuCore_2014 ||*/ strcmp(Info.Name, "typeLabel") && strcmp(Info.Name, "typeDefinition"))) {
             // Handling generic errors from arrays
             for (int k = 0; k < Info_Flag_Max; k++) {
+                #pragma warning(suppress: 6297, justification: "shifting k by 2 will not overflow an int")
                 if (!Info.Flags[Count0 + Count_Max1 + (k << 2)]) {
                     Item.AddError(Error, 0x80 | (int8u)j, E((unsigned)E::Present0 + Count_Max1), 0, (source)k);
                 }
@@ -3436,6 +3437,7 @@ static void CheckErrors_Elements(file_adm_private* File_Adm_Private, item Item_T
         if (true) {
             // Handling generic errors from arrays
             for (int k = 0; k < Info_Flag_Max; k++) {
+                #pragma warning(suppress: 6297, justification: "shifting k by 2 will not overflow an int")
                 if (!Info.Flags[Count0 + Count_Max2 + (k << 2)]) {
                     Item.AddError(Error, j, E((unsigned)E::Present0 + Count_Max2), Count <= (int8u)-1 ? (int8u)Count : (int8u)-1, (source)k);
                 }
@@ -4358,7 +4360,7 @@ void audioBlockFormat_Check(file_adm_private* File_Adm_Private) {
                 auto Max = (is_cartesian || k == audioBlockFormat_depth) ? 1 : 360;
                 char* End;
                 auto Value = strtof(Element.c_str(), &End);
-                if (End - Element.c_str() < Element.size()) {
+                if ((size_t)(End - Element.c_str()) < Element.size()) {
                     BlockFormat.AddError(Error, string(1, ':') + (*item_Infos[item_audioBlockFormat].Element_Infos)[k].Name + ':' + (*item_Infos[item_audioBlockFormat].Element_Infos)[k].Name + " element value \"" + Element + "\" is malformed");
                 }
                 else if (Value < 0 || Value > Max) {
@@ -6094,7 +6096,7 @@ static void FillErrors(file_adm_private* File_Adm_Private, const item item_Type,
                             switch ((E)ErrorType) {
                             case E::Form:
                             case E::Permitted:
-                                if (Opt0 < File_Adm_Private->Errors_Tips[k][l].size()) {
+                                if ((size_t)Opt0 < File_Adm_Private->Errors_Tips[k][l].size()) {
                                     Value.insert(Pos, File_Adm_Private->Errors_Tips[k][l][Opt0]);
                                 }
                                 break;
@@ -6383,12 +6385,12 @@ void File_Adm::Streams_Fill()
                 }
             }
         }
-        for (size_t j = 0; j < (PosCommon == 0 ? 1 : PosCommon); j++)
+        for (size_t j = 0; j < (size_t)(PosCommon == 0 ? 1 : PosCommon); j++)
         {
             if (profileInfos[0].Strings[j].empty()) {
                 continue;
             }
-            Fill(Stream_Audio, 0, (string("AdmProfile_") + profile_names_InternalID[j]).c_str(), j < PosCommon ? profileInfos[0].Strings[j] : "Multiple");
+            Fill(Stream_Audio, 0, (string("AdmProfile_") + profile_names_InternalID[j]).c_str(), j < (size_t)PosCommon ? profileInfos[0].Strings[j] : "Multiple");
             Fill_SetOptions(Stream_Audio, 0, (string("AdmProfile_") + profile_names_InternalID[j]).c_str(), "N NTY");
         }
     }
@@ -6902,6 +6904,8 @@ void File_Adm::Streams_Fill()
                 }
                 for (size_t j = 0; j < metadataSegment_Element_Max; j++) {
                     if (!metadataSegmentPerElement[j]) {
+                        if (Items.empty())
+                            Items.resize(1);
                         Items[0].AddError(Error, ':' + CraftName(item_Infos[item_metadataSegment].Name) + ":GeneralCompliance:" + metadataSegment_Elements[j].Name + " is missing", Source_DolbyE_1_2);
                     }
                 }
@@ -7507,7 +7511,7 @@ void File_Adm::Streams_Fill()
             const auto& Element = TrackUID.Attributes[audioTrackUID_sampleRate];
             char* End;
             auto Value = strtof(Element.c_str(), &End);
-            if (End - Element.c_str() < Element.size()) {
+            if ((size_t)(End - Element.c_str()) < Element.size()) {
                 TrackUID.AddError(Error, ":audioTrackUID" + to_string(i) + ":sampleRate:sampleRate attribute value \"" + Element + "\" is malformed");
             }
             else if (IsAtmos && Value != 48000 && Value != 96000) {
@@ -7519,7 +7523,7 @@ void File_Adm::Streams_Fill()
             const auto& Element = TrackUID.Attributes[audioTrackUID_bitDepth];
             char* End;
             auto Value = strtof(Element.c_str(), &End);
-            if (End - Element.c_str() < Element.size()) {
+            if ((size_t)(End - Element.c_str()) < Element.size()) {
                 TrackUID.AddError(Error, ":audioTrackUID" + to_string(i) + ":bitDepth:bitDepth attribute value \"" + Element + "\" is malformed");
             }
             else if (IsAtmos && Value != 24) {

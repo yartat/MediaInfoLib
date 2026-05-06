@@ -420,8 +420,8 @@ struct FindReplaceCompany_struct {
 };
 
 static const FindReplaceCompany_struct Model_Replace[] = {
-    { "Canon", Model_Replace_Canon, {} },
-    { "OpenCube", Model_Replace_OpenCube, {} },
+    { "Canon", Model_Replace_Canon, nullptr },
+    { "OpenCube", Model_Replace_OpenCube, nullptr },
 }; 
 
 //---------------------------------------------------------------------------
@@ -2098,7 +2098,7 @@ static const FindReplaceCompany_struct Model_Name[] = {
     { "Sony", Model_Name_Sony, "Xperia " },
     { "Sony Ericsson", Model_Name_Sony_Ericsson, "Xperia " },
     { "Samsung", Model_Name_Samsung, "Galaxy " },
-    { "Xiaomi", Model_Name_Xiaomi, {} },
+    { "Xiaomi", Model_Name_Xiaomi, nullptr },
 };
 
 //---------------------------------------------------------------------------
@@ -4035,8 +4035,12 @@ void File__Analyze::Streams_Finish_StreamOnly_Video(size_t Pos)
      || Retrieve(Stream_Video, Pos, Video_MasteringDisplay_ColorPrimaries).empty()
         ))
     {
-        //We actually fill HDR10/HDR10+ by default, so it will be removed below if not fitting in the color related rules
-        Clear(Stream_Video, Pos, Video_HDR_Format_Compatibility);
+        //If HDR10+ Profile A with HLG, it is actually HLG+
+        if (Retrieve(Stream_Video, Pos, Video_transfer_characteristics) == __T("HLG") && Retrieve(Stream_Video, Pos, Video_HDR_Format_Compatibility).rfind(__T("HDR10+ Profile A"), 0) == 0)
+            Fill(Stream_Video, Pos, Video_HDR_Format_Compatibility, "HLG+", Unlimited, true, true);
+        else
+            //We actually fill HDR10/HDR10+ by default, so it will be removed below if not fitting in the color related rules
+            Clear(Stream_Video, Pos, Video_HDR_Format_Compatibility);
     }
     if (Retrieve(Stream_Video, Pos, Video_HDR_Format_String).empty())
     {
@@ -4967,8 +4971,7 @@ void File__Analyze::Streams_Finish_InterStreams()
                 continue;
             for (size_t StreamPos=0; StreamPos<Count_Get((stream_t)StreamKind); StreamPos++)
             {
-                if (!IsValid)
-                    IsValid=true;
+                IsValid=true;
                 if (Retrieve((stream_t)StreamKind, StreamPos, Fill_Parameter((stream_t)StreamKind, Generic_BitRate_Mode))!=__T("CBR"))
                     IsCBR=false;
                 if (Retrieve((stream_t)StreamKind, StreamPos, Fill_Parameter((stream_t)StreamKind, Generic_BitRate_Mode))==__T("VBR"))

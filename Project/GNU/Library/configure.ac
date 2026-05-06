@@ -119,6 +119,7 @@ AC_ARG_ENABLE(tta,     AC_HELP_STRING([--disable-tta],     [Disable Audio - True
 AC_ARG_ENABLE(twinvq,  AC_HELP_STRING([--disable-twinvq],  [Disable Audio - TwinVQ]),                                     MediaInfoTwinVQ=$enableval,  MediaInfoTwinVQ=depend)
 AC_ARG_ENABLE(vorbis,  AC_HELP_STRING([--disable-vorbis],  [Disable Audio - Vorbis]),                                     MediaInfovorbis=$enableval,  MediaInfovorbis=depend)
 AC_ARG_ENABLE(wvpk,    AC_HELP_STRING([--disable-wvpk],    [Disable Audio - Wavepack]),                                   MediaInfoWvpk=$enableval,    MediaInfoWvpk=depend)
+AC_ARG_ENABLE(amigaicon, AC_HELP_STRING([--disable-amigaicon], [Disable Image - Amiga Icon]),                              MediaInfoAmigaIcon=$enableval, MediaInfoAmigaIcon=depend)
 AC_ARG_ENABLE(arriraw, AC_HELP_STRING([--disable-arriraw], [Disable Image - Arri Raw]),                                   MediaInfoArriRaw=$enableval, MediaInfoArriRaw=depend)
 AC_ARG_ENABLE(bmp,     AC_HELP_STRING([--disable-bmp],     [Disable Image - Bitmap]),                                     MediaInfoBmp=$enableval,     MediaInfoBmp=depend)
 AC_ARG_ENABLE(bpg,     AC_HELP_STRING([--disable-bpg],     [Disable Image - BPG]),                                        MediaInfoBpg=$enableval,     MediaInfoBpg=depend)
@@ -194,6 +195,7 @@ AC_ARG_ENABLE(pdf,     AC_HELP_STRING([--disable-pdf] ,    [Disable Text - PDF])
 AC_ARG_ENABLE(pgs,     AC_HELP_STRING([--disable-pgs] ,    [Disable Text - PGS]),                                         MediaInfoPgs=$enableval,     MediaInfoPgs=depend)
 AC_ARG_ENABLE(scc,     AC_HELP_STRING([--disable-scc] ,    [Disable Text - SCC]),                                         MediaInfoScc=$enableval,     MediaInfoScc=depend)
 AC_ARG_ENABLE(aic,     AC_HELP_STRING([--disable-aic],     [Disable Video - AIC (Apple Intermediate Codec)]),             MediaInfoAic=$enableval,     MediaInfoAic=depend)
+AC_ARG_ENABLE(apv,     AC_HELP_STRING([--disable-apv],     [Disable Video - Advanced Professional Video (APV)]),      	  MediaInfoApv=$enableval,     MediaInfoApv=depend)
 AC_ARG_ENABLE(av1,     AC_HELP_STRING([--disable-av1],     [Disable Video - AOMedia Video 1 (AV1)]),                      MediaInfoAv1=$enableval,     MediaInfoAv1=depend)
 AC_ARG_ENABLE(av2,     AC_HELP_STRING([--disable-av2],     [Disable Video - AOMedia Video 2 (AV2)]),                      MediaInfoAv2=$enableval,     MediaInfoAv2=depend)
 AC_ARG_ENABLE(avc,     AC_HELP_STRING([--disable-avc],     [Disable Video - AVC/H264]),                                   MediaInfoAvc=$enableval,     MediaInfoAvc=depend)
@@ -300,6 +302,7 @@ if test "$MediaInfoTta"     = "no";  then AC_DEFINE(MEDIAINFO_TTA_NO)     fi; if
 if test "$MediaInfoTwinVQ"  = "no";  then AC_DEFINE(MEDIAINFO_TWINVQ_NO)  fi; if test "$MediaInfoTwinVQ"  = "yes"; then AC_DEFINE(MEDIAINFO_TWINVQ_YES)  fi
 if test "$MediaInfoVorbis"  = "no";  then AC_DEFINE(MEDIAINFO_VORBIS_NO)  fi; if test "$MediaInfoVorbis"  = "yes"; then AC_DEFINE(MEDIAINFO_VORBIS_YES)  fi
 if test "$MediaInfoWvpk"    = "no";  then AC_DEFINE(MEDIAINFO_WVPK_NO)    fi; if test "$MediaInfoWvpk"    = "yes"; then AC_DEFINE(MEDIAINFO_WVPK_YES)    fi
+if test "$MediaInfoAmigaIcon" = "no";  then AC_DEFINE(MEDIAINFO_AMIGAICON_NO) fi; if test "$MediaInfoAmigaIcon" = "yes"; then AC_DEFINE(MEDIAINFO_AMIGAICON_YES) fi
 if test "$MediaInfoArriRaw" = "no";  then AC_DEFINE(MEDIAINFO_ARRIRAW_NO) fi; if test "$MediaInfoArriRaw" = "yes"; then AC_DEFINE(MEDIAINFO_ARRIRAW_YES) fi
 if test "$MediaInfoBmp"     = "no";  then AC_DEFINE(MEDIAINFO_BMP_NO)     fi; if test "$MediaInfoBmp"     = "yes"; then AC_DEFINE(MEDIAINFO_BMP_YES)     fi
 if test "$MediaInfoBpg"     = "no";  then AC_DEFINE(MEDIAINFO_BPG_NO)     fi; if test "$MediaInfoBpg"     = "yes"; then AC_DEFINE(MEDIAINFO_BPG_YES)     fi
@@ -374,6 +377,7 @@ if test "$MediaInfoPdf"     = "no";  then AC_DEFINE(MEDIAINFO_PDF_NO)     fi; if
 if test "$MediaInfoPgs"     = "no";  then AC_DEFINE(MEDIAINFO_PGS_NO)     fi; if test "$MediaInfoPgs"     = "yes"; then AC_DEFINE(MEDIAINFO_PGS_YES)     fi
 if test "$MediaInfoScc"     = "no";  then AC_DEFINE(MEDIAINFO_SCC_NO)     fi; if test "$MediaInfoScc"     = "yes"; then AC_DEFINE(MEDIAINFO_SCC_YES)     fi
 if test "$MediaInfoAic"     = "no";  then AC_DEFINE(MEDIAINFO_AIC_NO)     fi; if test "$MediaInfoAic"     = "yes"; then AC_DEFINE(MEDIAINFO_AIC_YES)     fi
+if test "$MediaInfoApv"     = "no";  then AC_DEFINE(MEDIAINFO_APV_NO)     fi; if test "$MediaInfoApv"     = "yes"; then AC_DEFINE(MEDIAINFO_APV_YES)     fi
 if test "$MediaInfoAv1"     = "no";  then AC_DEFINE(MEDIAINFO_AV1_NO)     fi; if test "$MediaInfoAv1"     = "yes"; then AC_DEFINE(MEDIAINFO_AV1_YES)     fi
 if test "$MediaInfoAv2"     = "no";  then AC_DEFINE(MEDIAINFO_AV2_NO)     fi; if test "$MediaInfoAv2"     = "yes"; then AC_DEFINE(MEDIAINFO_AV2_YES)     fi
 if test "$MediaInfoAvc"     = "no";  then AC_DEFINE(MEDIAINFO_AVC_NO)     fi; if test "$MediaInfoAvc"     = "yes"; then AC_DEFINE(MEDIAINFO_AVC_YES)     fi
@@ -1076,6 +1080,7 @@ Mcho "Tta    " "$MediaInfoTta"
 Mcho "TwinVQ " "$MediaInfoTwinVQ"
 Mcho "Vorbis " "$MediaInfoVorbis"
 Mcho "Wvpk   " "$MediaInfoWvpk"
+Mcho "AmigaIcon" "$MediaInfoAmigaIcon"
 Mcho "ArriRaw" "$MediaInfoArriRaw"
 Mcho "Bmp    " "$MediaInfoBmp"
 Mcho "Bpg    " "$MediaInfoBpg"
@@ -1149,6 +1154,7 @@ Mcho "Pdf    " "$MediaInfoPdf"
 Mcho "Pgs    " "$MediaInfoPgs"
 Mcho "Scc    " "$MediaInfoScc"
 Mcho "Aic    " "$MediaInfoAic"
+Mcho "Apv    " "$MediaInfoApv"
 Mcho "Av1    " "$MediaInfoAv1"
 Mcho "Av2    " "$MediaInfoAv2"
 Mcho "Avc    " "$MediaInfoAvc"

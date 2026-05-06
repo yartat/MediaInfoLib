@@ -1961,7 +1961,7 @@ void File_Usac::Streams_Finish_Conformance()
 void File_Usac::numPreRollFrames_Check(usac_config& CurrentConf, int32u numPreRollFrames, const string& numPreRollFramesConchString)
 {
     string FieldName = numPreRollFramesConchString.substr(numPreRollFramesConchString.rfind(' ') + 1);
-    int numPreRollFrames_Max;
+    int32u numPreRollFrames_Max;
     if (CurrentConf.coreSbrFrameLengthIndex >= coreSbrFrameLengthIndex_Mapping_Size || coreSbrFrameLengthIndex_Mapping[CurrentConf.coreSbrFrameLengthIndex].sbrRatioIndex)
     {
         if (CurrentConf.harmonicSBR)
@@ -2867,7 +2867,6 @@ void File_Usac::uniDrcConfigExtension()
                     #if MEDIAINFO_CONFORMANCE
                         if (C.drcSetEffect && (C.drcSetEffect & 0x27) != 0x27) // If one of the 8 first bits is set, bits (1 is LSB) 1, 2, 3, 6 must be set
                         {
-                            string Value;
                             for (int8u i = 0; i < 6; i++)
                             {
                                 if (!(C.drcSetEffect & (1 << i)))
@@ -3248,7 +3247,7 @@ bool File_Usac::drcInstructionsUniDrc(bool V1, bool NoV0)
             continue; // 0 means not present
         Element_Begin1("DrcChannel");
         int8s gainSetIndex=*DrcChannelGroup-1;
-        int8u bandCount=V1?(gainSetIndex<C.gainSets.size()?C.gainSets[gainSetIndex].bandCount:0):1;
+        int8u bandCount=V1?(gainSetIndex<(int64s)C.gainSets.size()?C.gainSets[gainSetIndex].bandCount:0):1;
         for (int8u k=0; k<bandCount; k++)
         {
             Element_Begin1("band");
@@ -3500,7 +3499,6 @@ bool File_Usac::loudnessInfo(bool FromAlbum, bool V1)
         Element_Begin1("measurement");
         int8u methodDefinition, methodValue, measurementSystem, reliability;
         Get_S1 (4, methodDefinition,                            "methodDefinition"); Param_Info1C(methodDefinition && methodDefinition<=LoudnessMeaning_Size, LoudnessMeaning[methodDefinition-1]);
-        int8u Size;
         if (methodDefinition>=methodDefinition_Format_Size)
         {
             Param_Info1("(Unsupported)");

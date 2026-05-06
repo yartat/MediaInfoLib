@@ -147,7 +147,7 @@ jobs:
           fi
           mkdir Project/CMake/Build
           cd Project/CMake/Build
-          cmake -DBUILD_ZENLIB=1 -DZLIB_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release ${{ matrix.environement == 'cmake-dll' && '-DBUILD_SHARED_LIBS=ON' || '' }} ..
+          cmake -DBUILD_ZENLIB=1 -DZLIB_BUILD_SHARED=OFF -DZLIB_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release ${{ matrix.environement == 'cmake-dll' && '-DBUILD_SHARED_LIBS=ON' || '' }} ..
           cmake --build . ${{ runner.os == 'Windows' && '--config Release' || '-j4' }}
           # List all files from Project/GNU/Library with all subdirectories
       - name: Upload build artifacts
@@ -188,7 +188,7 @@ jobs:
         run: |
           echo "${{ env.BUILD_DATE }}"
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
         with:
           msbuild-architecture: x64
       - name: Build

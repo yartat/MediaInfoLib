@@ -106,7 +106,7 @@ static tag_struct Mpeg_Descriptors_video_properties_tag_1=
     {  9, 14,  0, 1},
     { 12,  1,  6, 1},
 };
-static int8u Mpeg_Descriptors_video_properties_tag_1_Size=sizeof(Mpeg_Descriptors_video_properties_tag_0)/sizeof(Mpeg_Descriptors_video_properties_tag_0[0]);
+static int8u Mpeg_Descriptors_video_properties_tag_1_Size=sizeof(Mpeg_Descriptors_video_properties_tag_1)/sizeof(Mpeg_Descriptors_video_properties_tag_1[0]);
 static tag_struct Mpeg_Descriptors_video_properties_tag_2=
 {
     {  9, 16,  9, 0},
@@ -115,7 +115,7 @@ static tag_struct Mpeg_Descriptors_video_properties_tag_2=
     {  9, 16,  0, 0},
     {  9, 18,  0, 0},
 };
-static int8u Mpeg_Descriptors_video_properties_tag_2_Size=sizeof(Mpeg_Descriptors_video_properties_tag_0)/sizeof(Mpeg_Descriptors_video_properties_tag_0[0]);
+static int8u Mpeg_Descriptors_video_properties_tag_2_Size=sizeof(Mpeg_Descriptors_video_properties_tag_2)/sizeof(Mpeg_Descriptors_video_properties_tag_2[0]);
 static int8u Mpeg_Descriptors_video_properties_tag_Sizes[]=
 {
     Mpeg_Descriptors_video_properties_tag_0_Size,
@@ -2717,7 +2717,7 @@ void File_Mpeg_Descriptors::Descriptor_3F_14()
 {
     //Parsing
     int32u brat, max_buffer_size;
-    int16u horizontal_size, vertical_size, Framerate_Numerator, Ppih, Plev, MaxCLL, MaxFALL;
+    int16u horizontal_size, vertical_size, Framerate_Numerator, Ppih, Plev;
     int8u Interlace_Mode, Framerate_Denominator, Sample_Bitdepth, Sampling_Structure, descriptor_version, colour_primaries, transfer_characteristics, matrix_coefficients;
     bool schar_Valid_Flag, video_full_range_flag, mdm_flag;
     Get_B1 (descriptor_version,                                 "descriptor_version");
@@ -3576,16 +3576,10 @@ void File_Mpeg_Descriptors::Descriptor_7F_06()
     Get_S1 (5, editorial_classification,                        "editorial_classification");
     Skip_SB(                                                    "reserved_future_use");
     Get_SB (language_code_present,                              "language_code_present");
-    if (language_code_present)
-    {
-        BS_End();
-        Get_Local (3, Language,                                 "ISO_639_language_code");
-        BS_Begin();
-    }
-    if (language_code_present)
-    if (Data_BS_Remain())
-        Skip_BS(Data_BS_Remain(),                               "private_data_bytes");
     BS_End();
+    if (language_code_present)
+        Get_Local (3, Language,                                 "ISO_639_language_code");
+    Skip_XX(Element_Size - Element_Offset,                      "private_data_bytes");
 
     FILLING_BEGIN();
         if (elementary_PID_IsValid)
@@ -3689,7 +3683,6 @@ void File_Mpeg_Descriptors::Descriptor_7F_19()
     {
         Element_Begin1("preselection");
         Descriptor_7F_19_Info& Info=Infos[p];
-        int8u preselection_id;
         bool language_code_present, text_label_present, multi_stream_info_present, future_extension;
         Get_S1 (5, Info.preselection_id,                        "preselection_id");
         Get_S1 (3, Info.audio_rendering_indication,             "audio_rendering_indication");
@@ -4450,10 +4443,11 @@ void File_Mpeg_Descriptors::Get_DVB_Text(int64u Size, int32u LanguageCode, Ztrin
                     return; //Invalid
                 Size--;
                 Get_B1 (CodePage1,                              "CodePage2");
-                switch (CodePage1)
-                {
-                    default:     Get_ISO_8859_1(Size, Value,    Info); //Not implemented, trying best effort at least for letters <0x80
-                }
+                //switch (CodePage1)
+                //{
+                //    default:     
+                                 Get_ISO_8859_1(Size, Value,    Info); //Not implemented, trying best effort at least for letters <0x80
+                //}
                 break;
             case 0x11:
             case 0x14: Get_UTF16B(Size, Value,                  Info); break;
