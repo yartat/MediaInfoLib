@@ -2049,6 +2049,13 @@ void File_Usac::UsacConfig(size_t BitsNotIncluded)
             Fill_Conformance("Crosscheck AudioSpecificConfig samplingFrequency", ("MP4 AudioSpecificConfig samplingFrequency " + to_string(Frequency_b) + " does not match USAC UsacConfig usacSamplingFrequency " + to_string(C.sampling_frequency)).c_str());
     #endif
     Get_S1 (3, C.coreSbrFrameLengthIndex,                       "coreSbrFrameLengthIndex");
+    if (C.coreSbrFrameLengthIndex >= coreSbrFrameLengthIndex_Mapping_Size) {
+        #if MEDIAINFO_CONFORMANCE
+                Fill_Conformance("UsacConfig AudioSpecificConfig channelConfiguration", ("MP4 AudioSpecificConfig coreSbrFrameLengthIndex " + to_string(C.coreSbrFrameLengthIndex) + " is known as reserved in ISO/IEC 23003-3:2020, bitstream parsing is partial and may be wrong").c_str(), bitset8(), Info);
+        #endif
+        Param_Info1("Not supported");
+        return;
+    }
     Get_S1 (5, C.channelConfigurationIndex,                     "channelConfigurationIndex"); Param_Info1C(C.channelConfigurationIndex, Aac_ChannelLayout_GetString(C.channelConfigurationIndex));
     #if MEDIAINFO_CONFORMANCE
         if (channelConfiguration && C.channelConfigurationIndex && C.channelConfigurationIndex != channelConfiguration)
@@ -3402,7 +3409,7 @@ void File_Usac::fill_bytes(size_t usacConfigExtLength)
         {
             int8u fill_byte;
             Get_S1 (8, fill_byte,                               "fill_byte");
-            if (fill_byte != 0b10100101)
+            if (fill_byte != 0xA5)
                 fill_bytes[fill_byte]++;
         }
         if (!fill_bytes.empty())
