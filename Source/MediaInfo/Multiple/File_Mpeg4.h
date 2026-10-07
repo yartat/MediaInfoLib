@@ -240,6 +240,7 @@ private :
     void moov_trak_mdia_minf_stbl_stsd_xxxx_ccst();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_chan();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_chnl();
+    void moov_trak_mdia_minf_stbl_stsd_xxxx_acxd();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_clap();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_clli();
     void moov_trak_mdia_minf_stbl_stsd_xxxx_colr();
@@ -730,6 +731,7 @@ private :
         void Parsers_Clear()
         {
             Parsers.clear();
+            IsPcm=false;
             #ifdef MEDIAINFO_DVDIF_ANALYZE_YES
                 IsDvDif=false;
             #endif //MEDIAINFO_DVDIF_ANALYZE_YES
